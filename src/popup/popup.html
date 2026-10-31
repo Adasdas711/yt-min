@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Minimal YouTube</title>
+        <link rel="stylesheet" href="./popup.css" />
+    </head>
+    <body>
+        <main>
+            <header class="brand">
+                <svg class="brand__mark" viewBox="0 0 40 30" aria-hidden="true">
+                    <rect width="40" height="30" rx="10" fill="currentColor" />
+                    <path d="m16 9 11 6-11 6z" fill="#fff" />
+                </svg>
+                <div>
+                    <h1>Minimal YouTube</h1>
+                    <p id="tagline">More focus. Less noise.</p>
+                </div>
+            </header>
+            <label class="setting" for="toggle">
+                <span class="setting__copy">
+                    <span id="setting-title" class="setting__title">Focus mode</span>
+                    <span id="status" class="setting__status" aria-live="polite">Loading…</span>
+                </span>
+                <span class="switch">
+                    <input id="toggle" type="checkbox" role="switch" disabled aria-labelledby="setting-title" aria-describedby="details error" />
+                    <span class="switch__track" aria-hidden="true"></span>
+                </span>
+            </label>
+            <p id="details" class="details">A clean home, centered channels, and videos without Shorts or recommendations.</p>
+            <p id="error" class="error" role="alert" hidden></p>
+            <footer id="footer">Changes apply to open YouTube tabs.</footer>
+        </main>
+        <script src="./popup.js"></script>
+    </body>
+</html>
