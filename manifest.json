@@ -2,7 +2,7 @@
     "manifest_version": 3,
 
     "name": "Minimal YouTube",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "minimum_chrome_version": "105",
     "description": "A focused YouTube experience: clean search, centered channels and video pages, without recommendations or Shorts.",
     "author": "Ephraim Atta-Duncan",
@@ -17,7 +17,7 @@
         {
             "css": ["src/styles/styles.css"],
             "js": ["src/content/content.js"],
-            "run_at": "document_idle",
+            "run_at": "document_start",
             "matches": ["https://*.youtube.com/*"],
             "exclude_matches": ["https://music.youtube.com/*"]
         }

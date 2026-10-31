@@ -3,6 +3,7 @@
 Run: python tests/smoke.py (requires installed Playwright and Chromium).
 No live YouTube requests or unpacked-extension installation are performed.
 """
+import json
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -29,7 +30,34 @@ ytd-banner-header-renderer, tp-yt-paper-tabs { display: block; }
 ytd-page-manager { margin-left: 72px; }
 #header, #contents, #primary, #secondary { min-height: 30px; }
 video { width: 640px; height: 360px; object-fit: contain; }
+ytd-masthead { height: 56px; font-family: Arial, sans-serif; }
+html[dark] body { background: #0f0f0f; color: #f1f1f1; }
+ytd-masthead > #container { height: 56px; display: flex; align-items: center; justify-content: space-between; }
+ytd-masthead #start { display: flex; flex: 0 0 240px; width: 240px; }
+ytd-masthead #logo { display: block; width: 100px; height: 24px; }
+ytd-masthead #center { display: flex; flex: 0 1 640px; width: 640px; }
+ytd-masthead #end { width: 240px; }
+ytd-searchbox { display: block; width: 100%; }
+ytd-searchbox #search-form { display: flex; width: 100%; }
+ytd-searchbox #container { flex: 1; min-width: 0; }
+ytd-searchbox #container, ytd-searchbox #search-input { display: flex; align-items: center; height: 100%; }
+ytd-searchbox #search-input { width: 100%; }
+ytd-searchbox input#search { width: 100%; min-width: 0; }
+ytd-masthead input { border: 0; outline: none; background: transparent; font: inherit; }
+ytd-masthead #logo { color: inherit; text-decoration: none; }
+ytd-topbar-logo-renderer { display: block; width: 129px; padding: 16px; }
+ytd-masthead #logo { width: 129px; padding: 16px; }
+ytd-masthead #logo-icon { display: inline-block; width: 90px; height: 20px; }
+yt-searchbox { display: block; width: 100%; }
+.ytSearchboxComponentHost, .ytSearchboxComponentSearchForm { display: flex; width: 100%; }
+.ytSearchboxComponentInputBox { display: flex; align-items: center; flex: 1; min-width: 0; }
+.ytSearchboxComponentInput { width: 100%; min-width: 0; }
 </style>"""
+
+MASTHEAD = '''<ytd-masthead><div id="container"><div id="start"><ytd-topbar-logo-renderer><a id="logo" href="/" aria-label="YouTube"><span id="logo-icon"><svg viewBox="0 0 90 20" aria-hidden="true"><rect x="0" y="1" width="27" height="18" rx="5" fill="#ff0033"/><path d="m11 5 9 5-9 5z" fill="white"/><text x="31" y="16" font-family="Arial" font-weight="bold" font-size="15" fill="currentColor">YouTube</text></svg></span></a></ytd-topbar-logo-renderer></div>
+  <div id="center"><ytd-searchbox><form id="search-form" action="/results" method="get"><div id="container"><div id="search-input"><input id="search" name="search_query" aria-label="Search"></div></div><button id="search-icon-legacy" type="submit" aria-label="Search"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 5 5"/></svg></button></form></ytd-searchbox></div>
+  <div id="end"><div id="buttons"><button id="create">Create</button><button id="avatar-btn">Account</button></div></div>
+  <button id="voice-search-button">Voice</button></div></ytd-masthead>'''
 
 
 def document(body="", title="(12) YouTube"):
@@ -83,6 +111,16 @@ def centered(page, selector, tolerance=3):
     assert bounds["x"] >= 0 and bounds["x"] + bounds["width"] <= viewport + 1, bounds
 
 
+def centered_header(page):
+    logo = page.locator("#logo-icon svg").bounding_box()
+    search = page.locator("#search-form, .ytSearchboxComponentSearchForm").bounding_box()
+    assert logo and search, (logo, search)
+    left = min(logo["x"], search["x"])
+    right = max(logo["x"] + logo["width"], search["x"] + search["width"])
+    assert abs(left + right - page.viewport_size["width"]) < 3, (logo, search)
+    assert logo["y"] < search["y"] + search["height"] and search["y"] < logo["y"] + logo["height"]
+
+
 def navigate_spa(page, path):
     page.evaluate("""path => {
       history.pushState({}, '', path);
@@ -106,6 +144,24 @@ def assert_stable(page):
     assert mutations == 0, f"Watch UI keeps mutating after stabilization: {mutations}"
 
 
+def setup_at_document_start(browser, path, enabled=True, defer_settings=False):
+    page = browser.new_page(viewport={"width": 1440, "height": 960})
+    page.errors = []
+    page.on("pageerror", lambda error: page.errors.append(str(error)))
+    code = (ROOT / "src/content/content.js").read_text()
+    initial = json.dumps({"enabled": enabled})
+    script = f"({MOCK})({initial});\n"
+    if defer_settings:
+        script += "chrome.storage.local.get = (keys, cb) => { window.__resolveSettings = () => cb(window.__stored); };\n"
+    page.add_init_script(script=script + code)
+    html = document('<ytd-app id="early-app"><ytd-page-manager class="ytd-app"><p id="early-native">Native app</p></ytd-page-manager></ytd-app>')
+    probe = "<script>window.__earlyStartup = {enabled: document.documentElement.classList.contains('minimal-youtube'), page: document.documentElement.dataset.mytPage, bodyExists: !!document.body};</script>"
+    html = html.replace("</head>", f"<style>{(ROOT / 'src/styles/styles.css').read_text()}</style>{probe}</head>")
+    page.route("https://www.youtube.com/**", lambda route: route.fulfill(content_type="text/html", body=html))
+    page.goto("https://www.youtube.com" + path)
+    return page
+
+
 def main():
     passed = 0
 
@@ -122,6 +178,15 @@ def main():
         assert page.locator("#native-state").count() == 1, "Homepage must preserve YouTube's native DOM"
         expect(page).to_have_title("YouTube")
         centered(page, ".myt-search")
+        submit = page.locator(".myt-search__submit")
+        assert submit.text_content().strip() == "", "Homepage search should use an icon-only submit button"
+        assert submit.get_attribute("aria-label"), "Icon-only search needs an accessible name"
+        expect(submit.locator("svg")).to_have_count(1)
+        assert page.locator(".myt-search").evaluate("element => getComputedStyle(element).boxShadow") == "none"
+        home_bg = page.locator("#myt-home").evaluate("element => getComputedStyle(element).backgroundColor")
+        for selector in ["html", "body", "#native-app"]:
+            background = page.locator(selector).evaluate("element => getComputedStyle(element).backgroundColor")
+            assert background in [home_bg, "rgba(0, 0, 0, 0)"], (selector, background, home_bg)
         page.locator("#myt-query").fill("    ")
         page.locator(".myt-search__submit").click()
         assert page.url == "https://www.youtube.com/", "Empty search must stay on home"
@@ -235,6 +300,94 @@ def main():
         ok("initially disabled extension leaves Shorts and cards untouched")
         page.close()
 
+        page = setup(browser, "/results?search_query=shorts", '<ytd-app><div id="shelves"></div></ytd-app>')
+        immediate = page.evaluate("""() => {
+          document.querySelector('#shelves').innerHTML = `
+            <ytd-reel-shelf-renderer id="instant-old">Old Shorts</ytd-reel-shelf-renderer>
+            <ytd-rich-section-renderer id="instant-modern"><ytm-shorts-lockup-view-model><a href="/shorts/modern">Modern Short</a></ytm-shorts-lockup-view-model></ytd-rich-section-renderer>
+            <yt-horizontal-list-renderer id="mixed-shelf"><yt-lockup-view-model id="mixed-regular"><a href="/watch?v=normal">Ordinary video</a></yt-lockup-view-model><yt-lockup-view-model id="mixed-short"><a href="/shorts/mixed">Short</a></yt-lockup-view-model></yt-horizontal-list-renderer>
+            <ytd-video-renderer id="short-badge"><a href="/watch?v=badge">Short video</a><ytd-thumbnail-overlay-time-status-renderer overlay-style="SHORTS">0:30</ytd-thumbnail-overlay-time-status-renderer></ytd-video-renderer>
+            <ytd-video-renderer id="subdomain-short"><a href="https://m.youtube.com/shorts/subdomain">Mobile short</a></ytd-video-renderer>`;
+          return Object.fromEntries(['instant-old','instant-modern','mixed-short','mixed-regular'].map(id => [id, getComputedStyle(document.getElementById(id)).display]));
+        }""")
+        assert immediate["instant-old"] == immediate["instant-modern"] == immediate["mixed-short"] == "none", immediate
+        assert immediate["mixed-regular"] != "none", immediate
+        expect(page.locator("#mixed-regular")).to_be_visible()
+        expect(page.locator("#mixed-short")).to_have_attribute("data-myt-hidden", "shorts")
+        expect(page.locator("#short-badge")).to_be_hidden()
+        expect(page.locator("#subdomain-short")).to_be_hidden()
+        expect(page.locator("#instant-modern")).to_be_hidden()
+        ok("new Shorts shelves/cards hide before the next frame and mixed shelves preserve ordinary videos")
+        page.close()
+
+        for path, kind in [("/watch?v=early", "watch"), ("/results?search_query=early", "search"), ("/@creator/videos", "channel"), ("/", "home")]:
+            page = setup_at_document_start(browser, path)
+            early = page.evaluate("__earlyStartup")
+            assert early["enabled"] and early["page"] == kind and not early["bodyExists"], (path, early)
+            assert not page.errors, page.errors
+            assert page.locator("#early-native").count() == 1
+            if kind == "home":
+                expect(page.locator("#myt-home")).to_be_visible()
+            ok(f"document_start applies {kind} styling before body/app markup without initialization errors")
+            page.close()
+
+        page = setup_at_document_start(browser, "/watch?v=disabled", enabled=False, defer_settings=True)
+        expect(page).to_have_title("(12) YouTube")
+        assert page.locator("#myt-home").count() == 0
+        assert page.locator("#early-native").count() == 1
+        page.evaluate("__resolveSettings()")
+        expect(page.locator("html.minimal-youtube")).to_have_count(0)
+        expect(page).to_have_title("(12) YouTube")
+        assert not page.errors, page.errors
+        ok("delayed saved-disabled startup preserves native DOM/title and removes provisional styling")
+        page.close()
+
+        page = setup_at_document_start(browser, "/watch?v=history")
+        state = page.evaluate("""() => {
+          document.dispatchEvent(new CustomEvent('yt-navigate-start', {detail:{url:'/results?search_query=history'}}));
+          return {enabled:document.documentElement.classList.contains('minimal-youtube'), page:document.documentElement.dataset.mytPage};
+        }""")
+        assert state == {"enabled": True, "page": "search"}, state
+        navigate_spa(page, "/results?search_query=history")
+        expect(page.locator("html")).to_have_attribute("data-myt-page", "search")
+        page.go_back()
+        expect(page.locator("html")).to_have_attribute("data-myt-page", "watch")
+        page.go_forward()
+        expect(page.locator("html")).to_have_attribute("data-myt-page", "search")
+        page.evaluate("document.documentElement.className = 'native-theme'")
+        expect(page.locator("html.minimal-youtube")).to_have_count(1)
+        paints = page.evaluate("""async () => {
+          const states=[];
+          for(let n=0;n<4;n++){await new Promise(requestAnimationFrame); states.push({enabled:document.documentElement.classList.contains('minimal-youtube'),page:document.documentElement.dataset.mytPage});}
+          return states;
+        }""")
+        assert all(state == {"enabled": True, "page": "search"} for state in paints), paints
+        assert not page.errors, page.errors
+        ok("SPA start/finish, history back/forward and native html-class replacement keep styles active before paint")
+        page.close()
+
+        page = setup(browser, body='<ytd-app><ytd-page-manager class="ytd-app"><p id="preserved-home-state">Native app</p></ytd-page-manager></ytd-app>', theme="dark")
+        page.evaluate("document.dispatchEvent(new CustomEvent('yt-navigate-start', {detail:{url:'/results?search_query=delayed'}}))")
+        expect(page.locator("html")).to_have_attribute("data-myt-page", "search")
+        expect(page.locator("#myt-home")).to_be_visible()
+        page.evaluate("history.pushState({}, '', '/results?search_query=delayed')")
+        page.evaluate("async () => { for(let n=0;n<3;n++) await new Promise(requestAnimationFrame); }")
+        expect(page.locator("#myt-home")).to_be_visible()
+        page.locator("ytd-page-manager").evaluate("element => element.insertAdjacentHTML('beforeend', '<ytd-search id=ready-results>Results ready</ytd-search>')")
+        expect(page.locator("#myt-home")).to_have_count(0)
+        expect(page.locator("#ready-results")).to_be_visible()
+        assert page.locator("#preserved-home-state").count() == 1
+        ok("home overlay persists through pending/committed navigation until the native destination mounts")
+        page.close()
+
+        page = setup(browser)
+        page.evaluate("document.dispatchEvent(new CustomEvent('yt-navigate-start', {detail:{url:'/results?search_query=cancel'}})); document.dispatchEvent(new Event('yt-navigate-cancel'))")
+        expect(page.locator("#myt-home")).to_be_visible()
+        assert page.url == "https://www.youtube.com/"
+        expect(page.locator("html")).to_have_attribute("data-myt-page", "home")
+        ok("cancelled navigation keeps the home overlay and original route intact")
+        page.close()
+
         page = setup(browser, "/feed/subscriptions", '<ytd-app><ytd-page-manager class="ytd-app"><ytd-browse><div id="primary" style="width: 700px; margin-left: 37px">Subscriptions</div></ytd-browse></ytd-page-manager></ytd-app>')
         bounds = page.locator("#primary").bounding_box()
         assert bounds["width"] == 700 and bounds["x"] == 37, bounds
@@ -284,11 +437,7 @@ def main():
             ok(f"channel centered without horizontal overflow at {width}px")
             page.close()
 
-        channel_profile = '''<ytd-app>
-          <ytd-masthead><div id="container"><div id="start"><a id="logo" href="/">YouTube</a></div>
-          <div id="center"><input id="search" aria-label="Search"></div>
-          <div id="end"><div id="buttons"><button id="create">Create</button><button id="avatar-btn">Account</button></div></div>
-          <button id="voice-search-button">Voice</button></div></ytd-masthead>
+        channel_profile = '<ytd-app>' + MASTHEAD + '''
           <ytd-page-manager class="ytd-app"><ytd-browse page-subtype="channels">
           <div id="header"><div id="banner" style="height:180px;background:#345"><img id="banner-image" alt="Channel banner" style="display:block;width:100%;height:180px"></div>
           <ytd-c4-tabbed-header-renderer><div id="channel-header-container"><div id="profile"><img id="profile-avatar" alt="Profile" style="display:block;width:160px;height:160px;border-radius:50%"><h1>Channel title</h1></div></div></ytd-c4-tabbed-header-renderer></div>
@@ -307,6 +456,9 @@ def main():
         assert page.locator("#channel-thumbnail").evaluate("element => parseFloat(getComputedStyle(element).borderRadius)") >= 12
         grid_gap = page.locator("#channel-grid").evaluate("element => parseFloat(getComputedStyle(element).getPropertyValue('--ytd-rich-grid-item-margin'))")
         assert grid_gap >= 28, grid_gap
+        columns = page.locator("#channel-grid").evaluate("element => parseInt(getComputedStyle(element).getPropertyValue('--ytd-rich-grid-items-per-row'))")
+        assert columns == 3, columns
+        centered_header(page)
         for selector in ["#logo", "#search"]:
             expect(page.locator(selector)).to_be_visible()
         for selector in ["#create", "#avatar-btn", "#voice-search-button"]:
@@ -322,10 +474,10 @@ def main():
         ok("modern image-banner component also spans the channel width without resizing the avatar")
         page.close()
 
-        channel_scroll = '''<ytd-app style="height:100%"><ytd-page-manager id="main-scroll" class="ytd-app" style="position:absolute;top:60px;left:120px;width:calc(100% - 240px);height:840px;overflow-y:auto">
+        channel_scroll = '''<ytd-app style="height:100%"><div id="main-scroll" style="position:absolute;top:60px;left:120px;width:calc(100% - 240px);height:840px;overflow-y:auto"><ytd-page-manager class="ytd-app">
           <ytd-browse page-subtype="channels" style="min-height:2400px">
           <div id="nested-scroll" style="width:300px;height:120px;overflow-y:auto"><div style="height:800px">Nested native scrollbox</div></div>
-          <div style="height:2000px">Channel videos</div></ytd-browse></ytd-page-manager></ytd-app>'''
+          <div style="height:2000px">Channel videos</div></ytd-browse></ytd-page-manager></div></ytd-app>'''
         page = setup(browser, "/@creator/videos", channel_scroll)
         page.evaluate("document.documentElement.style.cssText = 'height:100%;overflow:hidden'; document.body.style.cssText = 'height:100%;overflow:hidden'")
         page.mouse.move(10, 400)
@@ -347,15 +499,51 @@ def main():
         navigate_spa(page, "/feed/subscriptions")
         page.mouse.wheel(0, 300)
         page.evaluate("async () => { for (let n=0;n<5;n++) await new Promise(requestAnimationFrame); }")
-        assert page.locator("#main-scroll").evaluate("element => element.scrollTop") == 0
-        ok("gutter-wheel fallback stays inactive when disabled or outside channel pages")
+        page.wait_for_function("document.querySelector('#main-scroll').scrollTop >= 250")
+        ok("gutter-wheel fallback stays inactive when disabled and also supports other enabled pages")
         page.close()
 
-        watch = '''<ytd-app>
-          <ytd-masthead><div id="container"><div id="start"><a id="logo" href="/">YouTube</a></div>
-          <div id="center"><input id="search" aria-label="Search"></div>
-          <div id="end"><div id="buttons"><button id="create">Create</button><button id="avatar-btn">Account</button></div></div>
-          <button id="voice-search-button">Voice</button></div></ytd-masthead>
+        for path, renderer in [("/watch?v=scroll", "ytd-watch-flexy"), ("/results?search_query=scroll", "ytd-search")]:
+            scroll_fixture = channel_scroll.replace("ytd-browse", renderer)
+            page = setup(browser, path, scroll_fixture)
+            page.evaluate("document.documentElement.style.cssText = 'height:100%;overflow:hidden'; document.body.style.cssText = 'height:100%;overflow:hidden'")
+            page.mouse.move(10, 400)
+            page.mouse.wheel(0, 300)
+            page.wait_for_function("document.querySelector('#main-scroll').scrollTop >= 250")
+            page.locator("#main-scroll").evaluate("element => element.scrollTop = 0")
+            page.evaluate("document.body.insertAdjacentHTML('beforeend', '<div id=movie_player class=html5-video-player style=position:absolute;left:0;top:100px;width:100px;height:100px>Player</div>')")
+            page.mouse.move(10, 140)
+            page.mouse.wheel(0, 300)
+            page.evaluate("async () => { for (let n=0;n<5;n++) await new Promise(requestAnimationFrame); }")
+            assert page.locator("#main-scroll").evaluate("element => element.scrollTop") == 0
+            ok(f"gutter scrolling works on {renderer} while player-area wheel events stay untouched")
+            page.close()
+
+        for path in ["/watch?v=header", "/results?search_query=header", "/@creator/videos", "/feed/subscriptions"]:
+            page = setup(browser, path, '<ytd-app>' + MASTHEAD + '<ytd-page-manager class="ytd-app"><ytd-browse>Native content</ytd-browse></ytd-page-manager></ytd-app>')
+            centered_header(page)
+            expect(page.locator("#create")).to_be_hidden()
+            expect(page.locator("#avatar-btn")).to_be_hidden()
+            page.locator("#search").fill("кот & C++")
+            page.locator("#search-icon-legacy").click()
+            page.wait_for_url("**/results?**")
+            assert parse_qs(urlparse(page.url).query)["search_query"] == ["кот & C++"], page.url
+            ok(f"logo and functional native search stay centered together on {path.split('?')[0]}")
+            page.close()
+
+        legacy_searchbox = MASTHEAD[MASTHEAD.index('<ytd-searchbox>'):MASTHEAD.index('</ytd-searchbox>') + len('</ytd-searchbox>')]
+        modern_searchbox = '''<yt-searchbox><div class="ytSearchboxComponentHost"><form class="ytSearchboxComponentSearchForm" action="/results" method="get"><div class="ytSearchboxComponentInputBox"><input class="ytSearchboxComponentInput" id="search" name="search_query" aria-label="Search"></div><button class="ytSearchboxComponentSearchButton" type="submit" aria-label="Search"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 5 5"/></svg></button></form></div></yt-searchbox>'''
+        modern_header = MASTHEAD.replace(legacy_searchbox, modern_searchbox)
+        page = setup(browser, "/results?search_query=modern", '<ytd-app>' + modern_header + '<ytd-page-manager class="ytd-app"><ytd-search>Modern results</ytd-search></ytd-page-manager></ytd-app>')
+        centered_header(page)
+        page.locator("#search").fill("modern & search")
+        page.locator(".ytSearchboxComponentSearchButton").click()
+        page.wait_for_url("**/results?**")
+        assert parse_qs(urlparse(page.url).query)["search_query"] == ["modern & search"]
+        ok("modern native searchbox keeps its visible logo/form group centered and submits normally")
+        page.close()
+
+        watch = '<ytd-app>' + MASTHEAD + '''
           <ytd-page-manager class="ytd-app"><ytd-watch-flexy>
           <div id="columns"><div id="primary"><div id="player"><video></video></div>
           <ytd-watch-metadata><div id="above-the-fold"><h1>Video title</h1>
@@ -393,6 +581,7 @@ def main():
         expect(page.locator("#create")).to_be_hidden()
         expect(page.locator("#avatar-btn")).to_be_hidden()
         expect(page.locator("#voice-search-button")).to_be_hidden()
+        centered_header(page)
         expect(page.locator("#comments-teaser")).to_be_hidden()
         expect(page.locator("#modern-comments-teaser")).to_be_hidden()
         metadata = page.locator("ytd-watch-metadata").bounding_box()
@@ -598,10 +787,10 @@ def main():
         modern = '''<yt-lockup-view-model id="modern-video"><div class="ytLockupViewModelHost"><a href="/watch?v=modern"><div style="aspect-ratio:16/9;background:#333">Modern preview</div></a>
           <div class="ytLockupMetadataViewModelHost"><h3><a href="/watch?v=modern">Modern video</a></h3><a href="/@modern">Modern channel</a></div></div></yt-lockup-view-model>'''
         search = search_header + '''<ytd-page-manager class="ytd-app"><ytd-search><div id="container">
-          <ytd-section-list-renderer><div id="contents"><ytd-item-section-renderer><div id="contents">''' + result_card(1) + result_card(2) + '''
+          <ytd-section-list-renderer><div id="contents"><ytd-item-section-renderer><div id="contents">''' + result_card(1) + result_card(2) + result_card(3) + '''
           <ytd-channel-renderer id="channel-result"><a href="/@channel">Channel result</a></ytd-channel-renderer>
           <ytd-playlist-renderer id="playlist-result"><a href="/playlist?list=fixture">Playlist result</a></ytd-playlist-renderer>
-          ''' + modern + result_card(3) + '''<ytd-continuation-item-renderer id="continuation">Load more</ytd-continuation-item-renderer>
+          ''' + modern + result_card(4) + '''<ytd-continuation-item-renderer id="continuation">Load more</ytd-continuation-item-renderer>
           </div></ytd-item-section-renderer></div></ytd-section-list-renderer>
           </div></ytd-search></ytd-page-manager></ytd-app>'''
         page = setup(browser, "/results?search_query=fixture", search)
@@ -610,6 +799,9 @@ def main():
         right = page.locator("#result-2").bounding_box()
         assert abs(left["y"] - right["y"]) < 2 and right["x"] > left["x"] + left["width"], (left, right)
         assert abs(left["width"] - right["width"]) < 2, (left, right)
+        third = page.locator("#result-3").bounding_box()
+        assert abs(third["y"] - left["y"]) < 2 and third["x"] > right["x"] + right["width"], (left, right, third)
+        assert abs(third["width"] - left["width"]) < 2
         for selector in ["#result-1 #thumbnail", "#result-1 #video-title", "#result-1 ytd-channel-name"]:
             expect(page.locator(selector)).to_be_visible()
         for selector in ["#result-1 #metadata-line", "#result-1 #description-text", "#result-1 .metadata-snippet-container", "#result-1 ytd-badge-supported-renderer"]:
@@ -621,22 +813,33 @@ def main():
             expect(page.locator(selector)).to_be_visible()
         for selector in ["#create", "#avatar-btn", "#voice-search-button"]:
             expect(page.locator(selector)).to_be_hidden()
-        ok("desktop search uses two equal preview-top cards with title/channel and a logo/search-only header")
+        centered_header(page)
+        ok("desktop search uses three equal preview-top cards with title/channel and a centered logo/search header")
 
         for selector in ["#channel-result", "#playlist-result", "#continuation"]:
             expect(page.locator(selector)).to_be_visible()
             bounds = page.locator(selector).bounding_box()
-            assert bounds["width"] > left["width"] * 1.9, (selector, bounds, left)
+            assert bounds["width"] > left["width"] * 2.9, (selector, bounds, left)
         expect(page.locator("#channel-result a")).to_have_attribute("href", "/@channel")
         expect(page.locator("#playlist-result a")).to_have_attribute("href", "/playlist?list=fixture")
         expect(page.locator("#modern-video[data-myt-search-video]")).to_have_count(1)
         modern_bounds = page.locator("#modern-video").bounding_box()
         assert abs(modern_bounds["width"] - left["width"]) < 2, (modern_bounds, left)
-        page.locator("ytd-item-section-renderer > #contents").evaluate("(element, card) => element.insertAdjacentHTML('beforeend', card)", result_card(4))
-        expect(page.locator("#result-4 #description-text")).to_be_hidden()
-        dynamic = page.locator("#result-4").bounding_box()
+        page.locator("ytd-item-section-renderer > #contents").evaluate("(element, card) => element.insertAdjacentHTML('beforeend', card)", result_card(5))
+        expect(page.locator("#result-5 #description-text")).to_be_hidden()
+        dynamic = page.locator("#result-5").bounding_box()
         assert abs(dynamic["width"] - left["width"]) < 2, (dynamic, left)
         ok("mixed search channels/playlists/continuation retain full width and dynamic/modern video cards use the grid")
+        page.close()
+
+        page = setup(browser, "/results?search_query=fixture", search, width=900)
+        first = page.locator("#result-1").bounding_box()
+        second = page.locator("#result-2").bounding_box()
+        third = page.locator("#result-3").bounding_box()
+        assert abs(first["y"] - second["y"]) < 2 and second["x"] > first["x"] + first["width"]
+        assert third["y"] >= first["y"] + first["height"] and abs(third["x"] - first["x"]) < 2, (first, second, third)
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        ok("900px search reduces the video grid to two columns without overflow")
         page.close()
 
         page = setup(browser, "/results?search_query=fixture", search, width=390)

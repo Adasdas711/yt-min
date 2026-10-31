@@ -8,7 +8,7 @@ html.minimal-youtube {
     --myt-border: #e5e5ea;
     --myt-soft: #f1f1f4;
     --myt-accent: #ff334b;
-    --myt-shadow: 0 12px 40px rgb(25 25 35 / 5%);
+    --myt-shadow: none;
     --myt-channel-width: 1280px;
 }
 
@@ -20,10 +20,11 @@ html.minimal-youtube[dark] {
     --myt-muted: #92929d;
     --myt-border: #2c2c33;
     --myt-soft: #24242a;
-    --myt-shadow: 0 12px 48px rgb(0 0 0 / 18%);
+    --myt-shadow: none;
 }
 
 /* The homepage is an overlay, so YouTube's application and navigation survive. */
+html.minimal-youtube[data-myt-page="home"] ytd-app,
 html.minimal-youtube[data-myt-page="home"] ytd-app #masthead-container,
 html.minimal-youtube[data-myt-page="home"] ytd-page-manager > ytd-browse[page-subtype="home"],
 html.minimal-youtube[data-myt-page="home"] ytd-mini-guide-renderer,
@@ -31,11 +32,29 @@ html.minimal-youtube[data-myt-page="home"] ytd-guide-renderer {
     visibility: hidden !important;
 }
 
+html.minimal-youtube[data-myt-page="home"],
+html.minimal-youtube[data-myt-page="home"] body,
+html.minimal-youtube[data-myt-page="home"] ytd-app {
+    background: var(--myt-bg) !important;
+    background-image: none !important;
+}
+
+html.minimal-youtube[data-myt-page="home"] body::before,
+html.minimal-youtube[data-myt-page="home"] body::after {
+    display: none !important;
+}
+
 html.minimal-youtube .myt-home {
     box-sizing: border-box;
     position: fixed;
     z-index: 2100;
     inset: 0;
+    isolation: isolate;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    background-image: none;
+    box-shadow: none;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -49,8 +68,9 @@ html.minimal-youtube .myt-home {
     -webkit-font-smoothing: antialiased;
 }
 
-/* The homepage theme is local to this overlay; native YouTube keeps its theme. */
-html.minimal-youtube[data-myt-page="home"][data-myt-theme="light"] .myt-home {
+/* Theme variables are scoped to the home route and inherit into its flat backdrop. */
+html.minimal-youtube[data-myt-page="home"][data-myt-theme="light"],
+html.minimal-youtube[data-myt-theme="light"] .myt-home {
     color-scheme: light;
     --myt-bg: #f9f9fb;
     --myt-surface: #ffffff;
@@ -58,10 +78,11 @@ html.minimal-youtube[data-myt-page="home"][data-myt-theme="light"] .myt-home {
     --myt-muted: #74747d;
     --myt-border: #e5e5ea;
     --myt-soft: #f1f1f4;
-    --myt-shadow: 0 12px 40px rgb(25 25 35 / 5%);
+    --myt-shadow: none;
 }
 
-html.minimal-youtube[data-myt-page="home"][data-myt-theme="dark"] .myt-home {
+html.minimal-youtube[data-myt-page="home"][data-myt-theme="dark"],
+html.minimal-youtube[data-myt-theme="dark"] .myt-home {
     color-scheme: dark;
     --myt-bg: #101012;
     --myt-surface: #19191d;
@@ -69,7 +90,7 @@ html.minimal-youtube[data-myt-page="home"][data-myt-theme="dark"] .myt-home {
     --myt-muted: #92929d;
     --myt-border: #2c2c33;
     --myt-soft: #24242a;
-    --myt-shadow: 0 12px 48px rgb(0 0 0 / 18%);
+    --myt-shadow: none;
 }
 
 html.minimal-youtube .myt-home *,
@@ -122,13 +143,14 @@ html.minimal-youtube .myt-search {
     border: 1px solid var(--myt-border);
     border-radius: 18px;
     background: var(--myt-surface);
-    box-shadow: var(--myt-shadow);
-    transition: border-color 150ms ease, box-shadow 150ms ease;
+    box-shadow: none;
+    transition: border-color 150ms ease;
 }
 
 html.minimal-youtube .myt-search:focus-within {
     border-color: var(--myt-muted);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--myt-muted) 12%, transparent), var(--myt-shadow);
+    outline: 2px solid color-mix(in srgb, var(--myt-muted) 20%, transparent);
+    outline-offset: 2px;
 }
 
 html.minimal-youtube .myt-search__icon {
@@ -193,6 +215,7 @@ html.minimal-youtube .myt-search__clear:hover {
 }
 
 html.minimal-youtube .myt-search__submit {
+    width: 48px;
     min-width: 48px;
     height: 48px;
     padding: 12px;
@@ -280,15 +303,6 @@ html.minimal-youtube ytd-app ytd-page-manager.ytd-app {
     margin-right: 0 !important;
 }
 
-html.minimal-youtube ytd-masthead #container {
-    padding-inline: 24px;
-}
-
-html.minimal-youtube ytd-masthead #center {
-    flex: 0 1 720px;
-    min-width: 0;
-}
-
 /* Channel: a viewport-wide cover, centered profile, and a separate content rail. */
 html.minimal-youtube[data-myt-page="channel"] ytd-app,
 html.minimal-youtube[data-myt-page="channel"] ytd-page-manager,
@@ -301,7 +315,7 @@ html.minimal-youtube[data-myt-page="channel"] ytd-page-manager > ytd-browse {
 }
 
 html.minimal-youtube[data-myt-page="channel"] ytd-browse {
-    --myt-channel-columns: 4;
+    --myt-channel-columns: 3;
 }
 
 /* These wrappers may contain the banner: never constrain them to the text rail. */
@@ -378,7 +392,7 @@ html.minimal-youtube[data-myt-page="channel"] ytd-c4-tabbed-header-renderer #tab
     border: 1px solid var(--myt-border);
     border-radius: 18px;
     background: var(--yt-spec-base-background, var(--myt-bg));
-    box-shadow: 0 6px 20px rgb(0 0 0 / 4%);
+    box-shadow: none;
 }
 
 html.minimal-youtube[data-myt-page="channel"] :is(yt-tab-group-shape, tp-yt-paper-tabs) {
@@ -396,7 +410,7 @@ html.minimal-youtube[data-myt-page="channel"] ytd-rich-grid-renderer {
 html.minimal-youtube[data-myt-page="channel"] ytd-rich-grid-renderer {
     --ytd-rich-grid-items-per-row: var(--myt-channel-columns) !important;
     --ytd-rich-grid-item-margin: 28px;
-    --ytd-rich-grid-item-max-width: 320px;
+    --ytd-rich-grid-item-max-width: 400px;
     --ytd-rich-grid-row-margin: 32px;
 }
 
@@ -501,37 +515,194 @@ html.minimal-youtube ytd-playlist-panel-renderer {
     border-radius: 14px;
 }
 
-/* Focused headers on watch, search and channel pages: logo and search only. */
-html.minimal-youtube:is([data-myt-page="watch"], [data-myt-page="search"], [data-myt-page="channel"]) ytd-masthead #end,
-html.minimal-youtube:is([data-myt-page="watch"], [data-myt-page="search"], [data-myt-page="channel"]) ytd-masthead #guide-button,
-html.minimal-youtube:is([data-myt-page="watch"], [data-myt-page="search"], [data-myt-page="channel"]) ytd-masthead #voice-search-button,
-html.minimal-youtube:is([data-myt-page="watch"], [data-myt-page="search"], [data-myt-page="channel"]) ytd-masthead #country-code,
-html.minimal-youtube:is([data-myt-page="watch"], [data-myt-page="search"], [data-myt-page="channel"]) ytd-masthead #logo-country-code,
-html.minimal-youtube:is([data-myt-page="watch"], [data-myt-page="search"], [data-myt-page="channel"]) ytd-masthead #skip-navigation {
+/* Shared masthead: logo and search form one centered group from the first frame. */
+html.minimal-youtube ytd-masthead #end,
+html.minimal-youtube ytd-masthead #guide-button,
+html.minimal-youtube ytd-masthead #voice-search-button,
+html.minimal-youtube ytd-masthead #country-code,
+html.minimal-youtube ytd-masthead #logo-country-code,
+html.minimal-youtube ytd-masthead #skip-navigation {
     display: none !important;
 }
 
-html.minimal-youtube:is([data-myt-page="watch"], [data-myt-page="search"], [data-myt-page="channel"]) ytd-masthead #container {
-    justify-content: flex-start;
-    gap: clamp(20px, 5vw, 80px);
-}
-
-html.minimal-youtube:is([data-myt-page="watch"], [data-myt-page="search"], [data-myt-page="channel"]) ytd-masthead #start {
-    flex: none;
-}
-
-html.minimal-youtube:is([data-myt-page="watch"], [data-myt-page="search"], [data-myt-page="channel"]) ytd-masthead #center {
-    display: flex !important;
-    flex: 0 1 720px;
+html.minimal-youtube ytd-masthead {
+    box-sizing: border-box;
     min-width: 0;
+    height: 56px;
+    min-height: 56px;
 }
 
-html.minimal-youtube:is([data-myt-page="watch"], [data-myt-page="search"], [data-myt-page="channel"]) ytd-masthead :is(ytd-searchbox, yt-searchbox, .ytSearchboxComponentHost) {
+html.minimal-youtube ytd-masthead > #container {
+    box-sizing: border-box;
+    display: flex !important;
+    align-items: center;
+    justify-content: center !important;
+    gap: 24px;
+    width: 100% !important;
+    min-width: 0;
+    height: 56px;
+    min-height: 56px;
+    padding: 0 24px;
+}
+
+html.minimal-youtube ytd-masthead #start {
+    display: flex;
+    flex: none !important;
+    width: auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0;
+}
+
+/* Remove the logo's invisible native gutters, not just its flex wrapper. */
+html.minimal-youtube ytd-masthead ytd-topbar-logo-renderer,
+html.minimal-youtube ytd-masthead #logo {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    flex: none;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+html.minimal-youtube ytd-masthead #logo-icon {
+    display: block;
+    flex: none;
+    width: 90px !important;
+    height: 20px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+html.minimal-youtube ytd-masthead #logo-icon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+html.minimal-youtube ytd-masthead #center {
+    display: flex !important;
+    flex: 0 1 640px !important;
+    width: 100%;
+    min-width: 0 !important;
+    max-width: 640px;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+html.minimal-youtube ytd-masthead :is(ytd-searchbox, yt-searchbox, .ytSearchboxComponentHost) {
     display: flex !important;
     flex: 1 1 auto;
+    width: 100%;
     min-width: 0 !important;
+    max-width: none;
     margin-inline: 0 !important;
     padding-inline: 0 !important;
+}
+
+/* Legacy searchbox: retain its native inputs, clear button and suggestions. */
+html.minimal-youtube ytd-masthead ytd-searchbox #search-form {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    margin: 0;
+    border: 1px solid var(--myt-border);
+    border-radius: 14px;
+    background: var(--myt-surface);
+    box-shadow: none;
+}
+
+html.minimal-youtube ytd-masthead ytd-searchbox #container {
+    box-sizing: border-box;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    margin: 0;
+    padding-inline: 16px 6px;
+    border: 0 !important;
+    border-radius: 14px 0 0 14px;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+html.minimal-youtube ytd-masthead ytd-searchbox #search-icon-legacy {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 46px;
+    min-width: 46px;
+    height: 36px;
+    margin: 3px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--myt-soft);
+    color: var(--myt-ink);
+}
+
+html.minimal-youtube ytd-masthead ytd-searchbox input {
+    min-width: 0;
+    color: var(--myt-ink);
+    font-size: 15px;
+    line-height: 1.4;
+}
+
+/* Current YouTube searchbox classes use the same flat rounded treatment. */
+html.minimal-youtube ytd-masthead :is(yt-searchbox, .ytSearchboxComponentHost) :is(.ytSearchboxComponentInputBox, .yt-searchbox-input-box, .yt-searchbox__input-box) {
+    box-sizing: border-box;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 44px;
+    margin: 0;
+    padding-inline: 16px 8px;
+    border: 1px solid var(--myt-border) !important;
+    border-radius: 14px 0 0 14px !important;
+    background: var(--myt-surface) !important;
+    box-shadow: none !important;
+}
+
+html.minimal-youtube ytd-masthead :is(yt-searchbox, .ytSearchboxComponentHost) :is(.ytSearchboxComponentSearchButton, .yt-searchbox-search-button, .yt-searchbox__search-button) {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 48px;
+    min-width: 48px;
+    height: 44px;
+    margin: 0;
+    border: 1px solid var(--myt-border);
+    border-left: 0;
+    border-radius: 0 14px 14px 0;
+    background: var(--myt-soft);
+    color: var(--myt-ink);
+    box-shadow: none;
+}
+
+html.minimal-youtube ytd-masthead :is(yt-searchbox, .ytSearchboxComponentHost) input {
+    min-width: 0;
+    color: var(--myt-ink);
+    font-size: 15px;
+}
+
+html.minimal-youtube ytd-masthead ytd-searchbox #search-form:focus-within,
+html.minimal-youtube ytd-masthead :is(yt-searchbox, .ytSearchboxComponentHost) :is(.ytSearchboxComponentInputBox, .yt-searchbox-input-box, .yt-searchbox__input-box):focus-within {
+    border-color: var(--myt-muted) !important;
+    outline: 2px solid color-mix(in srgb, var(--myt-muted) 16%, transparent);
+    outline-offset: 2px;
+}
+
+html.minimal-youtube ytd-masthead :is(#search-icon-legacy, .ytSearchboxComponentSearchButton, .yt-searchbox-search-button, .yt-searchbox__search-button):hover {
+    background: color-mix(in srgb, var(--myt-muted) 20%, var(--myt-soft));
 }
 
 /* A quieter text column below the full-size native player. */
@@ -632,7 +803,7 @@ html.minimal-youtube[data-myt-page="watch"] .myt-comments-toggle svg {
     height: 18px;
 }
 
-/* Search: compact native cards in two columns, without changing DOM order. */
+/* Search: small native cards in three columns, without changing DOM order. */
 html.minimal-youtube[data-myt-page="search"] ytd-search {
     box-sizing: border-box;
     width: 100%;
@@ -657,7 +828,7 @@ html.minimal-youtube[data-myt-page="search"] ytd-search ytd-item-section-rendere
 
 html.minimal-youtube[data-myt-page="search"] ytd-search ytd-item-section-renderer > #contents {
     display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: start;
     gap: 28px 24px;
 }
@@ -822,12 +993,16 @@ html.minimal-youtube ytd-reel-item-renderer,
 html.minimal-youtube ytd-shorts,
 html.minimal-youtube ytd-rich-shelf-renderer[is-shorts],
 html.minimal-youtube ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]),
-html.minimal-youtube ytd-rich-section-renderer:has(ytm-shorts-lockup-view-model),
-html.minimal-youtube ytd-shelf-renderer:has(ytd-reel-item-renderer),
 html.minimal-youtube ytm-shorts-lockup-view-model,
 html.minimal-youtube yt-shorts-lockup-view-model,
 html.minimal-youtube yt-shorts-shelf-view-model,
+html.minimal-youtube ytm-shorts-lockup-view-model-v2,
+html.minimal-youtube yt-shorts-shelf-view-model-v2,
+html.minimal-youtube ytd-rich-item-renderer:has(ytm-shorts-lockup-view-model, yt-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2),
+html.minimal-youtube ytd-rich-section-renderer:has(yt-shorts-shelf-view-model, yt-shorts-shelf-view-model-v2),
 html.minimal-youtube ytd-rich-item-renderer:has(a[href^="/shorts/"]),
+html.minimal-youtube ytd-video-renderer:has(ytd-thumbnail-overlay-time-status-renderer[overlay-style="SHORTS"]),
+html.minimal-youtube ytd-rich-item-renderer:has(ytd-thumbnail-overlay-time-status-renderer[overlay-style="SHORTS"]),
 html.minimal-youtube ytd-video-renderer:has(a#thumbnail[href^="/shorts/"]),
 html.minimal-youtube yt-lockup-view-model:has(a[href^="/shorts/"]),
 html.minimal-youtube ytd-guide-entry-renderer:has(a[href^="/shorts"]),
@@ -838,13 +1013,13 @@ html.minimal-youtube [data-myt-hidden="shorts"] {
     display: none !important;
 }
 
-@media (max-width: 1100px) {
-    html.minimal-youtube[data-myt-page="channel"] ytd-browse {
-        --myt-channel-columns: 3;
-    }
+/* Dedicated modern search shelves must disappear before the JS scan, too.
+   A mixed shelf with ordinary video lockups keeps those results visible. */
+html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-section-renderer):has(ytm-shorts-lockup-view-model, yt-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2):not(:has(ytd-video-renderer a[href*="/watch?"], yt-lockup-view-model a[href*="/watch?"])) {
+    display: none !important;
 }
 
-@media (max-width: 800px) {
+@media (max-width: 900px) {
     html.minimal-youtube[data-myt-page="channel"] ytd-browse {
         --myt-channel-columns: 2;
     }
@@ -857,6 +1032,10 @@ html.minimal-youtube [data-myt-hidden="shorts"] {
 }
 
 @media (max-width: 1000px) {
+    html.minimal-youtube[data-myt-page="search"] ytd-search ytd-item-section-renderer > #contents {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     html.minimal-youtube ytd-watch-flexy:not([theater]):not([fullscreen]) #columns {
         flex-direction: column;
         gap: 24px;
@@ -895,11 +1074,13 @@ html.minimal-youtube [data-myt-hidden="shorts"] {
     }
 
     html.minimal-youtube .myt-search__submit {
+        width: 44px;
         min-width: 44px;
         height: 44px;
     }
 
-    html.minimal-youtube ytd-masthead #container {
+    html.minimal-youtube ytd-masthead > #container {
+        gap: 12px;
         padding-inline: 12px;
     }
 
