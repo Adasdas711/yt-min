@@ -13,7 +13,7 @@ for content_script in manifest['content_scripts']:
     for path in content_script['js'] + content_script['css']:
         assert ROOT / path in files, f'Missing content script: {path}'
 assert ROOT / manifest['action']['default_popup'] in files, 'Missing popup'
-output = ROOT / 'dist' / f'minimal-youtube-{manifest["version"]}.zip'
+output = ROOT / 'articafts' / f'minimal-youtube-{manifest["version"]}.zip'
 output.parent.mkdir(exist_ok=True)
 with ZipFile(output, 'w', compression=ZIP_DEFLATED) as archive:
     for path in files:
