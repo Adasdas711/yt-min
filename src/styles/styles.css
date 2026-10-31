@@ -651,6 +651,11 @@ html.minimal-youtube ytd-masthead ytd-searchbox #search-icon-legacy {
 
 html.minimal-youtube ytd-masthead ytd-searchbox input {
     min-width: 0;
+    padding: 0;
+    border: 0 !important;
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
     color: var(--myt-ink);
     font-size: 15px;
     line-height: 1.4;
@@ -690,6 +695,11 @@ html.minimal-youtube ytd-masthead :is(yt-searchbox, .ytSearchboxComponentHost) :
 
 html.minimal-youtube ytd-masthead :is(yt-searchbox, .ytSearchboxComponentHost) input {
     min-width: 0;
+    padding: 0;
+    border: 0 !important;
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
     color: var(--myt-ink);
     font-size: 15px;
 }
