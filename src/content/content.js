@@ -53,6 +53,8 @@
     const voteElements = new Set();
     const searchVideoCards = new Set();
     const commentPanelStates = new Map();
+    const brandedLinks = new Set();
+    const brandMarkup = '<svg class="myt-home__mark" viewBox="0 0 44 32" aria-hidden="true"><rect x="1" y="1" width="42" height="30" rx="10" fill="#ff0033"/><path d="m18 9 12 7-12 7Z" fill="white"/></svg><span class="myt-home__wordmark">YouTube</span>';
     const voteSelector = [
         "ytd-segmented-like-dislike-button-renderer", "segmented-like-dislike-button-view-model",
         "yt-segmented-like-dislike-button-view-model", "like-button-view-model", "dislike-button-view-model",
@@ -124,6 +126,38 @@
         commentsButton = null;
         for (const element of voteElements) element.removeAttribute("data-myt-votes");
         voteElements.clear();
+    }
+
+    function syncBrand() {
+        if (!enabled) return;
+        for (const link of brandedLinks) {
+            if (!link.isConnected) {
+                link.querySelectorAll(":scope > .myt-masthead-brand").forEach(brand => brand.remove());
+                link.removeAttribute("data-myt-logo");
+                brandedLinks.delete(link);
+            }
+        }
+        for (const link of document.querySelectorAll("ytd-masthead a#logo, ytd-masthead ytd-topbar-logo-renderer a[href]")) {
+            const brands = [...link.querySelectorAll(":scope > .myt-masthead-brand")];
+            if (!brands.length) {
+                const brand = document.createElement("span");
+                brand.className = "myt-masthead-brand";
+                brand.innerHTML = brandMarkup;
+                link.append(brand);
+            } else brands.slice(1).forEach(brand => brand.remove());
+            if (!link.hasAttribute("data-myt-logo")) link.setAttribute("data-myt-logo", "");
+            brandedLinks.add(link);
+        }
+    }
+
+    function restoreBrand() {
+        for (const brand of document.querySelectorAll("ytd-masthead .myt-masthead-brand")) brand.remove();
+        for (const link of brandedLinks) {
+            link.querySelectorAll(":scope > .myt-masthead-brand").forEach(brand => brand.remove());
+            link.removeAttribute("data-myt-logo");
+        }
+        document.querySelectorAll("ytd-masthead [data-myt-logo]").forEach(link => link.removeAttribute("data-myt-logo"));
+        brandedLinks.clear();
     }
 
     function syncSearch(scope = document) {
@@ -361,11 +395,9 @@
         container.setAttribute("aria-label", "YouTube");
         container.innerHTML = `
             <a class="myt-home__brand" href="/" aria-label="YouTube">
-                <svg class="myt-home__mark" viewBox="0 0 44 32" aria-hidden="true"><rect x="1" y="1" width="42" height="30" rx="10" fill="#ff0033"/><path d="m18 9 12 7-12 7Z" fill="white"/></svg>
-                <span class="myt-home__wordmark">YouTube</span>
+                ${brandMarkup}
             </a>
             <form class="myt-search" role="search" action="/results" method="get" accept-charset="UTF-8">
-                <svg class="myt-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></svg>
                 <input class="myt-search__input" id="myt-query" name="search_query" type="search" autocomplete="off" aria-label="${copy.label}" placeholder="${copy.search}">
                 <button class="myt-search__clear" type="button" aria-label="${copy.clear}" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
                 <button class="myt-search__submit" type="submit" aria-label="${copy.submit}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></svg></button>
@@ -494,6 +526,7 @@
             if (!enabled) return;
             updateRoute();
             renderTheme();
+            syncBrand();
             if (!settingsReady) return;
             syncWatch();
             refreshHidden([...pendingRoots]);
@@ -537,6 +570,7 @@
                 }
             }
         }
+        syncBrand();
         schedule();
     });
 
@@ -557,6 +591,7 @@
                 attributes: true, attributeFilter: ["href", "aria-label", "aria-hidden", "visibility", "is-shorts", "dark", "hidden"],
             });
             updateRoute(true);
+            syncBrand();
             cleanTitle();
         } else {
             classObserver.disconnect();
@@ -569,6 +604,7 @@
             home?.remove();
             home = null;
             resetWatch();
+            restoreBrand();
             syncSearch();
             delete root.dataset.mytTheme;
             currentURL = "";

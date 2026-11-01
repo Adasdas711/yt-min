@@ -170,13 +170,6 @@ html.minimal-youtube .myt-search:focus-within {
     outline-offset: 2px;
 }
 
-html.minimal-youtube .myt-search__icon {
-    width: 21px;
-    height: 21px;
-    flex: none;
-    color: var(--myt-muted);
-}
-
 html.minimal-youtube .myt-search__input {
     min-width: 0;
     width: 100%;
@@ -598,6 +591,37 @@ html.minimal-youtube ytd-masthead #logo-icon svg {
     display: block;
     width: 100%;
     height: 100%;
+}
+
+/* Preserve YouTube's native link and DOM while sharing the homepage brand. */
+html.minimal-youtube ytd-masthead [data-myt-logo] {
+    height: auto !important;
+    color: var(--myt-ink);
+    font-size: 0;
+    text-decoration: none;
+}
+
+html.minimal-youtube ytd-masthead [data-myt-logo] > :not(.myt-masthead-brand) {
+    display: none !important;
+}
+
+html.minimal-youtube ytd-masthead .myt-masthead-brand {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    gap: 10px;
+    font-family: "Roboto", "Arial", sans-serif;
+    line-height: 1;
+}
+
+/* These are decorative leading icons inside the input, not submit buttons.
+   Native focus can absolutely position them over the first typed characters. */
+html.minimal-youtube ytd-masthead ytd-searchbox :is(#search-input #search-icon, #search-input .search-icon, #search-icon:not(button), #search-icon-container, #search-icon-wrapper),
+html.minimal-youtube ytd-masthead :is(yt-searchbox, .ytSearchboxComponentHost) :is(.ytSearchboxComponentInputBox, .yt-searchbox-input-box, .yt-searchbox__input-box) :is(.ytSearchboxComponentSearchIcon, .ytSearchboxComponentSearchIconContainer, .yt-searchbox-search-icon, .yt-searchbox-search-icon-container, .yt-searchbox__search-icon, .yt-searchbox__search-icon-container) {
+    display: none !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 html.minimal-youtube ytd-masthead #center {
@@ -1038,6 +1062,43 @@ html.minimal-youtube[data-myt-page="search"] yt-lockup-view-model[data-myt-searc
     display: none !important;
 }
 
+/* One surface per video card. Wrapper grids and non-video result rows stay bare. */
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-page="channel"]) {
+    --myt-card-bg: #f0f0f3;
+    --myt-card-hover-bg: #f7f7f9;
+    --myt-card-transition-duration: 150ms;
+}
+
+html.minimal-youtube[dark]:is([data-myt-page="search"], [data-myt-page="channel"]) {
+    --myt-card-bg: #19191d;
+    --myt-card-hover-bg: #25252b;
+}
+
+html.minimal-youtube[data-myt-page="search"] ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer, yt-lockup-view-model)[data-myt-search-video][data-myt-search-cell],
+html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(
+    ytd-rich-item-renderer:has(a[href*="/watch?"], ytd-rich-grid-media, ytd-video-renderer, ytd-grid-video-renderer):not(:has(ytd-rich-grid-playlist-renderer, yt-collection-thumbnail-view-model, yt-collections-stack, [content-type="playlist"], [is-playlist])),
+    ytd-grid-video-renderer:not(ytd-rich-item-renderer *),
+    yt-lockup-view-model:has(a[href*="/watch?"]):not(:is(ytd-rich-item-renderer, ytd-grid-video-renderer) *):not([content-type="playlist"]):not([is-playlist]):not(:has(yt-collection-thumbnail-view-model, yt-collections-stack, yt-collection-thumbnail-overlay-view-model))
+) {
+    box-sizing: border-box;
+    min-width: 0;
+    padding: 9px !important;
+    border-radius: 16px;
+    background-color: var(--myt-card-bg);
+    transition: background-color var(--myt-card-transition-duration) ease;
+}
+
+html.minimal-youtube[data-myt-page="search"] ytd-search [data-myt-search-video]:is(:hover, :focus-within),
+html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(ytd-rich-item-renderer, ytd-grid-video-renderer, yt-lockup-view-model):is(:hover, :focus-within) {
+    --myt-card-bg: var(--myt-card-hover-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html.minimal-youtube:is([data-myt-page="search"], [data-myt-page="channel"]) {
+        --myt-card-transition-duration: 0ms;
+    }
+}
+
 /* Shorts: shelves, modern cards, old results, navigation and channel tabs. */
 html.minimal-youtube ytd-reel-shelf-renderer,
 html.minimal-youtube ytd-reel-item-renderer,
@@ -1099,6 +1160,15 @@ html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-sec
 }
 
 @media (max-width: 600px) {
+    html.minimal-youtube ytd-masthead .myt-masthead-brand .myt-home__mark {
+        width: 32px;
+        height: 24px;
+    }
+
+    html.minimal-youtube ytd-masthead .myt-masthead-brand .myt-home__wordmark {
+        font-size: 22px;
+    }
+
     html.minimal-youtube[data-myt-page="search"] ytd-search {
         padding: 20px 16px 32px;
     }

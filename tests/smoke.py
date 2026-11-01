@@ -88,7 +88,7 @@ MOCK = """(initial) => {
 
 
 def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, native_dark=False, language="en"):
-    page = browser.new_page(viewport={"width": width, "height": 960})
+    page = browser.new_page(viewport={"width": width, "height": 960}, reduced_motion="reduce")
     page.route("https://www.youtube.com/**", lambda route: route.fulfill(
         status=200, content_type="text/html", body=document(body)))
     page.goto("https://www.youtube.com" + path)
@@ -113,7 +113,8 @@ def centered(page, selector, tolerance=3):
 
 
 def centered_header(page):
-    logo = page.locator("#logo-icon svg").bounding_box()
+    brand = page.locator("ytd-masthead .myt-masthead-brand")
+    logo = brand.bounding_box() if brand.count() else page.locator("#logo-icon svg").bounding_box()
     search = page.locator("#search-form, .ytSearchboxComponentSearchForm").bounding_box()
     assert logo and search, (logo, search)
     left = min(logo["x"], search["x"])
@@ -179,6 +180,25 @@ def assert_uniform_full_page(page):
     assert result["height"] == page.viewport_size["height"], f"Hidden native content still expands home page: {result}"
 
 
+def assert_card_surface(page, selector):
+    card = page.locator(selector)
+    color = "element => getComputedStyle(element).backgroundColor.match(/[\\d.]+/g).map(Number)"
+    page.evaluate("document.activeElement?.blur()")
+    page.mouse.move(1, 1)
+    base = card.evaluate(color)
+    assert len(base) == 3 or base[3] > .95, (selector, base)
+    assert max(base[:3]) - min(base[:3]) < 16, (selector, base)
+    assert card.evaluate("element => parseFloat(getComputedStyle(element).borderRadius)") >= 12
+    card.hover()
+    hover = card.evaluate(color)
+    assert sum(hover[:3]) > sum(base[:3]), (selector, base, hover)
+    page.mouse.move(1, 1)
+    card.locator('a[href]').first.focus()
+    focused = card.evaluate(color)
+    assert sum(focused[:3]) > sum(base[:3]), (selector, base, focused)
+    page.evaluate("document.activeElement?.blur()")
+
+
 def main():
     passed = 0
 
@@ -192,6 +212,9 @@ def main():
 
         page = setup(browser, body='<ytd-app id="native-app"><ytd-page-manager><p id="native-state">Native state</p></ytd-page-manager></ytd-app>')
         expect(page.locator("#myt-home")).to_be_visible()
+        expect(page.locator("#myt-home .myt-search__icon")).to_have_count(0)
+        home_mark = page.locator("#myt-home .myt-home__mark").inner_html()
+        home_wordmark = page.locator("#myt-home .myt-home__wordmark").text_content()
         assert page.locator("#native-state").count() == 1, "Homepage must preserve YouTube's native DOM"
         expect(page).to_have_title("YouTube")
         centered(page, ".myt-search")
@@ -588,6 +611,51 @@ def main():
         ok("modern native searchbox keeps its visible logo/form group centered and submits normally")
         page.close()
 
+        for variant, header in [('legacy', MASTHEAD), ('modern', modern_header)]:
+            for width in [1440, 390]:
+                page = setup(browser, '/results?search_query=icon', '<ytd-app>' + header + '<ytd-page-manager class="ytd-app"><ytd-search>Results</ytd-search></ytd-page-manager></ytd-app>', width=width)
+                icon_class = 'search-icon' if variant == 'legacy' else 'ytSearchboxComponentSearchIconContainer'
+                icon_id = 'search-icon' if variant == 'legacy' else 'fixture-modern-icon'
+                holder = '#search-input' if variant == 'legacy' else '.ytSearchboxComponentInputBox'
+                page.locator(holder).evaluate("(element, fixture) => { element.style.position='relative'; element.insertAdjacentHTML('afterbegin', fixture); }", f'<span id="{icon_id}" class="{icon_class}" data-fixture-leading style="position:absolute;left:0;top:0;width:24px;height:24px"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="10" cy="10" r="7"/></svg></span>')
+                expect(page.locator('[data-fixture-leading]')).to_be_hidden()
+                expect(page.locator('.myt-masthead-brand')).to_have_count(1)
+                expect(page.locator('#logo-icon')).to_be_hidden()
+                assert page.locator('.myt-masthead-brand .myt-home__mark').inner_html() == home_mark
+                assert page.locator('.myt-masthead-brand .myt-home__wordmark').text_content() == home_wordmark
+                centered_header(page)
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Header must fit narrow screens'
+                page.locator('#search').fill('Савельев Сергей & C++')
+                expect(page.locator('#search')).to_have_value('Савельев Сергей & C++')
+                submit = page.locator('#search-icon-legacy' if variant == 'legacy' else '.ytSearchboxComponentSearchButton')
+                expect(submit).to_be_visible()
+                if width == 1440:
+                    page.locator('#search').press('Enter')
+                else:
+                    submit.click()
+                page.wait_for_url('**/results?**')
+                assert parse_qs(urlparse(page.url).query)['search_query'] == ['Савельев Сергей & C++']
+                ok(f'{variant} search at {width}px removes overlapping leading icon, retains native submit and uses homepage brand')
+                page.close()
+
+        page = setup(browser, '/results?search_query=brand', '<ytd-app>' + MASTHEAD + '<ytd-page-manager class="ytd-app"><ytd-search>Results</ytd-search></ytd-page-manager></ytd-app>')
+        page.locator('#logo').evaluate("element => element.innerHTML = '<span id=logo-icon><svg viewBox=\"0 0 90 20\"><rect width=90 height=20/></svg></span>'")
+        expect(page.locator('.myt-masthead-brand')).to_have_count(1)
+        expect(page.locator('#logo-icon')).to_be_hidden()
+        page.locator('#logo').evaluate("element => element.append(element.querySelector('.myt-masthead-brand').cloneNode(true))")
+        expect(page.locator('.myt-masthead-brand')).to_have_count(1)
+        assert_stable(page)
+        page.evaluate('__setEnabled(false)')
+        expect(page.locator('.myt-masthead-brand')).to_have_count(0)
+        expect(page.locator('#logo-icon')).to_be_visible()
+        expect(page.locator('#logo')).to_have_attribute('href', '/')
+        page.evaluate('__setEnabled(true)')
+        expect(page.locator('.myt-masthead-brand')).to_have_count(1)
+        page.locator('#logo').click()
+        page.wait_for_url('https://www.youtube.com/')
+        ok('homepage-style masthead brand repairs native rerenders without duplicates, restores native logo on disable and keeps its home link')
+        page.close()
+
         watch = '<ytd-app>' + MASTHEAD + '''
           <ytd-page-manager class="ytd-app"><ytd-watch-flexy>
           <div id="columns"><div id="primary"><div id="player"><video></video></div>
@@ -940,6 +1008,41 @@ def main():
         expect(page.locator("#result-1 ytd-channel-name")).to_be_visible()
         ok("390px search stacks video cards in one column without overflow")
         page.close()
+
+        for dark in [True, False]:
+            page = setup(browser, '/results?search_query=surfaces', search, native_dark=dark)
+            page.emulate_media(reduced_motion='reduce')
+            for selector in ['#result-1', '#modern-video']:
+                assert_card_surface(page, selector)
+            for selector in ['#playlist-result', '#channel-result', '#continuation']:
+                assert page.locator(selector).evaluate("element => getComputedStyle(element).backgroundColor") == 'rgba(0, 0, 0, 0)', selector
+            page.set_viewport_size({'width':390, 'height':960})
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            expect(page.locator('#result-1 #video-title')).to_be_visible()
+            page.evaluate('__setEnabled(false)')
+            assert page.locator('#result-1').evaluate("element => getComputedStyle(element).backgroundColor") == 'rgba(0, 0, 0, 0)'
+            ok(f"{'dark' if dark else 'light'} search video cards have gray rounded surfaces that brighten on hover/focus without painting playlists or breaking mobile width")
+            page.close()
+
+            channel_cards = '''<ytd-app><ytd-page-manager class="ytd-app"><ytd-browse page-subtype="channels"><div id="contents">
+              <ytd-rich-grid-renderer style="display:grid;grid-template-columns:repeat(var(--ytd-rich-grid-items-per-row),minmax(0,1fr));gap:28px">
+                <ytd-rich-item-renderer id="rich-surface"><yt-lockup-view-model id="nested-lockup"><a href="/watch?v=rich"><div style="height:120px">Preview</div></a><h3><a href="/watch?v=rich">Rich video</a></h3></yt-lockup-view-model></ytd-rich-item-renderer>
+              </ytd-rich-grid-renderer>
+              <ytd-grid-renderer style="display:block"><div id="items"><ytd-grid-video-renderer id="grid-surface" style="display:block"><a href="/watch?v=grid"><div style="height:120px">Preview</div></a><h3><a href="/watch?v=grid">Grid video</a></h3></ytd-grid-video-renderer></div></ytd-grid-renderer>
+              <div style="width:380px;max-width:100%"><yt-lockup-view-model id="standalone-surface"><a href="/watch?v=standalone"><div style="height:120px">Preview</div></a><h3><a href="/watch?v=standalone">Standalone video</a></h3></yt-lockup-view-model></div>
+              <ytd-rich-item-renderer id="channel-playlist"><yt-collection-thumbnail-view-model>Playlist cover</yt-collection-thumbnail-view-model><a href="/watch?v=first&list=PLfixture">Playlist</a></ytd-rich-item-renderer>
+            </div></ytd-browse></ytd-page-manager></ytd-app>'''
+            page = setup(browser, '/@creator/videos', channel_cards, native_dark=dark)
+            page.emulate_media(reduced_motion='reduce')
+            for selector in ['#rich-surface', '#grid-surface', '#standalone-surface']:
+                assert_card_surface(page, selector)
+            assert page.locator('#nested-lockup').evaluate("element => getComputedStyle(element).backgroundColor") == 'rgba(0, 0, 0, 0)'
+            assert page.locator('#nested-lockup').evaluate("element => parseFloat(getComputedStyle(element).paddingLeft)") == 0
+            assert page.locator('#channel-playlist').evaluate("element => getComputedStyle(element).backgroundColor") == 'rgba(0, 0, 0, 0)'
+            page.set_viewport_size({'width':390, 'height':960})
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            ok(f"{'dark' if dark else 'light'} channel rich/grid/modern video cards brighten on hover/focus with one padded surface and no mobile overflow")
+            page.close()
 
         popup_html = (ROOT / "src/popup/popup.html").read_text().replace('<script src="./popup.js"></script>', '')
         page = browser.new_page()
