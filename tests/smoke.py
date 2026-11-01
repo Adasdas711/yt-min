@@ -3,6 +3,7 @@
 Run: python tests/smoke.py (requires installed Playwright and Chromium).
 No live YouTube requests or unpacked-extension installation are performed.
 """
+import base64
 import json
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -162,6 +163,22 @@ def setup_at_document_start(browser, path, enabled=True, defer_settings=False):
     return page
 
 
+def assert_uniform_full_page(page):
+    png = page.screenshot(full_page=True, animations="disabled")
+    result = page.evaluate("""async encoded => {
+      const image = await createImageBitmap(await (await fetch('data:image/png;base64,' + encoded)).blob());
+      const canvas = new OffscreenCanvas(image.width, image.height);
+      const context = canvas.getContext('2d');
+      context.drawImage(image, 0, 0);
+      const points = [[0,0],[image.width-1,0],[0,image.height-1],[image.width-1,image.height-1]];
+      for(let y=0;y<image.height;y+=120) points.push([4,y],[image.width-5,y]);
+      const colors = points.map(([x,y])=>[...context.getImageData(x,y,1,1).data].join(','));
+      return {width:image.width,height:image.height,colors:[...new Set(colors)]};
+    }""", base64.b64encode(png).decode())
+    assert len(result["colors"]) == 1, f"Full-page screenshot contains horizontal background bands: {result}"
+    assert result["height"] == page.viewport_size["height"], f"Hidden native content still expands home page: {result}"
+
+
 def main():
     passed = 0
 
@@ -223,6 +240,34 @@ def main():
         expect(page.locator("#myt-home")).to_be_visible()
         ok("saved homepage theme loads and external theme-only changes preserve the enabled extension")
         page.close()
+
+        for theme in ["dark", "light"]:
+            page = browser.new_page(viewport={"width":1440,"height":960})
+            page.route("https://www.youtube.com/**", lambda route: route.fulfill(content_type="text/html", body=document('<ytd-app id="tall-native" style="height:2400px;background:linear-gradient(red,blue)">Tall native content</ytd-app>')))
+            page.goto("https://www.youtube.com/")
+            page.evaluate("document.body.style.cssText='transform:translateY(80px);filter:brightness(.85);contain:layout;min-height:2400px'; window.scrollTo(0,300)")
+            assert page.evaluate("scrollY") >= 300, "Fixture must start with a genuinely scrolled native document"
+            body_style = page.locator("body").get_attribute("style")
+            page.evaluate(MOCK, {"theme":theme})
+            page.add_style_tag(path=str(ROOT / "src/styles/styles.css"))
+            page.add_script_tag(path=str(ROOT / "src/content/content.js"))
+            page.emulate_media(reduced_motion="reduce")
+            expect(page.locator("#myt-home")).to_be_visible()
+            assert page.locator("#myt-home").evaluate("element => element.parentElement === document.documentElement")
+            bounds = page.locator("#myt-home").bounding_box()
+            assert bounds["x"] == bounds["y"] == 0 and bounds["width"] == 1440 and bounds["height"] == 960, bounds
+            assert_uniform_full_page(page)
+            page.set_viewport_size({"width":1024,"height":700})
+            bounds = page.locator("#myt-home").bounding_box()
+            assert bounds["x"] == bounds["y"] == 0 and bounds["width"] == 1024 and bounds["height"] == 700, bounds
+            assert_uniform_full_page(page)
+            page.evaluate("__setEnabled(false)")
+            expect(page.locator("#myt-home")).to_have_count(0)
+            expect(page.locator("#tall-native")).to_be_visible()
+            assert page.locator("body").get_attribute("style") == body_style
+            assert page.evaluate("document.documentElement.scrollHeight") >= 2400
+            ok(f"{theme} home escapes transformed/filtered body, removes tall native flow, stays flat full-page after resize and restores on disable")
+            page.close()
 
         page = setup(browser)
         page.locator("#myt-query").fill("remove me")
@@ -830,6 +875,50 @@ def main():
         dynamic = page.locator("#result-5").bounding_box()
         assert abs(dynamic["width"] - left["width"]) < 2, (dynamic, left)
         ok("mixed search channels/playlists/continuation retain full width and dynamic/modern video cards use the grid")
+        page.close()
+
+        def modern_result(identifier, href, avatar=False, playlist=False):
+            identity = 'content-type="playlist"' if playlist else ''
+            avatar_link = '<a id="avatar" href="/@creator">Avatar</a>' if avatar else ''
+            return f'''<yt-lockup-view-model id="{identifier}" {identity}><div class="ytLockupViewModelHost">
+              {avatar_link}<a class="ytLockupViewModelContentImage" href="{href}"><div style="aspect-ratio:16/9;background:#333">Preview</div></a>
+              <div class="ytLockupMetadataViewModelHost"><h3><a href="{href}">Video {identifier}</a></h3><a href="/@creator">Channel</a></div>
+              </div></yt-lockup-view-model>'''
+
+        regressions = (modern_result('list-video', '/watch?v=ordinary&list=PLcontext') +
+            modern_result('avatar-first', '/watch?v=avatar', avatar=True) +
+            '<div id="single-wrapper" style="width:1100px">' + modern_result('wrapped-video', '/watch?v=wrapped') + '</div>' +
+            '<ytd-shelf-renderer id="video-shelf"><div id="content"><div id="shelf-items">' +
+            result_card(21) + result_card(22) + result_card(23) + '</div></div></ytd-shelf-renderer>' +
+            modern_result('real-playlist', '/watch?v=first&list=PLcollection', playlist=True) +
+            '<ytd-continuation-item-renderer id="new-continuation">Load more</ytd-continuation-item-renderer>')
+        regression_search = search_header + '<ytd-page-manager class="ytd-app"><ytd-search><div id="container"><ytd-section-list-renderer><div id="contents"><ytd-item-section-renderer><div id="contents">' + regressions + '</div></ytd-item-section-renderer></div></ytd-section-list-renderer></div></ytd-search></ytd-page-manager></ytd-app>'
+        page = setup(browser, '/results?search_query=regression', regression_search)
+        row_width = page.locator('ytd-item-section-renderer > #contents').bounding_box()['width']
+        expected_width = (row_width - 48) / 3
+        for selector in ['#list-video', '#avatar-first', '#wrapped-video', '#single-wrapper', '#result-21', '#result-22', '#result-23']:
+            expect(page.locator(selector + '[data-myt-search-cell]')).to_have_count(1)
+            box = page.locator(selector).bounding_box()
+            assert abs(box['width'] - expected_width) < 2, (selector, box, expected_width)
+        first_row = [page.locator(selector).bounding_box() for selector in ['#list-video', '#avatar-first', '#single-wrapper']]
+        assert max(box['y'] for box in first_row) - min(box['y'] for box in first_row) < 2, first_row
+        shelf_row = [page.locator(f'#result-{number}').bounding_box() for number in [21,22,23]]
+        assert max(box['y'] for box in shelf_row) - min(box['y'] for box in shelf_row) < 2, shelf_row
+        assert page.locator('#real-playlist[data-myt-search-video]').count() == 0
+        assert abs(page.locator('#real-playlist').bounding_box()['width'] - row_width) < 2
+        assert abs(page.locator('#new-continuation').bounding_box()['width'] - row_width) < 2
+        ok('list-context, avatar-first, wrapped and shelved videos stay in three columns while real playlists keep full width')
+
+        page.locator('ytd-item-section-renderer > #contents').evaluate("(element, card) => element.insertAdjacentHTML('beforeend', '<div id=late-wrapper style=width:1100px>' + card + '</div>')", modern_result('late-video', '/watch?v=late&list=PLcontext'))
+        expect(page.locator('#late-wrapper[data-myt-search-cell]')).to_have_count(1)
+        assert abs(page.locator('#late-video').bounding_box()['width'] - expected_width) < 2
+        page.locator('#avatar-first').evaluate("element => { element.setAttribute('content-type','playlist'); element.querySelector('h3 a').href = '/playlist?list=recycled'; }")
+        expect(page.locator('#avatar-first[data-myt-search-video]')).to_have_count(0)
+        assert abs(page.locator('#avatar-first').bounding_box()['width'] - row_width) < 2
+        page.evaluate('__setEnabled(false)')
+        assert page.locator('[data-myt-search-video], [data-myt-search-cell], [data-myt-search-grid]').count() == 0
+        assert page.locator('#single-wrapper').get_attribute('style') == 'width:1100px'
+        ok('dynamic search wrappers get compact cells, recycled playlists restore width and disabling removes all layout markers')
         page.close()
 
         page = setup(browser, "/results?search_query=fixture", search, width=900)

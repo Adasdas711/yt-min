@@ -127,30 +127,90 @@
     }
 
     function syncSearch(scope = document) {
-        for (const card of searchVideoCards) {
-            if (!enabled || root.dataset.mytPage !== "search" || !card.isConnected) {
-                card.removeAttribute("data-myt-search-video");
-                searchVideoCards.delete(card);
+        const attributes = ["data-myt-search-video", "data-myt-search-cell", "data-myt-search-grid"];
+        const active = enabled && root.dataset.mytPage === "search";
+        for (const element of searchVideoCards) {
+            if (!active || !element.isConnected || !element.closest("ytd-search")) {
+                for (const name of attributes) element.removeAttribute(name);
+                searchVideoCards.delete(element);
             }
         }
-        if (!enabled || root.dataset.mytPage !== "search") return;
-        const cards = [
-            ...(scope instanceof Element && scope.matches("yt-lockup-view-model") ? [scope] : []),
-            ...scope.querySelectorAll("yt-lockup-view-model"),
-        ];
-        for (const card of cards) {
-            if (!card.closest("ytd-search")) continue;
-            const anchor = card.querySelector("a[href]");
-            const url = anchor && new URL(anchor.href, location.href);
-            // Playlist/channel lockups keep their native information. Only an
-            // ordinary video result gets the compact title/channel treatment.
-            const video = url?.origin === location.origin && url.pathname === "/watch" && !url.searchParams.has("list");
-            if (video && !searchVideoCards.has(card)) {
-                card.setAttribute("data-myt-search-video", "");
-                searchVideoCards.add(card);
-            } else if (!video) {
-                card.removeAttribute("data-myt-search-video");
-                searchVideoCards.delete(card);
+        if (!active) return;
+        const searches = new Set([
+            ...(scope instanceof Element && scope.closest("ytd-search") ? [scope.closest("ytd-search")] : []),
+            ...scope.querySelectorAll("ytd-search"),
+        ]);
+        const videoSelector = "ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer, yt-lockup-view-model";
+        const otherResults = "ytd-channel-renderer, ytd-playlist-renderer, ytd-grid-playlist-renderer, ytd-radio-renderer, ytd-movie-renderer";
+        const shelves = "ytd-shelf-renderer, grid-shelf-view-model, ytd-rich-section-renderer, yt-horizontal-list-renderer";
+        const listContainers = "ytd-item-section-renderer > #contents, ytd-shelf-renderer > #content, ytd-horizontal-card-list-renderer > #items, grid-shelf-view-model #items, yt-horizontal-list-renderer #items, ytd-rich-grid-renderer > #contents";
+        const urlOf = anchor => {
+            try { return anchor && new URL(anchor.href, location.href); }
+            catch { return null; }
+        };
+        const isVideoURL = url => url && url.protocol === "https:" &&
+            (url.hostname === "youtube.com" || url.hostname.endsWith(".youtube.com")) &&
+            url.pathname === "/watch" && Boolean(url.searchParams.get("v"));
+        const isVideo = card => {
+            if (card.closest(nativeShorts) || card.closest(otherResults) || card.matches("[is-playlist], [content-type='playlist'], [data-content-type='playlist']") ||
+                card.querySelector("yt-collection-thumbnail-view-model, yt-collections-stack, yt-collection-thumbnail-overlay-view-model, ytd-thumbnail-overlay-side-panel-renderer, .ytCollectionThumbnailViewModelHost")) return false;
+            // A channel avatar can precede the main thumbnail in current lockups.
+            // The title or thumbnail identifies the result; incidental links do not.
+            const title = card.querySelector("a#video-title[href], a#video-title-link[href], h3 a[href], a.yt-lockup-metadata-view-model__title[href], a.yt-lockup-metadata-view-model-wiz__title[href], a.ytLockupMetadataViewModelTitle[href]");
+            const thumbnail = card.querySelector("ytd-thumbnail a[href], a#thumbnail[href], .yt-lockup-view-model__content-image a[href], .yt-lockup-view-model-wiz__content-image a[href], .ytLockupViewModelContentImage a[href], a:has(yt-thumbnail-view-model)[href]");
+            const main = title || thumbnail;
+            if (main) return isVideoURL(urlOf(main));
+            return [...card.querySelectorAll("a[href]")].some(anchor =>
+                !anchor.closest("ytd-channel-name, #channel-info, #avatar, .yt-lockup-metadata-view-model__image, .yt-lockup-metadata-view-model-wiz__image, .ytLockupMetadataViewModelImage") && isVideoURL(urlOf(anchor)));
+        };
+        for (const search of searches) {
+            const wanted = new Map();
+            const mark = (element, name) => {
+                if (!wanted.has(element)) wanted.set(element, new Set());
+                wanted.get(element).add(name);
+            };
+            const videos = [...search.querySelectorAll(videoSelector)].filter(isVideo).filter(card =>
+                !card.parentElement.closest(videoSelector));
+            const descendantCounts = new Map();
+            for (const card of videos) {
+                mark(card, "data-myt-search-video");
+                mark(card, "data-myt-search-cell");
+                for (let parent = card.parentElement; parent && parent !== search; parent = parent.parentElement) {
+                    descendantCounts.set(parent, (descendantCounts.get(parent) || 0) + 1);
+                }
+            }
+            for (const container of search.querySelectorAll(listContainers)) {
+                if (descendantCounts.has(container)) mark(container, "data-myt-search-grid");
+            }
+            const wrappers = new Set();
+            for (const card of videos) {
+                // Keep native nodes in place. A single-video wrapper is a cell;
+                // a wrapper containing several videos gets its own nested grid.
+                for (let parent = card.parentElement; parent && parent !== search; parent = parent.parentElement) {
+                    if (parent.matches("ytd-item-section-renderer > #contents")) break;
+                    if (parent.matches(`${videoSelector}, ytd-shelf-renderer, grid-shelf-view-model, ytd-rich-section-renderer, ytd-item-section-renderer, ytd-section-list-renderer`)) continue;
+                    wrappers.add(parent);
+                }
+            }
+            for (const parent of wrappers) {
+                const count = descendantCounts.get(parent);
+                const structuralList = parent.matches(`${listContainers}, yt-horizontal-list-renderer`);
+                const mixed = parent.matches(otherResults) || parent.querySelector(`${otherResults}, ${shelves}`);
+                if (structuralList || count > 1 || mixed) mark(parent, "data-myt-search-grid");
+                else if (count === 1) mark(parent, "data-myt-search-cell");
+            }
+            for (const element of searchVideoCards) {
+                if (!search.contains(element)) continue;
+                for (const name of attributes) {
+                    if (!wanted.get(element)?.has(name)) element.removeAttribute(name);
+                }
+                if (!wanted.has(element)) searchVideoCards.delete(element);
+            }
+            for (const [element, names] of wanted) {
+                for (const name of names) {
+                    if (!element.hasAttribute(name)) element.setAttribute(name, "");
+                }
+                searchVideoCards.add(element);
             }
         }
     }
@@ -360,7 +420,10 @@
             // A native GET form encodes &, #, + and Unicode correctly and retains
             // keyboard submission; do not interpolate the raw query into a URL.
         });
-        document.body.append(container);
+        // Body can be transformed, filtered or contained by YouTube/other styles.
+        // A fixed child of that body is no longer a viewport overlay. Keep the
+        // homepage beside body so its size and color do not inherit those effects.
+        root.append(container);
         requestAnimationFrame(() => {
             if (container.isConnected && document.hasFocus() &&
                 (document.activeElement === document.body || document.activeElement.closest("ytd-app"))) {
@@ -437,9 +500,11 @@
             for (const node of pendingRoots) {
                 if (node.isConnected) {
                     scanShorts(node);
-                    syncSearch(node);
                 }
             }
+            // Added thumbnails/labels can produce many mutation roots in one
+            // frame. Reconcile each search once, rather than once per new node.
+            if (pendingRoots.size) syncSearch();
             pendingRoots.clear();
             cleanTitle();
         });
