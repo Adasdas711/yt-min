@@ -1,8 +1,8 @@
 "use strict";
 
 (() => {
-    const russian = navigator.language.toLowerCase().startsWith("ru");
-    const copy = russian ? {
+    let russian = navigator.language.toLowerCase().startsWith("ru");
+    const translations = { ru: {
         tagline: "Больше внимания. Меньше шума.",
         title: "Режим фокуса",
         on: "Включён",
@@ -11,7 +11,7 @@
         footer: "Изменения применяются к открытым вкладкам YouTube.",
         readError: "Не удалось загрузить настройки. Откройте расширение заново.",
         saveError: "Не удалось сохранить. Попробуйте ещё раз.",
-    } : {
+    }, en: {
         tagline: "More focus. Less noise.",
         title: "Focus mode",
         on: "Enabled",
@@ -20,17 +20,23 @@
         footer: "Changes apply to open YouTube tabs.",
         readError: "Could not load settings. Please reopen the extension.",
         saveError: "Could not save. Please try again.",
-    };
-    document.documentElement.lang = russian ? "ru" : "en";
-    document.getElementById("tagline").textContent = copy.tagline;
-    document.getElementById("setting-title").textContent = copy.title;
-    document.getElementById("details").textContent = copy.details;
-    document.getElementById("footer").textContent = copy.footer;
+    }};
+    let copy = translations[russian ? "ru" : "en"];
     const toggle = document.getElementById("toggle");
     const status = document.getElementById("status");
     const error = document.getElementById("error");
     let enabled = true;
     let ready = false;
+    function applyLanguage(value) {
+        russian = value === "ru" || (value !== "en" && navigator.language.toLowerCase().startsWith("ru"));
+        copy = translations[russian ? "ru" : "en"];
+        document.documentElement.lang = russian ? "ru" : "en";
+        document.getElementById("tagline").textContent = copy.tagline;
+        document.getElementById("setting-title").textContent = copy.title;
+        document.getElementById("details").textContent = copy.details;
+        document.getElementById("footer").textContent = copy.footer;
+    }
+    applyLanguage(null);
     function render() {
         toggle.checked = enabled;
         status.textContent = enabled ? copy.on : copy.off;
@@ -39,12 +45,13 @@
         error.textContent = message;
         error.hidden = !message;
     }
-    chrome.storage.local.get("enabled", (data) => {
+    chrome.storage.local.get(["enabled", "language"], (data) => {
         if (chrome.runtime.lastError) {
             status.textContent = "—";
             showError(copy.readError);
             return;
         }
+        applyLanguage(data.language);
         enabled = typeof data.enabled === "undefined" ? true : Boolean(data.enabled);
         ready = true;
         render();
@@ -66,7 +73,9 @@
         });
     });
     chrome.storage.onChanged.addListener((changes, area) => {
-        if (area !== "local" || !changes.enabled) return;
+        if (area !== "local") return;
+        if (changes.language) { applyLanguage(changes.language.newValue); render(); }
+        if (!changes.enabled) return;
         enabled = typeof changes.enabled.newValue === "undefined" ? true : Boolean(changes.enabled.newValue);
         render();
     });

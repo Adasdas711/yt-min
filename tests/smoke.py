@@ -229,6 +229,247 @@ def check_home_isolation(browser, theme):
     page.close()
 
 
+
+def check_search_icon_variants(browser, variant, width, path):
+    if variant == 'legacy':
+        header = MASTHEAD.replace('name="search_query"', 'type="search" name="search_query"')
+        form = '#search-form'
+        marker = 'id="search-icon"'
+    else:
+        start = MASTHEAD.index('<ytd-searchbox>')
+        end = MASTHEAD.index('</ytd-searchbox>') + len('</ytd-searchbox>')
+        header = MASTHEAD[:start] + '''<yt-searchbox><form class="ytSearchboxComponentSearchForm" action="/results">
+          <div class="ytSearchboxComponentInputBox"><input id="search" type="search" name="search_query"></div>
+          </form></yt-searchbox>''' + MASTHEAD[end:]
+        form = '.ytSearchboxComponentSearchForm'
+        marker = 'class="ytSearchboxComponentSearchIcon"'
+    page = setup(browser, path, '<ytd-app>' + header + '</ytd-app>', width=width)
+    # YouTube can mount a leading icon as a sibling of its input box when focused.
+    page.locator('#search').fill('mr beast')
+    page.locator('#search').focus()
+    page.locator(form).evaluate("""(element, marker) => {
+      element.insertAdjacentHTML('afterbegin', `<button type="button" ${marker} data-leading-icon
+        style="position:absolute;left:16px;top:8px;width:24px;height:24px">
+        <svg width="24" height="24"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg></button>`);
+      element.insertAdjacentHTML('beforeend', '<button type="button" id="native-clear">Clear</button>');
+      element.querySelector('#native-clear').addEventListener('click', () => { element.querySelector('input').value = ''; });
+    }""", marker)
+    expect(page.locator('[data-leading-icon]')).to_be_hidden()
+    expect(page.locator('#native-clear')).to_be_visible()
+    assert page.locator('#search').evaluate("element => getComputedStyle(element).appearance") == 'none'
+    assert page.locator('#search').evaluate("element => getComputedStyle(element, '::-webkit-search-decoration').appearance") == 'none'
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('[data-leading-icon]')).to_be_visible()
+    page.evaluate('__setEnabled(true)')
+    expect(page.locator('[data-leading-icon]')).to_be_hidden()
+    page.locator('#native-clear').click()
+    expect(page.locator('#search')).to_have_value('')
+    page.locator('#search').fill('mr beast & C++')
+    page.locator('#search').press('Enter')
+    page.wait_for_url('**/results?**')
+    assert parse_qs(urlparse(page.url).query)['search_query'] == ['mr beast & C++']
+    page.close()
+
+
+
+def check_gutter_document_scroll(browser, path, renderer):
+    fixture = f'''<ytd-app><ytd-page-manager><{renderer} page-subtype="channels" style="min-height:3200px">
+      <div id="contents" style="height:3000px;max-width:1200px;margin-inline:auto">Page content</div></{renderer}></ytd-page-manager></ytd-app>
+      <div id="left-gutter" style="position:fixed;left:0;top:0;width:80px;height:100vh;overflow:hidden;overscroll-behavior:contain"></div>
+      <div id="right-gutter" style="position:fixed;right:0;top:0;width:80px;height:100vh;overflow:hidden;overscroll-behavior:contain"></div>'''
+    page = setup(browser, path, fixture, width=2016)
+    page.evaluate("""() => {
+      for (const id of ['left-gutter', 'right-gutter']) {
+        document.getElementById(id).addEventListener('wheel', event => event.preventDefault(), {passive:false});
+      }
+    }""")
+    for x in [20, 1996]:
+        page.evaluate('window.scrollTo(0,0)')
+        page.mouse.move(x,400)
+        page.mouse.wheel(0,300)
+        page.wait_for_function('window.scrollY >= 250')
+        # Capture forwarding must consume the native default, not double the delta.
+        page.wait_for_timeout(100)
+        assert 250 <= page.evaluate('scrollY') <= 350
+        page.mouse.wheel(0,-150)
+        page.wait_for_function('window.scrollY < 250')
+    page.evaluate('__setEnabled(false); window.scrollTo(0,0)')
+    page.mouse.wheel(0,300)
+    page.wait_for_timeout(100)
+    assert page.evaluate('scrollY') == 0
+    page.close()
+
+
+
+def check_latest_search_shelf(browser, title, renderer):
+    fixture = f'''<ytd-app><ytd-page-manager><ytd-search><ytd-section-list-renderer><div id="contents"><ytd-item-section-renderer><div id="contents">
+      <ytd-channel-renderer id="matching-channel"><a href="/@creator">Creator</a><button id="subscribe">Subscribe</button></ytd-channel-renderer>
+      <{renderer} id="latest"><div id="header"><h2>{title}</h2></div><div id="content">
+      <ytd-video-renderer><a id="video-title" href="/watch?v=latest">Latest video</a></ytd-video-renderer><button>+8 more</button></div></{renderer}>
+      <ytd-video-renderer id="ordinary-video"><h3><a id="video-title" href="/watch?v=ordinary">{title}</a></h3></ytd-video-renderer>
+      <ytd-shelf-renderer id="ordinary-shelf"><div id="header"><h2>Popular videos</h2></div><div id="content"><ytd-video-renderer><a id="video-title" href="/watch?v=popular">Popular</a></ytd-video-renderer></div></ytd-shelf-renderer>
+      </div></ytd-item-section-renderer></div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>'''
+    page = setup(browser, '/results?search_query=creator', fixture)
+    expect(page.locator('#latest')).to_be_hidden()
+    for selector in ['#matching-channel', '#subscribe', '#ordinary-video', '#ordinary-shelf']:
+        expect(page.locator(selector)).to_be_visible()
+    page.locator('#latest #header h2').evaluate("element => element.textContent='Popular videos'")
+    expect(page.locator('#latest')).to_be_visible()
+    page.locator('#latest #header h2').evaluate('(element, title) => element.textContent=title',title)
+    expect(page.locator('#latest')).to_be_hidden()
+    page.locator('#latest').evaluate("element => { const copy=element.cloneNode(true); copy.id='dynamic-latest'; element.after(copy); }")
+    expect(page.locator('#dynamic-latest')).to_be_hidden()
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('#latest')).to_be_visible()
+    expect(page.locator('#dynamic-latest')).to_be_visible()
+    page.evaluate('__setEnabled(true)')
+    expect(page.locator('#latest')).to_be_hidden()
+    page.evaluate("document.querySelector('ytd-page-manager').insertAdjacentHTML('beforeend','<ytd-browse page-subtype=channels>Channel</ytd-browse>')")
+    navigate_spa(page, '/@creator/videos')
+    expect(page.locator('#latest')).to_be_visible()
+    page.close()
+
+
+
+def check_channel_sections(browser, width):
+    cards = ''.join(f'<ytd-grid-video-renderer id="popular-{i}"><ytd-thumbnail><a href="/watch?v={i}">Preview</a></ytd-thumbnail><a href="/watch?v={i}">Title</a></ytd-grid-video-renderer>' for i in range(5))
+    fixture = f'''<ytd-app><ytd-page-manager><ytd-browse page-subtype="channels"><div id="contents">
+      <ytd-shelf-renderer id="uploads"><div id="title-container"><h2>New Uploads</h2><button>Play all</button></div><div style="height:300px">Uploads</div></ytd-shelf-renderer>
+      <ytd-shelf-renderer id="for-you"><div id="title-container"><h2>For you</h2></div><ytd-horizontal-list-renderer><div style="overflow-x:auto"><div id="items" style="display:flex;width:max-content">{cards.replace('popular-', 'for-you-')}</div></div></ytd-horizontal-list-renderer></ytd-shelf-renderer>
+      <ytd-shelf-renderer id="popular"><div id="title-container"><h2>Popular videos</h2></div><ytd-horizontal-list-renderer><div id="carousel-scroll" style="overflow-x:auto"><div id="items" style="display:flex;width:max-content">{cards}</div></div></ytd-horizontal-list-renderer></ytd-shelf-renderer>
+      </div></ytd-browse></ytd-page-manager></ytd-app>'''
+    page = setup(browser, '/@creator', fixture, width=width)
+    expect(page.locator('#uploads')).to_be_hidden()
+    expect(page.locator('#for-you')).to_be_visible()
+    first = page.locator('#for-you-0 ytd-thumbnail').bounding_box()
+    popular = page.locator('#popular-0 ytd-thumbnail').bounding_box()
+    assert abs(first['width'] - popular['width']) < 1, (first,popular)
+    assert abs(popular['height'] - popular['width'] * 9 / 16) < 1, popular
+    rail = page.locator('#popular ytd-horizontal-list-renderer').bounding_box()['width']
+    expected_columns = 3 if width > 900 else 2 if width > 500 else 1
+    expected = (rail - (expected_columns - 1) * 28) / expected_columns
+    assert abs(page.locator('#popular-0').bounding_box()['width'] - expected) < 1
+    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+    assert page.locator('#carousel-scroll').evaluate('element => { element.scrollLeft=300; return element.scrollLeft; }') > 0
+    page.locator('#uploads h2').evaluate("element => element.firstChild.nodeValue='Popular videos'")
+    expect(page.locator('#uploads')).to_be_visible()
+    page.locator('#uploads h2').evaluate("element => element.firstChild.nodeValue='Новые видео'")
+    expect(page.locator('#uploads')).to_be_hidden()
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('#uploads')).to_be_visible()
+    page.close()
+
+
+def check_navigation_style_retention(browser):
+    fixture = '''<ytd-app><ytd-page-manager><ytd-watch-flexy id="old-watch"><div id="secondary">Native recommendations</div><ytd-comments>Native comments</ytd-comments></ytd-watch-flexy></ytd-page-manager></ytd-app>'''
+    page = setup(browser, '/watch?v=source', fixture)
+    expect(page.locator('#secondary')).to_be_hidden()
+    state = page.evaluate("""() => {
+      document.dispatchEvent(new CustomEvent('yt-navigate-start', {detail:{url:'/results?search_query=target'}}));
+      return {page:document.documentElement.dataset.mytPage, hidden:getComputedStyle(document.querySelector('#secondary')).display==='none'};
+    }""")
+    assert state == {'page':'search','hidden':True}, state
+    page.evaluate("history.pushState({},'', '/results?search_query=target')")
+    frames = page.evaluate("""async () => {
+      const states=[];
+      for(let n=0;n<8;n++) { await new Promise(requestAnimationFrame); states.push(getComputedStyle(document.querySelector('#secondary')).display); }
+      return states;
+    }""")
+    assert set(frames) == {'none'}, frames
+    page.evaluate("""() => {
+      document.querySelector('#old-watch').hidden=true;
+      document.querySelector('ytd-page-manager').insertAdjacentHTML('beforeend','<ytd-search><ytd-video-renderer><a id=video-title href=/watch?v=next>Next</a></ytd-video-renderer></ytd-search>');
+      document.dispatchEvent(new Event('yt-navigate-finish'));
+    }""")
+    expect(page.locator('html')).not_to_have_attribute('data-myt-previous-page')
+    expect(page.locator('ytd-search [data-myt-search-video]')).to_have_count(1)
+    page.evaluate("document.dispatchEvent(new CustomEvent('yt-navigate-start',{detail:{url:'/@creator'}})); document.dispatchEvent(new Event('yt-navigate-cancel'))")
+    expect(page.locator('html')).to_have_attribute('data-myt-page','search')
+    expect(page.locator('html')).not_to_have_attribute('data-myt-previous-page')
+    page.close()
+
+
+
+def check_home_settings(browser, width):
+    page = setup(browser, theme='dark', width=width)
+    page.evaluate("""() => {
+      window.__cookieRequests=[];
+      window.__testCookies=[{name:'PREF',domain:'.youtube.com'}];
+      chrome.runtime.sendMessage=(message, callback) => {
+        __cookieRequests.push(message.action);
+        if(message.action==='minimal-youtube:clear-cookies') {
+          const removed=__testCookies.length; __testCookies=[];
+          callback({ok:true, removed, cookies:[]});
+        } else callback({ok:true,cookies:__testCookies});
+      };
+    }""")
+    expect(page.locator('#myt-settings-panel')).to_be_hidden()
+    page.locator('#myt-settings-button').click()
+    expect(page.locator('#myt-settings-panel')).to_be_visible()
+    expect(page.locator('#myt-cookie-list')).to_contain_text('PREF · .youtube.com')
+    assert page.locator('#myt-account-manage').get_attribute('href') == 'https://www.youtube.com/account'
+    assert page.locator('#myt-account-signin').get_attribute('href').startswith('https://www.youtube.com/signin?')
+    assert page.locator('#myt-account-switch').get_attribute('href').startswith('https://accounts.google.com/AccountChooser?')
+    assert page.locator('#myt-account-signout').get_attribute('href').startswith('https://www.youtube.com/logout?')
+    page.locator('#myt-cookie-clear').click()
+    expect(page.locator('#myt-cookie-confirmation')).to_be_visible()
+    assert page.evaluate('__cookieRequests').count('minimal-youtube:clear-cookies') == 0
+    page.locator('#myt-cookie-cancel').click()
+    expect(page.locator('#myt-cookie-confirmation')).to_be_hidden()
+    assert page.evaluate('__cookieRequests').count('minimal-youtube:clear-cookies') == 0
+    page.locator('#myt-cookie-clear').click()
+    page.locator('#myt-cookie-confirm').click()
+    expect(page.locator('#myt-cookie-status')).to_have_text('Deleted: 1. Cookies: 0')
+    expect(page.locator('#myt-cookie-clear')).to_be_disabled()
+    assert page.evaluate('__cookieRequests').count('minimal-youtube:clear-cookies') == 1
+    page.locator('#myt-settings-theme').select_option('light')
+    expect(page.locator('html')).to_have_attribute('data-myt-theme','light')
+    assert page.evaluate('__stored.theme') == 'light'
+    page.locator('#myt-settings-close').click()
+    page.locator('#myt-theme-toggle').click()
+    page.locator('#myt-settings-button').click()
+    expect(page.locator('#myt-settings-theme')).to_have_value('dark')
+    page.evaluate("chrome.storage.local.set({language:'ru'})")
+    expect(page.locator('#myt-settings-panel h2')).to_have_text('Настройки')
+    expect(page.locator('#myt-settings-language')).to_have_value('ru')
+    expect(page.locator('#myt-query')).to_have_attribute('placeholder','Поиск на YouTube')
+    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+    page.locator('#myt-settings-close').click()
+    expect(page.locator('#myt-settings-panel')).to_be_hidden()
+    expect(page.locator('#myt-settings-button')).to_be_focused()
+    page.locator('#myt-settings-button').click()
+    page.locator('#myt-settings-close').press('Escape')
+    expect(page.locator('#myt-settings-panel')).to_be_hidden()
+    expect(page.locator('#myt-home')).to_be_visible()
+    page.locator('#myt-settings-button').click()
+    page.locator('#myt-settings-language').select_option('en')
+    page.wait_for_url('**/?**hl=en**')
+    assert parse_qs(urlparse(page.url).query)['persist_hl'] == ['1']
+    page.close()
+
+
+def check_settings_failures(browser):
+    page = setup(browser, theme='dark')
+    page.evaluate("""() => {
+      chrome.runtime.sendMessage=(message,cb)=>cb({ok:false,error:'cookies-unavailable'});
+      chrome.storage.local.set=(value,cb)=> {
+        chrome.runtime.lastError={message:'Fixture write failure'};
+        cb(); delete chrome.runtime.lastError;
+      };
+    }""")
+    page.locator('#myt-settings-button').click()
+    expect(page.locator('#myt-cookie-status')).to_contain_text('Could not access cookies')
+    expect(page.locator('#myt-cookie-clear')).to_be_disabled()
+    page.locator('#myt-settings-theme').select_option('light')
+    expect(page.locator('html')).to_have_attribute('data-myt-theme','dark')
+    expect(page.locator('#myt-settings-theme')).to_have_value('dark')
+    expect(page.locator('#myt-settings-error')).to_contain_text('Could not save')
+    page.locator('#myt-settings-language').select_option('ru')
+    expect(page.locator('#myt-settings-language')).to_have_value('')
+    assert page.url == 'https://www.youtube.com/'
+    page.close()
+
+
 def assert_card_surface(page, selector):
     card = page.locator(selector)
     color = "element => getComputedStyle(element).backgroundColor.match(/[\\d.]+/g).map(Number)"
@@ -488,6 +729,9 @@ def main():
         ok("delayed saved-disabled startup preserves native DOM/title and removes provisional styling")
         page.close()
 
+        check_navigation_style_retention(browser)
+        ok('outgoing minimalist styles survive pending/committed navigation until destination DOM mounts; cancellation restores the source route')
+
         page = setup_at_document_start(browser, "/watch?v=history")
         state = page.evaluate("""() => {
           document.dispatchEvent(new CustomEvent('yt-navigate-start', {detail:{url:'/results?search_query=history'}}));
@@ -620,6 +864,10 @@ def main():
         ok("modern image-banner component also spans the channel width without resizing the avatar")
         page.close()
 
+        for width in [2016, 900, 390]:
+            check_channel_sections(browser, width)
+            ok(f'channel at {width}px removes New Uploads, equalizes shelf thumbnail sizes, retains carousel scrolling and restores native sections on disable')
+
         channel_scroll = '''<ytd-app style="height:100%"><div id="main-scroll" style="position:absolute;top:60px;left:120px;width:calc(100% - 240px);height:840px;overflow-y:auto"><ytd-page-manager class="ytd-app">
           <ytd-browse page-subtype="channels" style="min-height:2400px">
           <div id="nested-scroll" style="width:300px;height:120px;overflow-y:auto"><div style="height:800px">Nested native scrollbox</div></div>
@@ -679,9 +927,15 @@ def main():
             ok(f"{renderer} detects an inner scrollport and ignores a stale hidden SPA renderer")
             page.close()
 
+        for path, renderer in [('/results?search_query=gutter', 'ytd-search'), ('/@creator/videos', 'ytd-browse')]:
+            check_gutter_document_scroll(browser, path, renderer)
+            ok(f'{renderer} forwards both blocked gutters to the document scrollport without double scrolling, and stays inactive when disabled')
+
         for path in ["/watch?v=header", "/results?search_query=header", "/@creator/videos", "/feed/subscriptions"]:
             page = setup(browser, path, '<ytd-app>' + MASTHEAD + '<ytd-page-manager class="ytd-app"><ytd-browse>Native content</ytd-browse></ytd-page-manager></ytd-app>')
             centered_header(page)
+            page.locator('#logo').focus()
+            assert page.locator('#logo').evaluate('element => getComputedStyle(element).outlineStyle') == 'none'
             expect(page.locator("#create")).to_be_hidden()
             expect(page.locator("#avatar-btn")).to_be_hidden()
             page.locator("#search").fill("кот & C++")
@@ -732,6 +986,11 @@ def main():
                 assert parse_qs(urlparse(page.url).query)['search_query'] == ['Савельев Сергей & C++']
                 ok(f'{variant} search at {width}px removes all search magnifiers, restores native buttons on disable and submits with Enter')
                 page.close()
+
+        for variant in ['legacy', 'modern']:
+            for path, width in [('/results?search_query=mr+beast', 1440), ('/@creator/videos', 390)]:
+                check_search_icon_variants(browser, variant, width, path)
+                ok(f'{variant} search at {width}px hides focus-mounted sibling magnifiers and browser decorations, keeps clear/Enter and restores native icons on disable')
 
         page = setup(browser, '/results?search_query=brand', '<ytd-app>' + MASTHEAD + '<ytd-page-manager class="ytd-app"><ytd-search>Results</ytd-search></ytd-page-manager></ytd-app>')
         page.locator('#logo').evaluate("element => element.innerHTML = '<span id=logo-icon><svg viewBox=\"0 0 90 20\"><rect width=90 height=20/></svg></span>'")
@@ -1084,6 +1343,10 @@ def main():
         ok('dynamic search wrappers get compact cells, recycled playlists restore width and disabling removes all layout markers')
         page.close()
 
+        for title, renderer in [('Новые видео на канале MrBeast', 'ytd-shelf-renderer'), ('Latest from MrBeast', 'grid-shelf-view-model')]:
+            check_latest_search_shelf(browser, title, renderer)
+            ok(f'{renderer} hides the entire latest-uploads shelf, handles dynamic/reused shelves, preserves channel/ordinary results and restores on disable or route change')
+
         page = setup(browser, "/results?search_query=fixture", search, width=900)
         first = page.locator("#result-1").bounding_box()
         second = page.locator("#result-2").bounding_box()
@@ -1139,6 +1402,12 @@ def main():
             ok(f"{'dark' if dark else 'light'} channel rich/grid/modern video cards brighten on hover/focus with one padded surface and no mobile overflow")
             page.close()
 
+        for width in [1440, 390]:
+            check_home_settings(browser,width)
+            ok(f'home settings at {width}px expose official account controls, confirm scoped cookie deletion, save theme/language and close accessibly')
+        check_settings_failures(browser)
+        ok('settings show cookie permission failures and restore theme/language after failed storage writes')
+
         popup_html = (ROOT / "src/popup/popup.html").read_text().replace('<script src="./popup.js"></script>', '')
         page = browser.new_page()
         page.set_content(popup_html)
@@ -1170,6 +1439,18 @@ def main():
         expect(page.locator("#error")).to_be_visible()
         ok("popup handles storage read failure without accepting an unknown state")
         page.close()
+        page = browser.new_page()
+        page.set_content(popup_html)
+        page.evaluate(MOCK, {'language':'ru'})
+        page.add_script_tag(path=str(ROOT / 'src/popup/popup.js'))
+        expect(page.locator('html')).to_have_attribute('lang','ru')
+        expect(page.locator('#setting-title')).to_have_text('Режим фокуса')
+        page.evaluate("chrome.storage.local.set({language:'en'})")
+        expect(page.locator('#setting-title')).to_have_text('Focus mode')
+        expect(page.locator('#toggle')).to_be_checked()
+        ok('popup uses the saved language and follows language changes without resetting focus mode')
+        page.close()
+
         browser.close()
     print(f"{passed} browser fixture checks passed (mock storage; live integration not tested)")
 

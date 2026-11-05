@@ -23,16 +23,75 @@
     const tabSelector = "yt-tab-shape, tp-yt-paper-tab, [role='tab'], yt-chip-cloud-chip-renderer";
     const channelRoute = /^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)(?:\/|$)/;
     const channelShorts = /^(\/(?:@[^/]+|(?:channel|c|user)\/[^/]+))\/shorts\/?$/;
-    const ru = (document.documentElement.lang || navigator.language).toLowerCase().startsWith("ru");
-    const copy = ru ? {
-        search: "Поиск на YouTube", clear: "Очистить поиск",
-        label: "Поиск видео", light: "Светлая тема", dark: "Тёмная тема",
-        comments: "Комментарии", hideComments: "Скрыть комментарии",
-    } : {
-        search: "Search YouTube", clear: "Clear search",
-        label: "Search videos", light: "Light theme", dark: "Dark theme",
-        comments: "Comments", hideComments: "Hide comments",
-    };
+    const defaultLanguage = (root.lang || navigator.language).toLowerCase().startsWith("ru") ? "ru" : "en";
+    const messages = {
+    "ru": {
+        "search": "Поиск на YouTube",
+        "clear": "Очистить поиск",
+        "label": "Поиск видео",
+        "light": "Светлая тема",
+        "dark": "Тёмная тема",
+        "comments": "Комментарии",
+        "hideComments": "Скрыть комментарии",
+        "settings": "Настройки",
+        "close": "Закрыть настройки",
+        "account": "Аккаунт YouTube",
+        "accountInfo": "Вход, выход и смена аккаунта на официальных страницах YouTube и Google.",
+        "manage": "Управление аккаунтом",
+        "signin": "Войти",
+        "switchAccount": "Сменить аккаунт",
+        "signout": "Выйти",
+        "cookies": "Cookies YouTube",
+        "cookieInfo": "Только cookies YouTube. Их удаление может потребовать повторного входа.",
+        "loading": "Загрузка…",
+        "deleteCookies": "Удалить cookies YouTube",
+        "confirmCookies": "Удалить все cookies YouTube в этом профиле?",
+        "confirm": "Удалить",
+        "cancel": "Отмена",
+        "cookieError": "Не удалось получить доступ к cookies. Проверьте разрешения расширения.",
+        "saveError": "Не удалось сохранить настройку. Попробуйте ещё раз.",
+        "cookieCount": "Cookies:",
+        "cookieDeleted": "Удалено:",
+        "language": "Язык",
+        "system": "Как на YouTube",
+        "theme": "Тема"
+    },
+    "en": {
+        "search": "Search YouTube",
+        "clear": "Clear search",
+        "label": "Search videos",
+        "light": "Light theme",
+        "dark": "Dark theme",
+        "comments": "Comments",
+        "hideComments": "Hide comments",
+        "settings": "Settings",
+        "close": "Close settings",
+        "account": "YouTube account",
+        "accountInfo": "Sign in, sign out and switch accounts on the official YouTube and Google pages.",
+        "manage": "Manage account",
+        "signin": "Sign in",
+        "switchAccount": "Switch account",
+        "signout": "Sign out",
+        "cookies": "YouTube cookies",
+        "cookieInfo": "YouTube cookies only. Deleting them may require signing in again.",
+        "loading": "Loading…",
+        "deleteCookies": "Delete YouTube cookies",
+        "confirmCookies": "Delete all YouTube cookies in this profile?",
+        "confirm": "Delete",
+        "cancel": "Cancel",
+        "cookieError": "Could not access cookies. Check the extension permissions.",
+        "saveError": "Could not save the setting. Please try again.",
+        "cookieCount": "Cookies:",
+        "cookieDeleted": "Deleted:",
+        "language": "Language",
+        "system": "Same as YouTube",
+        "theme": "Theme"
+    }
+};
+    let language = null;
+    let languageRevision = 0;
+    let copy = messages[defaultLanguage];
+    let settingsOpen = false;
     let enabled = false;
     let settingsReady = false;
     let currentURL = "";
@@ -52,6 +111,7 @@
     let commentsButton = null;
     const voteElements = new Set();
     const searchVideoCards = new Set();
+    const hiddenSections = new Set();
     const commentPanelStates = new Map();
     const brandedLinks = new Set();
     // A shadow root isolates the home controls from document-wide CSS.
@@ -186,6 +246,14 @@
     opacity: 1;
 }
 
+.myt-search__input::-webkit-search-decoration,
+.myt-search__input::-webkit-search-results-button,
+.myt-search__input::-webkit-search-results-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+    display: none;
+}
+
 .myt-search__input::-webkit-search-cancel-button {
     appearance: none;
 }
@@ -275,6 +343,47 @@
 
 
 :host::before, :host::after, :host::backdrop { content: none !important; display: none !important; }
+
+[hidden] { display: none !important; }
+.myt-settings-button {
+    position: fixed; right: 24px; top: 24px;
+    display: grid; place-items: center; width: 44px; height: 44px;
+    border: 1px solid var(--myt-border); border-radius: 14px;
+    background: var(--myt-surface); color: var(--myt-muted); cursor: pointer;
+}
+.myt-settings-button:hover { color: var(--myt-ink); background: var(--myt-soft); }
+.myt-settings-button svg { width: 22px; height: 22px; }
+.myt-settings-panel {
+    position: fixed; right: 24px; top: 80px; z-index: 1;
+    width: min(360px, calc(100% - 32px)); max-height: calc(100svh - 104px);
+    overflow: auto; overscroll-behavior: contain; padding: 20px;
+    border: 1px solid var(--myt-border); border-radius: 18px;
+    background: var(--myt-surface); color: var(--myt-ink); text-align: start;
+    font: 14px/1.5 "Roboto", "Arial", sans-serif;
+}
+.myt-settings-panel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.myt-settings-panel h2 { margin: 0; font-size: 18px; }
+.myt-settings-panel section { padding-block: 16px; border-bottom: 1px solid var(--myt-border); }
+.myt-settings-panel section:last-of-type { border: 0; padding-bottom: 0; }
+.myt-settings-panel h3, .myt-settings-panel label { display: block; font-size: 14px; font-weight: 600; margin: 0 0 8px; }
+.myt-settings-panel p { color: var(--myt-muted); font-size: 12px; margin: 8px 0; }
+.myt-settings-panel a, .myt-settings-panel button, .myt-settings-panel select {
+    font: inherit; border: 1px solid var(--myt-border); border-radius: 9px;
+    color: var(--myt-ink); background: var(--myt-soft); padding: 8px 10px;
+}
+.myt-settings-panel a, .myt-settings-panel button { cursor: pointer; text-decoration: none; }
+.myt-settings-panel button:disabled { opacity: .5; cursor: default; }
+.myt-settings-panel :is(a, button, select):focus-visible, .myt-settings-button:focus-visible { outline: 2px solid var(--myt-muted); outline-offset: 3px; }
+.myt-settings-panel select { width: 100%; }
+.myt-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.myt-settings-panel ul { margin: 8px 0; padding: 0; list-style: none; max-height: 120px; overflow: auto; font-size: 12px; overflow-wrap: anywhere; }
+.myt-settings-panel li { padding-block: 4px; border-bottom: 1px solid var(--myt-border); }
+.myt-settings-panel #myt-settings-error { color: var(--myt-ink); }
+@media (max-width: 600px) {
+    .myt-settings-button { right: 16px; top: 16px; }
+    .myt-settings-panel { right: 16px; top: 72px; max-height: calc(100svh - 88px); }
+}
+
 @media (max-width: 600px) {
     :host {
         justify-content: flex-start !important;
@@ -302,6 +411,32 @@
         "[target-id='watch-like']", "[target-id='watch-dislike']",
     ].join(",");
 
+    function applyLanguage(value) {
+        language = value === "ru" || value === "en" ? value : null;
+        copy = messages[language || defaultLanguage];
+        if (home?.isConnected) {
+            home.remove();
+            home = createHome();
+            renderTheme();
+        }
+        if (settingsReady) syncWatch();
+    }
+
+    function saveTheme(value) {
+        const previous = theme;
+        theme = value;
+        const writing = ++themeWrite;
+        renderTheme();
+        chrome.storage.local.set({ theme }, () => {
+            if (chrome.runtime?.lastError && writing === themeWrite) {
+                theme = previous;
+                renderTheme();
+                const error = home?.firstElementChild.shadowRoot.querySelector("#myt-settings-error");
+                if (error) error.textContent = copy.saveError;
+            }
+        });
+    }
+
     function renderTheme() {
         if (enabled) root.dataset.mytTheme = theme || (root.hasAttribute("dark") ? "dark" : "light");
         else delete root.dataset.mytTheme;
@@ -309,6 +444,8 @@
             home.dataset.mytTheme = root.dataset.mytTheme || "";
             home.firstElementChild.dataset.mytTheme = root.dataset.mytTheme || "";
         }
+        const themeSelect = home?.firstElementChild.shadowRoot.querySelector("#myt-settings-theme");
+        if (themeSelect) themeSelect.value = root.dataset.mytTheme || "light";
         const button = home?.firstElementChild.shadowRoot.querySelector("#myt-theme-toggle");
         if (!button) return;
         const dark = theme ? theme === "dark" : root.hasAttribute("dark");
@@ -403,9 +540,41 @@
         brandedLinks.clear();
     }
 
+    function syncSections() {
+        const wanted = new Set();
+        if (enabled) {
+            const pages = [root.dataset.mytPage, root.dataset.mytPreviousPage];
+            for (const page of new Set(pages)) {
+                const selector = page === "search" ? "ytd-search" : page === "channel" ? "ytd-browse[page-subtype='channels']" : null;
+                if (!selector) continue;
+                for (const scope of document.querySelectorAll(selector)) {
+                    for (const shelf of scope.querySelectorAll("ytd-shelf-renderer, grid-shelf-view-model, ytd-rich-section-renderer")) {
+                        const heading = shelf.querySelector("#title-container, #header, :scope > #title, :scope > h2, yt-section-header-view-model, .ytShelfHeaderLayoutTitle");
+                        const titleNode = heading?.querySelector("#title, h2, h3, .ytSectionHeaderViewModelTitle") || heading;
+                        const title = titleNode?.textContent.replace(/\s+/g, " ").trim() || "";
+                        const match = page === "search" ?
+                            /^(?:новые видео на канале|последние видео (?:на канале|от)|latest(?: videos)? from|new videos from)\s+/iu :
+                            /^(?:new uploads|новые (?:видео|загрузки)|последние (?:видео|загрузки))(?=$|\s)/iu;
+                        if (match.test(title)) wanted.add(shelf);
+                    }
+                }
+            }
+        }
+        for (const shelf of hiddenSections) {
+            if (!wanted.has(shelf)) {
+                shelf.removeAttribute("data-myt-hidden-section");
+                hiddenSections.delete(shelf);
+            }
+        }
+        for (const shelf of wanted) {
+            if (!shelf.hasAttribute("data-myt-hidden-section")) shelf.setAttribute("data-myt-hidden-section", "latest");
+            hiddenSections.add(shelf);
+        }
+    }
+
     function syncSearch(scope = document) {
         const attributes = ["data-myt-search-video", "data-myt-search-cell", "data-myt-search-grid"];
-        const active = enabled && root.dataset.mytPage === "search";
+        const active = enabled && (root.dataset.mytPage === "search" || root.dataset.mytPreviousPage === "search");
         for (const element of searchVideoCards) {
             if (!active || !element.isConnected || !element.closest("ytd-search")) {
                 for (const name of attributes) element.removeAttribute(name);
@@ -447,7 +616,7 @@
                 wanted.get(element).add(name);
             };
             const videos = [...search.querySelectorAll(videoSelector)].filter(isVideo).filter(card =>
-                !card.parentElement.closest(videoSelector));
+                !card.parentElement.closest(videoSelector) && !card.closest("[data-myt-hidden-section]"));
             const descendantCounts = new Map();
             for (const card of videos) {
                 mark(card, "data-myt-search-video");
@@ -636,6 +805,7 @@
         container.id = "myt-home";
         container.className = "myt-home";
         container.setAttribute("aria-label", "YouTube");
+        container.lang = language || defaultLanguage;
         const surface = document.createElement("div");
         const view = surface.attachShadow({ mode: "open" });
         container.append(surface);
@@ -651,20 +821,105 @@
                 <svg class="myt-theme-toggle__sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
                 <svg class="myt-theme-toggle__moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20.8 13A9 9 0 0 1 11 3.2 9 9 0 1 0 20.8 13Z"/></svg>
                 <span></span>
-            </button>`;
+            </button>
+            <button class="myt-settings-button" id="myt-settings-button" type="button" aria-label="${copy.settings}" title="${copy.settings}" aria-expanded="${settingsOpen}" aria-controls="myt-settings-panel">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m9 3-.6 2.3-2 .9L4.3 5.5 2.8 8.1l1.7 1.6-.2 2.3-1.7 1.5 1.5 2.7 2.3-.7 1.9 1.1.6 2.4h3l.6-2.4 1.9-1.1 2.3.7 1.5-2.7-1.7-1.5-.2-2.3 1.7-1.6-1.5-2.6-2.1.7-2-.9L12 3Z" transform="translate(1 1)"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <aside class="myt-settings-panel" id="myt-settings-panel" role="region" aria-label="${copy.settings}" ${settingsOpen ? "" : "hidden"}>
+                <header><h2>${copy.settings}</h2><button type="button" id="myt-settings-close" aria-label="${copy.close}">×</button></header>
+                <section><h3>${copy.account}</h3><p>${copy.accountInfo}</p><div class="myt-settings-actions">
+                    <a id="myt-account-manage" href="https://www.youtube.com/account">${copy.manage}</a>
+                    <a id="myt-account-signin" href="https://www.youtube.com/signin?next=%2F">${copy.signin}</a>
+                    <a id="myt-account-switch" href="https://accounts.google.com/AccountChooser?service=youtube&amp;continue=https%3A%2F%2Fwww.youtube.com%2F">${copy.switchAccount}</a>
+                    <a id="myt-account-signout" href="https://www.youtube.com/logout?next=%2F">${copy.signout}</a>
+                </div></section>
+                <section><h3>${copy.cookies}</h3><p>${copy.cookieInfo}</p><p id="myt-cookie-status" role="status"></p><ul id="myt-cookie-list"></ul>
+                    <button type="button" id="myt-cookie-clear" disabled>${copy.deleteCookies}</button>
+                    <div id="myt-cookie-confirmation" hidden><p>${copy.confirmCookies}</p><div class="myt-settings-actions"><button type="button" id="myt-cookie-confirm">${copy.confirm}</button><button type="button" id="myt-cookie-cancel">${copy.cancel}</button></div></div>
+                </section>
+                <section><label for="myt-settings-language">${copy.language}</label><select id="myt-settings-language"><option value="">${copy.system}</option><option value="ru">Русский</option><option value="en">English</option></select></section>
+                <section><label for="myt-settings-theme">${copy.theme}</label><select id="myt-settings-theme"><option value="light">${copy.light}</option><option value="dark">${copy.dark}</option></select></section>
+                <p id="myt-settings-error" role="alert"></p>
+            </aside>`;
         view.querySelector("#myt-theme-toggle").addEventListener("click", () => {
-            const previous = theme;
             const dark = theme ? theme === "dark" : root.hasAttribute("dark");
-            theme = dark ? "light" : "dark";
-            const writing = ++themeWrite;
-            renderTheme();
-            chrome.storage.local.set({ theme }, () => {
-                const error = chrome.runtime?.lastError;
-                if (error && writing === themeWrite) {
-                    theme = previous;
-                    renderTheme();
-                    console.warn("Minimal YouTube: could not save theme.");
+            saveTheme(dark ? "light" : "dark");
+        });
+        const panel = view.querySelector("#myt-settings-panel");
+        const settingsButton = view.querySelector("#myt-settings-button");
+        const cookieStatus = view.querySelector("#myt-cookie-status");
+        const cookieList = view.querySelector("#myt-cookie-list");
+        const clearCookies = view.querySelector("#myt-cookie-clear");
+        const confirmation = view.querySelector("#myt-cookie-confirmation");
+        const settingsError = view.querySelector("#myt-settings-error");
+        const setPanel = open => {
+            settingsOpen = open;
+            panel.hidden = !open;
+            settingsButton.setAttribute("aria-expanded", String(open));
+            confirmation.hidden = true;
+            if (open) {
+                view.querySelector("#myt-settings-close").focus();
+                requestCookies("minimal-youtube:get-cookies");
+            } else settingsButton.focus();
+        };
+        const requestCookies = action => {
+            cookieStatus.textContent = copy.loading;
+            clearCookies.disabled = true;
+            view.querySelector("#myt-cookie-confirm").disabled = true;
+            const done = response => {
+                if (!container.isConnected) return;
+                view.querySelector("#myt-cookie-confirm").disabled = false;
+                if (chrome.runtime?.lastError || !response?.ok || !Array.isArray(response.cookies)) {
+                    cookieStatus.textContent = copy.cookieError;
+                    return;
                 }
+                confirmation.hidden = true;
+                cookieList.replaceChildren();
+                for (const cookie of response.cookies) {
+                    const item = document.createElement("li");
+                    item.textContent = `${cookie.name} · ${cookie.domain}`;
+                    cookieList.append(item);
+                }
+                clearCookies.disabled = response.cookies.length === 0;
+                cookieStatus.textContent = `${typeof response.removed === "number" ? copy.cookieDeleted + " " + response.removed + ". " : ""}${copy.cookieCount} ${response.cookies.length}`;
+            };
+            try { chrome.runtime.sendMessage({ action }, done); }
+            catch { done(null); }
+        };
+        settingsButton.addEventListener("click", () => setPanel(panel.hidden));
+        view.querySelector("#myt-settings-close").addEventListener("click", () => setPanel(false));
+        view.addEventListener("keydown", event => {
+            if (event.key === "Escape" && !panel.hidden) {
+                event.preventDefault();
+                event.stopPropagation();
+                setPanel(false);
+            }
+        });
+        clearCookies.addEventListener("click", () => {
+            confirmation.hidden = false;
+            view.querySelector("#myt-cookie-confirm").focus();
+        });
+        view.querySelector("#myt-cookie-cancel").addEventListener("click", () => {
+            confirmation.hidden = true;
+            clearCookies.focus();
+        });
+        view.querySelector("#myt-cookie-confirm").addEventListener("click", () => requestCookies("minimal-youtube:clear-cookies"));
+        view.querySelector("#myt-settings-theme").addEventListener("change", event => saveTheme(event.target.value));
+        const languageSelect = view.querySelector("#myt-settings-language");
+        languageSelect.value = language || "";
+        languageSelect.addEventListener("change", () => {
+            const selected = languageSelect.value;
+            chrome.storage.local.set({ language: selected }, () => {
+                if (chrome.runtime?.lastError) {
+                    languageSelect.value = language || "";
+                    settingsError.textContent = copy.saveError;
+                    return;
+                }
+                if (language !== (selected || null)) applyLanguage(selected);
+                const url = new URL(location.href);
+                url.searchParams.set("hl", selected || defaultLanguage);
+                url.searchParams.set("persist_hl", "1");
+                location.assign(url.href);
             });
         });
         const input = view.querySelector("input");
@@ -705,6 +960,7 @@
         // contexts and ancestor transforms/filters. The hidden app stays intact.
         container.addEventListener("cancel", event => event.preventDefault());
         container.showModal();
+        if (settingsOpen) setPanel(true);
         requestAnimationFrame(() => {
             if (container.isConnected && document.hasFocus() &&
                 (document.activeElement === document.body || document.activeElement.closest("ytd-app"))) {
@@ -728,6 +984,17 @@
         if (pendingNavigation && location.href !== navigationSource) pendingNavigation = null;
         const url = new URL(pendingNavigation || location.href);
         const urlChanged = currentURL !== url.href;
+        const nextPage = url.pathname === "/" ? "home" : url.pathname === "/watch" ? "watch" :
+            url.pathname === "/results" ? "search" : channelRoute.test(url.pathname) ? "channel" : "other";
+        const previous = root.dataset.mytPage;
+        if (previous && previous !== nextPage && previous !== "home" && !root.dataset.mytPreviousPage) {
+            root.dataset.mytPreviousPage = previous;
+        }
+        // Incoming styles apply immediately, while outgoing styles remain until
+        // the native destination is mounted. Never reveal an unstyled old page.
+        if (!pendingNavigation && (url.pathname === "/" ? home?.isConnected : destinationMounted(url.pathname))) {
+            delete root.dataset.mytPreviousPage;
+        }
         const keepHome = pendingNavigation || (transitionActive && !destinationMounted(url.pathname));
         const releaseHome = home?.isConnected && url.pathname !== "/" && !keepHome;
         if (!force && !urlChanged && !releaseHome && (url.pathname !== "/" || home?.isConnected || !document.body)) return;
@@ -743,8 +1010,7 @@
         }
         redirectingURL = "";
         const path = url.pathname;
-        root.dataset.mytPage = path === "/" ? "home" : path === "/watch" ? "watch" : path === "/results" ? "search" :
-            channelRoute.test(path) ? "channel" : "other";
+        root.dataset.mytPage = nextPage;
         renderTheme();
         if (!settingsReady) return;
         if (path === "/") {
@@ -755,6 +1021,7 @@
         }
         renderTheme();
         syncWatch();
+        syncSections();
         if (urlChanged || force) {
             refreshHidden([document]);
             scanShorts(document);
@@ -778,6 +1045,7 @@
             syncBrand();
             if (!settingsReady) return;
             syncWatch();
+            syncSections();
             refreshHidden([...pendingRoots]);
             for (const node of pendingRoots) {
                 if (node.isConnected) {
@@ -854,6 +1122,7 @@
             home = null;
             resetWatch();
             restoreBrand();
+            syncSections();
             syncSearch();
             delete root.dataset.mytTheme;
             currentURL = "";
@@ -861,6 +1130,7 @@
             redirectingURL = "";
             transitionActive = false;
             delete root.dataset.mytPage;
+            delete root.dataset.mytPreviousPage;
         }
     }
 
@@ -942,30 +1212,50 @@
             return /auto|scroll/.test(overflow) ||
                 (element === document.scrollingElement && !/hidden|clip/.test(overflow));
         };
-        // Leave scrolling inside the native page, comments, menus, etc. alone.
+        const page = root.dataset.mytPage;
+        const mainSelector = page === "watch" ? "ytd-watch-flexy" :
+            page === "search" ? "ytd-search" : page === "channel" ? "ytd-browse[page-subtype='channels']" : "ytd-browse";
+        const visible = element => !element.closest("[hidden], [aria-hidden='true']") &&
+            element.getClientRects().length && getComputedStyle(element).visibility !== "hidden";
+        const main = [...document.querySelectorAll(mainSelector)].find(visible) ||
+            [...document.querySelectorAll("ytd-page-manager")].find(visible);
+        if (!main) return;
+        // Channels have a full-width banner but a narrower content rail.
+        const rail = page === "channel" ?
+            [...main.querySelectorAll("#channel-header-container, :scope > #contents, :scope > #tabs")]
+                .find(element => visible(element) && element.clientWidth > 0 && element.clientWidth < innerWidth) || main : main;
+        const bounds = rail.getBoundingClientRect();
+        let gutter = event.clientX < bounds.left || event.clientX >= bounds.right;
+        // Normal content and independent scrollboxes keep their native wheel path.
+        // An ancestor such as html may be scrollable even when a gutter overlay
+        // blocks its native wheel events, so it must not veto gutter forwarding.
+        if (!gutter && main.contains(target) && target !== main) return;
         for (let element = target; element; element = element.parentElement) {
-            if (canScroll(element)) return;
+            if (element !== document.scrollingElement && element !== document.body &&
+                !element.contains(main) && canScroll(element)) return;
         }
-        const mainSelector = root.dataset.mytPage === "watch" ? "ytd-watch-flexy" :
-            root.dataset.mytPage === "search" ? "ytd-search" : "ytd-browse, ytd-page-manager";
-        const main = [...document.querySelectorAll(mainSelector)].find(element =>
-            !element.closest("[hidden], [aria-hidden='true']") && element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
-        // Native layouts may put the main scrollport inside the renderer.
-        // Prefer its large content viewport over small nested panels.
-        const inner = main && [...main.querySelectorAll("*")].filter(element =>
-            element.getClientRects().length && canScroll(element) &&
+        const inner = [...main.querySelectorAll("*")].filter(element =>
             element.clientHeight >= innerHeight / 2 && element.clientWidth >= main.clientWidth / 2 &&
-            !element.closest("[hidden], [aria-hidden='true'], [role='dialog'], ytd-comments, ytd-player"))
+            canScroll(element) && visible(element) &&
+            !element.closest("[role='dialog'], ytd-comments, ytd-player"))
             .sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0];
+        if (!gutter && inner) {
+            const innerBounds = inner.getBoundingClientRect();
+            gutter = event.clientX < innerBounds.left || event.clientX >= innerBounds.right;
+        }
+        if (!gutter) return;
         let scroller = inner || main;
         while (scroller && !canScroll(scroller)) scroller = scroller.parentElement;
-        if (!scroller || scroller.contains(target)) return;
+        if (!scroller) return;
         const unit = event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? scroller.clientHeight :
             event.deltaMode === WheelEvent.DOM_DELTA_LINE ? parseFloat(getComputedStyle(scroller).lineHeight) || 16 : 1;
         const before = scroller.scrollTop;
-        scroller.scrollTop += event.deltaY * unit;
-        if (scroller.scrollTop !== before) event.preventDefault();
-    }, { passive: false });
+        scroller.scrollBy({ top: event.deltaY * unit, behavior: "instant" });
+        if (scroller.scrollTop !== before) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    }, { passive: false, capture: true });
 
     chrome.storage.onChanged.addListener((changes, area) => {
         if (area !== "local") return;
@@ -974,6 +1264,10 @@
             const value = changes.theme.newValue;
             theme = value === "dark" || value === "light" ? value : null;
             renderTheme();
+        }
+        if (Object.hasOwn(changes, "language")) {
+            languageRevision++;
+            applyLanguage(changes.language.newValue);
         }
         if (Object.hasOwn(changes, "enabled")) {
             storageRevision++;
@@ -985,6 +1279,7 @@
     });
     const initialRevision = storageRevision;
     const initialThemeRevision = themeRevision;
+    const initialLanguageRevision = languageRevision;
     // This script starts before the application DOM. Install default-on styling
     // immediately; the saved disabled setting removes it as soon as storage returns.
     // Nothing hides the document globally, including on storage/runtime failures.
@@ -997,6 +1292,7 @@
         if (themeRevision === initialThemeRevision) {
             theme = data?.theme === "dark" || data?.theme === "light" ? data.theme : null;
         }
+        if (languageRevision === initialLanguageRevision) applyLanguage(data?.language);
         if (storageRevision === initialRevision) {
             setEnabled(typeof data?.enabled === "undefined" ? true : Boolean(data.enabled));
         }
@@ -1004,7 +1300,7 @@
         renderTheme();
     }
     try {
-        chrome.storage.local.get(["enabled", "theme"], settingsLoaded);
+        chrome.storage.local.get(["enabled", "theme", "language"], settingsLoaded);
     } catch {
         settingsLoaded({});
     }
