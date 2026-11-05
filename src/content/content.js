@@ -34,15 +34,17 @@
         "comments": "Комментарии",
         "hideComments": "Скрыть комментарии",
         "settings": "Настройки",
+        "settingsHint": "Аккаунт, приватность и оформление",
+        "showCookies": "Показать список cookies",
         "close": "Закрыть настройки",
         "account": "Аккаунт YouTube",
-        "accountInfo": "Вход, выход и смена аккаунта на официальных страницах YouTube и Google.",
+        "accountInfo": "Вход и управление аккаунтом на YouTube и Google.",
         "manage": "Управление аккаунтом",
         "signin": "Войти",
         "switchAccount": "Сменить аккаунт",
         "signout": "Выйти",
         "cookies": "Cookies YouTube",
-        "cookieInfo": "Только cookies YouTube. Их удаление может потребовать повторного входа.",
+        "cookieInfo": "Только cookies YouTube. После удаления может потребоваться вход.",
         "loading": "Загрузка…",
         "deleteCookies": "Удалить cookies YouTube",
         "confirmCookies": "Удалить все cookies YouTube в этом профиле?",
@@ -65,15 +67,17 @@
         "comments": "Comments",
         "hideComments": "Hide comments",
         "settings": "Settings",
+        "settingsHint": "Account, privacy and appearance",
+        "showCookies": "View cookie list",
         "close": "Close settings",
         "account": "YouTube account",
-        "accountInfo": "Sign in, sign out and switch accounts on the official YouTube and Google pages.",
+        "accountInfo": "Sign in and manage your YouTube account.",
         "manage": "Manage account",
         "signin": "Sign in",
         "switchAccount": "Switch account",
         "signout": "Sign out",
         "cookies": "YouTube cookies",
-        "cookieInfo": "YouTube cookies only. Deleting them may require signing in again.",
+        "cookieInfo": "YouTube cookies only. You may need to sign in again.",
         "loading": "Loading…",
         "deleteCookies": "Delete YouTube cookies",
         "confirmCookies": "Delete all YouTube cookies in this profile?",
@@ -346,11 +350,27 @@
 :host::before, :host::after, :host::backdrop { content: none !important; display: none !important; }
 
 [hidden] { display: none !important; }
+
+:host([data-myt-theme="light"]) {
+    --myt-settings-bg: #ffffff;
+    --myt-settings-card: #f7f7f9;
+    --myt-settings-control: #ffffff;
+    --myt-danger: #bc2b3c;
+    --myt-settings-shadow: 0 24px 80px rgba(24, 24, 27, .16);
+}
+:host([data-myt-theme="dark"]) {
+    --myt-settings-bg: #171719;
+    --myt-settings-card: #202024;
+    --myt-settings-control: #29292e;
+    --myt-danger: #ff8b96;
+    --myt-settings-shadow: 0 24px 80px rgba(0, 0, 0, .4);
+}
 .myt-settings-button {
     position: fixed; right: 24px; top: 24px;
     display: grid; place-items: center; width: 44px; height: 44px;
     border: 1px solid var(--myt-border); border-radius: 14px;
     background: var(--myt-surface); color: var(--myt-muted); cursor: pointer;
+    transition: color 140ms ease, background-color 140ms ease;
 }
 .myt-settings-button:hover { color: var(--myt-ink); background: var(--myt-soft); }
 .myt-settings-button svg { width: 22px; height: 22px; }
@@ -359,38 +379,99 @@
     pointer-events: none;
 }
 .myt-settings-backdrop {
-    position: fixed; inset: 0; z-index: 2; background: rgba(0, 0, 0, .3);
+    position: fixed; inset: 0; z-index: 2;
+    background: rgba(0, 0, 0, .42); backdrop-filter: blur(6px);
 }
 .myt-settings-panel {
     position: fixed; left: 50%; top: 50%; z-index: 3;
     transform: translate(-50%, -50%);
-    width: min(420px, calc(100% - 32px)); max-height: calc(100svh - 32px);
-    overflow: auto; overscroll-behavior: contain; padding: 20px;
-    border: 1px solid var(--myt-border); border-radius: 18px;
-    background: var(--myt-surface); color: var(--myt-ink); text-align: start;
+    width: min(500px, calc(100% - 32px)); max-height: calc(100svh - 40px);
+    overflow: auto; overscroll-behavior: contain; padding: 0;
+    border: 1px solid var(--myt-border); border-radius: 24px;
+    background: var(--myt-settings-bg, var(--myt-surface)); color: var(--myt-ink); text-align: start;
+    box-shadow: var(--myt-settings-shadow);
+    scrollbar-width: thin;
     font: 14px/1.5 "Roboto", "Arial", sans-serif;
 }
-.myt-settings-panel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.myt-settings-panel h2 { margin: 0; font-size: 18px; }
-.myt-settings-panel section { padding-block: 16px; border-bottom: 1px solid var(--myt-border); }
-.myt-settings-panel section:last-of-type { border: 0; padding-bottom: 0; }
-.myt-settings-panel h3, .myt-settings-panel label { display: block; font-size: 14px; font-weight: 600; margin: 0 0 8px; }
-.myt-settings-panel p { color: var(--myt-muted); font-size: 12px; margin: 8px 0; }
+.myt-settings-panel:not([hidden]) { animation: myt-settings-enter 160ms ease-out; }
+@keyframes myt-settings-enter { from { opacity: 0; } to { opacity: 1; } }
+.myt-settings-panel > header {
+    position: sticky; top: 0; z-index: 2;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+    padding: 22px 24px 20px; border-bottom: 1px solid var(--myt-border);
+    background: var(--myt-settings-bg, var(--myt-surface));
+}
+.myt-settings-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.myt-settings-heading > span, .myt-section-icon {
+    display: grid; place-items: center; flex: none;
+    background: var(--myt-settings-control); color: var(--myt-muted);
+    width: 38px; height: 38px; border: 1px solid var(--myt-border); border-radius: 12px;
+}
+.myt-settings-panel svg { width: 18px; height: 18px; flex: none; }
+.myt-settings-panel h2 { margin: 0; font-size: 21px; font-weight: 600; letter-spacing: -.4px; line-height: 1.2; }
+.myt-settings-panel p { color: var(--myt-muted); font-size: 12px; line-height: 1.6; margin: 9px 0 14px; }
+.myt-settings-heading p { margin: 4px 0 0; font-size: 12px; }
+.myt-settings-body { display: grid; gap: 14px; padding: 20px 24px 24px; }
+.myt-settings-panel section {
+    min-width: 0; padding: 16px;
+    border: 1px solid var(--myt-border); border-radius: 16px;
+    background: var(--myt-settings-card, var(--myt-bg));
+}
+.myt-section-heading { display: flex; align-items: center; gap: 10px; }
+.myt-section-icon { width: 30px; height: 30px; border-radius: 9px; background: transparent; }
+.myt-section-heading h3 { margin: 0; font-size: 14px; font-weight: 600; }
 .myt-settings-panel a, .myt-settings-panel button, .myt-settings-panel select {
-    font: inherit; border: 1px solid var(--myt-border); border-radius: 9px;
-    color: var(--myt-ink); background: var(--myt-soft); padding: 8px 10px;
+    box-sizing: border-box; font: inherit;
+    border: 1px solid var(--myt-border); border-radius: 10px;
+    color: var(--myt-ink); background: var(--myt-settings-control, var(--myt-soft)); padding: 9px 12px;
+    transition: background-color 140ms ease, border-color 140ms ease;
 }
 .myt-settings-panel a, .myt-settings-panel button { cursor: pointer; text-decoration: none; }
-.myt-settings-panel button:disabled { opacity: .5; cursor: default; }
-.myt-settings-panel :is(a, button, select):focus-visible, .myt-settings-button:focus-visible { outline: 2px solid var(--myt-muted); outline-offset: 3px; }
-.myt-settings-panel select { width: 100%; }
-.myt-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.myt-settings-panel ul { margin: 8px 0; padding: 0; list-style: none; max-height: 120px; overflow: auto; font-size: 12px; overflow-wrap: anywhere; }
-.myt-settings-panel li { padding-block: 4px; border-bottom: 1px solid var(--myt-border); }
-.myt-settings-panel #myt-settings-error { color: var(--myt-ink); }
+.myt-settings-panel :is(a,button):hover:not(:disabled) { border-color: var(--myt-muted); }
+.myt-settings-panel button:disabled { opacity: .45; cursor: default; }
+.myt-settings-panel :is(a, button, select, summary):focus-visible, .myt-settings-button:focus-visible { outline: 2px solid var(--myt-muted); outline-offset: 3px; }
+.myt-settings-panel #myt-settings-close { display: grid; place-items: center; padding: 8px; width: 34px; height: 34px; border-color: transparent; background: transparent; color: var(--myt-muted); }
+.myt-settings-panel #myt-settings-close:hover { background: var(--myt-settings-card); color: var(--myt-ink); }
+.myt-settings-panel #myt-account-manage {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    width: 100%; min-height: 42px; font-weight: 600; font-size: 13px;
+    background: var(--myt-ink); color: var(--myt-bg); border-color: transparent;
+}
+.myt-settings-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.myt-account-actions { margin-top: 8px; }
+.myt-account-actions a { flex: 1 1 auto; text-align: center; white-space: nowrap; padding: 7px 9px; font-size: 12px; background: transparent; }
+.myt-settings-panel #myt-cookie-status { margin: 0 0 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.myt-cookie-details { margin-bottom: 12px; border: 1px solid var(--myt-border); border-radius: 10px; background: var(--myt-settings-bg); }
+.myt-cookie-details summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; list-style: none; cursor: pointer; padding: 9px 11px; font-size: 12px; color: var(--myt-muted); border-radius: 9px; }
+.myt-cookie-details summary::-webkit-details-marker { display: none; }
+.myt-cookie-details[open] summary svg { transform: rotate(180deg); }
+.myt-settings-panel ul { margin: 0; padding: 0 11px 8px; list-style: none; max-height: 120px; overflow: auto; scrollbar-width: thin; font-size: 11px; overflow-wrap: anywhere; }
+.myt-settings-panel li { padding-block: 6px; border-top: 1px solid var(--myt-border); }
+.myt-cookie-name { font-family: ui-monospace, monospace; }
+.myt-cookie-domain { color: var(--myt-muted); }
+.myt-settings-panel #myt-cookie-clear { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; color: var(--myt-danger); background: transparent; font-size: 12px; }
+.myt-settings-panel #myt-cookie-clear:hover:not(:disabled) { border-color: var(--myt-danger); }
+.myt-settings-panel #myt-cookie-confirmation { padding: 12px; border: 1px solid var(--myt-danger); border-radius: 12px; margin-top: 12px; }
+.myt-settings-panel #myt-cookie-confirmation p { margin: 0 0 10px; color: var(--myt-ink); }
+.myt-settings-panel #myt-cookie-confirm { background: var(--myt-danger); color: var(--myt-settings-bg); border-color: transparent; }
+.myt-preferences { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.myt-settings-panel label { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; margin-bottom: 10px; }
+.myt-settings-panel label svg { color: var(--myt-muted); width: 16px; height: 16px; }
+.myt-settings-panel select { width: 100%; min-height: 40px; font-size: 12px; padding: 9px 10px; }
+.myt-settings-panel #myt-settings-error { color: var(--myt-danger); margin: 0; font-size: 12px; }
+.myt-settings-panel #myt-settings-error:empty { display: none; }
 @media (max-width: 600px) {
     .myt-settings-button { right: 16px; top: 16px; }
-    .myt-settings-panel { max-height: calc(100svh - 32px); }
+}
+@media (max-width: 480px) {
+    .myt-settings-panel { border-radius: 20px; max-height: calc(100svh - 24px); }
+    .myt-settings-panel > header { padding: 18px 18px 16px; }
+    .myt-settings-body { padding: 16px 18px 18px; gap: 12px; }
+    .myt-preferences { grid-template-columns: 1fr; gap: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .myt-settings-panel:not([hidden]) { animation: none; }
+    .myt-settings-panel :is(a,button,select), .myt-settings-button { transition: none; }
 }
 
 @media (max-width: 600px) {
@@ -854,6 +935,21 @@
         for (const element of previous) scanShorts(element);
     }
 
+    function settingsIcon(name) {
+        const paths = {
+            settings: '<path d="M4 7h8m6 0h2M4 17h2m6 0h8"/><circle cx="15" cy="7" r="3"/><circle cx="9" cy="17" r="3"/>',
+            account: '<circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/>',
+            cookies: '<path d="M21 12a4 4 0 0 1-4-4 4 4 0 0 1-5-5 9 9 0 1 0 9 9Z"/><circle cx="8" cy="10" r=".8"/><circle cx="10" cy="16" r=".8"/><circle cx="15" cy="13" r=".8"/>',
+            arrow: '<path d="m7 17 10-10M7 7h10v10"/>',
+            chevron: '<path d="m6 9 6 6 6-6"/>',
+            close: '<path d="m6 6 12 12M18 6 6 18"/>',
+            trash: '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',
+            language: '<path d="M3 5h12M9 3v2M5 5c0 5 4 9 8 11M13 5c-1 5-4 9-10 12M14 21l4-10 4 10M15.5 17h5"/>',
+            theme: '<circle cx="12" cy="12" r="8"/><path d="M12 4v16a8 8 0 0 0 0-16Z" fill="currentColor"/>',
+        };
+        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`;
+    }
+
     function createHome() {
         if (!document.body) return null;
         const container = document.createElement("dialog");
@@ -882,20 +978,27 @@
             </button>
             <div class="myt-settings-backdrop" id="myt-settings-backdrop" ${settingsOpen ? "" : "hidden"}></div>
             <aside class="myt-settings-panel" id="myt-settings-panel" role="dialog" aria-modal="true" aria-labelledby="myt-settings-title" ${settingsOpen ? "" : "hidden"}>
-                <header><h2 id="myt-settings-title">${copy.settings}</h2><button type="button" id="myt-settings-close" aria-label="${copy.close}">×</button></header>
-                <section><h3>${copy.account}</h3><p>${copy.accountInfo}</p><div class="myt-settings-actions">
-                    <a id="myt-account-manage" href="https://www.youtube.com/account">${copy.manage}</a>
-                    <a id="myt-account-signin" href="https://www.youtube.com/signin?next=%2F">${copy.signin}</a>
-                    <a id="myt-account-switch" href="https://accounts.google.com/AccountChooser?service=youtube&amp;continue=https%3A%2F%2Fwww.youtube.com%2F">${copy.switchAccount}</a>
-                    <a id="myt-account-signout" href="https://www.youtube.com/logout?next=%2F">${copy.signout}</a>
-                </div></section>
-                <section><h3>${copy.cookies}</h3><p>${copy.cookieInfo}</p><p id="myt-cookie-status" role="status"></p><ul id="myt-cookie-list"></ul>
-                    <button type="button" id="myt-cookie-clear" disabled>${copy.deleteCookies}</button>
-                    <div id="myt-cookie-confirmation" hidden><p>${copy.confirmCookies}</p><div class="myt-settings-actions"><button type="button" id="myt-cookie-confirm">${copy.confirm}</button><button type="button" id="myt-cookie-cancel">${copy.cancel}</button></div></div>
-                </section>
-                <section><label for="myt-settings-language">${copy.language}</label><select id="myt-settings-language"><option value="">${copy.system}</option><option value="ru">Русский</option><option value="en">English</option></select></section>
-                <section><label for="myt-settings-theme">${copy.theme}</label><select id="myt-settings-theme"><option value="light">${copy.light}</option><option value="dark">${copy.dark}</option></select></section>
-                <p id="myt-settings-error" role="alert"></p>
+                <header><div class="myt-settings-heading"><span>${settingsIcon("settings")}</span><div><h2 id="myt-settings-title">${copy.settings}</h2><p>${copy.settingsHint}</p></div></div><button type="button" id="myt-settings-close" aria-label="${copy.close}">${settingsIcon("close")}</button></header>
+                <div class="myt-settings-body">
+                    <section><div class="myt-section-heading"><span class="myt-section-icon">${settingsIcon("account")}</span><h3>${copy.account}</h3></div><p>${copy.accountInfo}</p>
+                        <a id="myt-account-manage" href="https://www.youtube.com/account">${copy.manage}${settingsIcon("arrow")}</a>
+                        <div class="myt-settings-actions myt-account-actions">
+                            <a id="myt-account-signin" href="https://www.youtube.com/signin?next=%2F">${copy.signin}</a>
+                            <a id="myt-account-switch" href="https://accounts.google.com/AccountChooser?service=youtube&amp;continue=https%3A%2F%2Fwww.youtube.com%2F">${copy.switchAccount}</a>
+                            <a id="myt-account-signout" href="https://www.youtube.com/logout?next=%2F">${copy.signout}</a>
+                        </div>
+                    </section>
+                    <section><div class="myt-section-heading"><span class="myt-section-icon">${settingsIcon("cookies")}</span><h3>${copy.cookies}</h3></div><p>${copy.cookieInfo}</p><p id="myt-cookie-status" role="status"></p>
+                        <details class="myt-cookie-details" hidden><summary>${copy.showCookies}${settingsIcon("chevron")}</summary><ul id="myt-cookie-list"></ul></details>
+                        <button type="button" id="myt-cookie-clear" disabled>${settingsIcon("trash")}${copy.deleteCookies}</button>
+                        <div id="myt-cookie-confirmation" hidden><p>${copy.confirmCookies}</p><div class="myt-settings-actions"><button type="button" id="myt-cookie-confirm">${copy.confirm}</button><button type="button" id="myt-cookie-cancel">${copy.cancel}</button></div></div>
+                    </section>
+                    <div class="myt-preferences">
+                        <section><label for="myt-settings-language">${settingsIcon("language")}${copy.language}</label><select id="myt-settings-language"><option value="">${copy.system}</option><option value="ru">Русский</option><option value="en">English</option></select></section>
+                        <section><label for="myt-settings-theme">${settingsIcon("theme")}${copy.theme}</label><select id="myt-settings-theme"><option value="light">${copy.light}</option><option value="dark">${copy.dark}</option></select></section>
+                    </div>
+                    <p id="myt-settings-error" role="alert"></p>
+                </div>
             </aside>`;
         view.querySelector("#myt-theme-toggle").addEventListener("click", () => {
             const dark = theme ? theme === "dark" : root.hasAttribute("dark");
@@ -923,6 +1026,7 @@
         };
         const requestCookies = action => {
             cookieStatus.textContent = copy.loading;
+            view.querySelector(".myt-cookie-details").hidden = true;
             clearCookies.disabled = true;
             view.querySelector("#myt-cookie-confirm").disabled = true;
             const done = response => {
@@ -936,9 +1040,16 @@
                 cookieList.replaceChildren();
                 for (const cookie of response.cookies) {
                     const item = document.createElement("li");
-                    item.textContent = `${cookie.name} · ${cookie.domain}`;
+                    const name = document.createElement("span");
+                    name.className = "myt-cookie-name";
+                    name.textContent = cookie.name;
+                    const domain = document.createElement("span");
+                    domain.className = "myt-cookie-domain";
+                    domain.textContent = ` · ${cookie.domain}`;
+                    item.append(name, domain);
                     cookieList.append(item);
                 }
+                view.querySelector(".myt-cookie-details").hidden = response.cookies.length === 0;
                 clearCookies.disabled = response.cookies.length === 0;
                 cookieStatus.textContent = `${typeof response.removed === "number" ? copy.cookieDeleted + " " + response.removed + ". " : ""}${copy.cookieCount} ${response.cookies.length}`;
             };

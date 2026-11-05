@@ -934,6 +934,7 @@ html.minimal-youtube[dark]:is(:is([data-myt-page="search"], [data-myt-previous-p
 }
 
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer, yt-lockup-view-model)[data-myt-search-video][data-myt-search-cell],
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-channel-renderer[data-myt-search-channel],
 html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-browse :is(
     ytd-rich-item-renderer:has(a[href*="/watch?"], ytd-rich-grid-media, ytd-video-renderer, ytd-grid-video-renderer):not(:has(ytd-rich-grid-playlist-renderer, yt-collection-thumbnail-view-model, yt-collections-stack, [content-type="playlist"], [is-playlist])),
     ytd-grid-video-renderer:not(ytd-rich-item-renderer *),
@@ -943,13 +944,31 @@ html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="chan
     min-width: 0;
     padding: 9px !important;
     border-radius: 16px;
-    background-color: var(--myt-card-bg);
+    background-color: var(--myt-card-bg) !important;
+    background-image: none !important;
     transition: background-color var(--myt-card-transition-duration) ease;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-video]:is(:hover, :focus-within),
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is([data-myt-search-video], [data-myt-search-channel]):is(:hover, :focus-within),
 html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-browse :is(ytd-rich-item-renderer, ytd-grid-video-renderer, yt-lockup-view-model):is(:hover, :focus-within) {
     --myt-card-bg: var(--myt-card-hover-bg);
+}
+
+/* YouTube can lift the hovered preview into a separate overlay outside the
+   card. Give that surface the same color without changing playback or sizing. */
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"], [data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-video-preview {
+    --yt-spec-base-background: var(--myt-card-hover-bg);
+    --yt-spec-raised-background: var(--myt-card-hover-bg);
+    background-color: var(--myt-card-hover-bg) !important;
+    background-image: none !important;
+    border-radius: 16px;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"], [data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-video-preview :is(#wrapper, #details) {
+    background-color: var(--myt-card-hover-bg) !important;
+    background-image: none !important;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"], [data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-video-preview #wrapper {
+    border-radius: inherit;
 }
 
 @media (prefers-reduced-motion: reduce) {

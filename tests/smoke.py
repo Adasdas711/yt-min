@@ -420,6 +420,11 @@ def check_home_settings(browser, width):
     page.locator('#myt-settings-theme').press('Tab')
     expect(page.locator('#myt-settings-close')).to_be_focused()
     expect(page.locator('#myt-cookie-list')).to_contain_text('PREF · .youtube.com')
+    expect(page.locator('#myt-cookie-list')).to_be_hidden()
+    page.locator('.myt-cookie-details summary').click()
+    expect(page.locator('#myt-cookie-list')).to_be_visible()
+    page.locator('.myt-cookie-details summary').click()
+    expect(page.locator('#myt-cookie-list')).to_be_hidden()
     assert page.locator('#myt-account-manage').get_attribute('href') == 'https://www.youtube.com/account'
     assert page.locator('#myt-account-signin').get_attribute('href').startswith('https://www.youtube.com/signin?')
     assert page.locator('#myt-account-switch').get_attribute('href').startswith('https://accounts.google.com/AccountChooser?')
@@ -638,6 +643,80 @@ def check_channel_first_within_sections(browser):
     assert v1['y']>=c1['y']+c1['height']+31, (c1,v1)
     page.evaluate('__setEnabled(false)')
     assert page.locator('[data-myt-search-video-start]').count()==0
+    page.close()
+
+
+
+def check_native_hover_surface(browser, dark):
+    fixture = '''<ytd-app><ytd-page-manager><ytd-search><ytd-item-section-renderer><div id="contents">
+      <ytd-video-renderer id="native-hover-video"><ytd-thumbnail><a href="/watch?v=hover"><div style="height:160px">Preview</div></a></ytd-thumbnail><h3><a id="video-title" href="/watch?v=hover">Video</a></h3></ytd-video-renderer>
+      <ytd-channel-renderer id="native-hover-channel"><a href="/@creator">Channel</a><button>Subscribe</button></ytd-channel-renderer>
+      <yt-lockup-view-model id="native-hover-modern"><a href="/watch?v=modern"><div style="height:160px">Modern preview</div></a><h3><a href="/watch?v=modern">Modern video</a></h3></yt-lockup-view-model>
+      </div></ytd-item-section-renderer></ytd-search></ytd-page-manager></ytd-app>'''
+    page=setup(browser,'/results?search_query=hover',fixture,native_dark=dark)
+    # Native preview styles can arrive after the extension and clear backgrounds.
+    page.add_style_tag(content="""
+      ytd-video-renderer:has(ytd-thumbnail:hover), ytd-channel-renderer:hover, yt-lockup-view-model:has(a:hover),
+      ytd-video-renderer:focus-within, ytd-channel-renderer:focus-within, yt-lockup-view-model:focus-within {
+        background: transparent !important;
+      }
+    """)
+    for selector,hover_target in [('#native-hover-video','#native-hover-video ytd-thumbnail'),('#native-hover-channel','#native-hover-channel a'),('#native-hover-modern','#native-hover-modern a')]:
+        page.mouse.move(1,1)
+        before=page.locator(selector).evaluate('element=>getComputedStyle(element).backgroundColor')
+        page.locator(hover_target).first.hover()
+        color=page.locator(selector).evaluate('element=>getComputedStyle(element).backgroundColor')
+        assert color not in ['transparent','rgba(0, 0, 0, 0)'], (selector,before,color)
+        assert color!=before, (selector,before,color)
+        page.mouse.move(1,1)
+        page.locator(selector+' a').first.focus()
+        color=page.locator(selector).evaluate('element=>getComputedStyle(element).backgroundColor')
+        assert color not in ['transparent','rgba(0, 0, 0, 0)'], (selector,color)
+        page.evaluate('document.activeElement.blur()')
+    page.evaluate("""() => document.body.insertAdjacentHTML('beforeend', '<ytd-video-preview id=floating-preview style="display:none;width:360px"><div id=wrapper><div style="height:150px;background:black">Player</div><div id=details>Metadata</div></div></ytd-video-preview>')""")
+    expect(page.locator('#floating-preview')).to_be_hidden()
+    page.locator('#floating-preview').evaluate("element=>element.style.display='block'")
+    expected='rgb(37, 37, 43)' if dark else 'rgb(247, 247, 249)'
+    for selector in ['#floating-preview','#floating-preview #wrapper','#floating-preview #details']:
+        assert page.locator(selector).evaluate('element=>getComputedStyle(element).backgroundColor')==expected
+    page.evaluate('__setEnabled(false)')
+    page.locator('#native-hover-video ytd-thumbnail').hover()
+    assert page.locator('#native-hover-video').evaluate('element=>getComputedStyle(element).backgroundColor')=='rgba(0, 0, 0, 0)'
+    page.close()
+
+
+
+def check_channel_hover_surface(browser, dark):
+    def card(tag,identifier):
+        return f'<{tag} id="{identifier}" style="display:block;width:360px"><ytd-thumbnail><a href="/watch?v={identifier}"><div style="height:140px">Preview</div></a></ytd-thumbnail><h3><a href="/watch?v={identifier}">Video</a></h3></{tag}>'
+    fixture='<ytd-app><ytd-page-manager><ytd-browse page-subtype="channels"><div id="contents">'
+    fixture+=card('ytd-rich-item-renderer','rich-hover')+card('ytd-grid-video-renderer','grid-hover')+card('yt-lockup-view-model','lockup-hover')
+    fixture+='</div></ytd-browse></ytd-page-manager></ytd-app>'
+    page=setup(browser,'/@creator/videos',fixture,native_dark=dark)
+    page.add_style_tag(content=':is(ytd-rich-item-renderer,ytd-grid-video-renderer,yt-lockup-view-model):is(:hover,:focus-within) { background:transparent !important; }')
+    for selector in ['#rich-hover','#grid-hover','#lockup-hover']:
+        assert_card_surface(page,selector)
+        page.locator(selector+' ytd-thumbnail').hover()
+        assert page.locator(selector).evaluate('element=>getComputedStyle(element).backgroundColor')!='rgba(0, 0, 0, 0)'
+    page.close()
+
+
+
+def check_settings_short_viewport(browser):
+    page=setup(browser,theme='light',width=390)
+    page.set_viewport_size({'width':390,'height':420})
+    page.evaluate("() => { chrome.runtime.sendMessage=(message,cb)=>cb({ok:true,cookies:[{name:'PREF',domain:'.youtube.com'}]}); }")
+    page.locator('#myt-settings-button').click()
+    box=page.locator('#myt-settings-panel').bounding_box()
+    assert box['y']>=11 and box['y']+box['height']<=409, box
+    page.locator('#myt-settings-theme').scroll_into_view_if_needed()
+    expect(page.locator('#myt-settings-close')).to_be_in_viewport()
+    expect(page.locator('#myt-settings-theme')).to_be_in_viewport()
+    assert page.locator('#myt-settings-panel').evaluate('element=>element.scrollTop')>0
+    page.locator('#myt-settings-theme').focus()
+    page.locator('#myt-settings-theme').press('Escape')
+    expect(page.locator('#myt-settings-panel')).to_be_hidden()
+    expect(page.locator('#myt-query')).to_be_visible()
     page.close()
 
 
@@ -1546,7 +1625,8 @@ def main():
             page.emulate_media(reduced_motion='reduce')
             for selector in ['#result-1', '#modern-video']:
                 assert_card_surface(page, selector)
-            for selector in ['#playlist-result', '#channel-result', '#continuation']:
+            assert_card_surface(page, '#channel-result')
+            for selector in ['#playlist-result', '#continuation']:
                 assert page.locator(selector).evaluate("element => getComputedStyle(element).backgroundColor") == 'rgba(0, 0, 0, 0)', selector
             page.set_viewport_size({'width':390, 'height':960})
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
@@ -1597,6 +1677,17 @@ def main():
 
         check_channel_first_within_sections(browser)
         ok('mixed result blocks show channels first and start videos on a new row, without reordering separate sections or native DOM')
+
+        for dark in [False,True]:
+            check_native_hover_surface(browser,dark)
+            ok(f'{"dark" if dark else "light"} video/channel surfaces remain opaque during native preview hover and keyboard focus, restoring native styles on disable')
+
+        for dark in [False,True]:
+            check_channel_hover_surface(browser,dark)
+            ok(f'{"dark" if dark else "light"} channel-page rich/grid/modern video backgrounds survive native hover/focus overrides')
+
+        check_settings_short_viewport(browser)
+        ok('settings fit a short viewport, keep the close control visible while scrolling and restore home on Escape')
 
         popup_html = (ROOT / "src/popup/popup.html").read_text().replace('<script src="./popup.js"></script>', '')
         page = browser.new_page()
