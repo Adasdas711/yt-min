@@ -62,40 +62,37 @@ html.minimal-youtube[data-myt-page="home"]:has(> #myt-home) > body {
     display: none !important;
 }
 
-html.minimal-youtube .myt-home {
-    box-sizing: border-box;
-    position: fixed;
-    z-index: 2100;
-    inset: 0;
-    isolation: isolate;
-    width: 100%;
-    height: 100%;
-    max-width: none;
-    background-image: none !important;
-    box-shadow: none !important;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: safe center;
-    min-height: 100svh;
-    max-height: none;
-    margin: 0;
-    border: 0;
-    border-radius: 0;
-    transform: none;
-    filter: none;
-    padding: 72px 24px 112px;
-    overflow: auto;
+/* The dialog paints in the browser top layer; its controls live in a shadow
+   tree. Only the full-viewport shell is exposed to document styles. */
+html.minimal-youtube #myt-home {
+    all: initial;
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: hidden !important;
     background: var(--myt-bg) !important;
-    color: var(--myt-ink);
-    font-family: "Roboto", "Arial", sans-serif;
-    -webkit-font-smoothing: antialiased;
+    box-shadow: none !important;
+    filter: none !important;
+    transform: none !important;
+    color-scheme: only light;
+}
+html.minimal-youtube #myt-home[data-myt-theme="dark"] {
+    color-scheme: only dark;
+}
+html.minimal-youtube #myt-home::backdrop {
+    background: transparent !important;
+    backdrop-filter: none !important;
 }
 
 /* Theme variables are scoped to the home route and inherit into its flat backdrop. */
-html.minimal-youtube[data-myt-page="home"][data-myt-theme="light"],
-html.minimal-youtube[data-myt-theme="light"] .myt-home {
-    color-scheme: light;
+html.minimal-youtube[data-myt-page="home"][data-myt-theme="light"] {
+    color-scheme: only light;
     --myt-bg: #f9f9fb;
     --myt-surface: #ffffff;
     --myt-ink: #18181b;
@@ -105,9 +102,8 @@ html.minimal-youtube[data-myt-theme="light"] .myt-home {
     --myt-shadow: none;
 }
 
-html.minimal-youtube[data-myt-page="home"][data-myt-theme="dark"],
-html.minimal-youtube[data-myt-theme="dark"] .myt-home {
-    color-scheme: dark;
+html.minimal-youtube[data-myt-page="home"][data-myt-theme="dark"] {
+    color-scheme: only dark;
     --myt-bg: #101012;
     --myt-surface: #19191d;
     --myt-ink: #f4f4f5;
@@ -115,31 +111,6 @@ html.minimal-youtube[data-myt-theme="dark"] .myt-home {
     --myt-border: #2c2c33;
     --myt-soft: #24242a;
     --myt-shadow: none;
-}
-
-html.minimal-youtube .myt-home *,
-html.minimal-youtube .myt-home *::before,
-html.minimal-youtube .myt-home *::after {
-    box-sizing: border-box;
-}
-
-html.minimal-youtube .myt-home__brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 36px;
-    color: inherit;
-    text-decoration: none;
-}
-
-html.minimal-youtube .myt-home > * {
-    flex-shrink: 0;
-}
-
-html.minimal-youtube .myt-home__brand:focus-visible {
-    outline: 2px solid var(--myt-accent);
-    outline-offset: 6px;
-    border-radius: 4px;
 }
 
 html.minimal-youtube .myt-home__mark {
@@ -154,133 +125,6 @@ html.minimal-youtube .myt-home__wordmark {
     font-weight: 700;
     line-height: 1;
     letter-spacing: -1.1px;
-}
-
-html.minimal-youtube .myt-search {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    width: min(100%, 600px);
-    min-height: 64px;
-    margin: 0;
-    padding: 7px 22px;
-    border: 1px solid var(--myt-border);
-    border-radius: 18px;
-    background: var(--myt-surface);
-    box-shadow: none;
-    transition: border-color 150ms ease;
-}
-
-html.minimal-youtube .myt-search:focus-within {
-    border-color: var(--myt-muted);
-    outline: 2px solid color-mix(in srgb, var(--myt-muted) 20%, transparent);
-    outline-offset: 2px;
-}
-
-html.minimal-youtube .myt-search__input {
-    min-width: 0;
-    width: 100%;
-    padding: 12px 0;
-    border: 0;
-    outline: none;
-    background: transparent;
-    color: var(--myt-ink);
-    font: inherit;
-    font-size: 16px;
-    line-height: 1.3;
-    appearance: none;
-}
-
-html.minimal-youtube .myt-search__input::placeholder {
-    color: var(--myt-muted);
-    opacity: 1;
-}
-
-html.minimal-youtube .myt-search__input::-webkit-search-cancel-button {
-    appearance: none;
-}
-
-html.minimal-youtube .myt-search__clear {
-    gap: 8px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: none;
-    border: 0;
-    cursor: pointer;
-    font: inherit;
-    transition: background 150ms ease, transform 150ms ease;
-}
-
-html.minimal-youtube .myt-search__clear {
-    width: 32px;
-    height: 36px;
-    padding: 7px;
-    border-radius: 9px;
-    background: transparent;
-    color: var(--myt-muted);
-}
-
-html.minimal-youtube .myt-search__clear[hidden] {
-    display: none;
-}
-
-html.minimal-youtube .myt-search__clear:hover {
-    background: var(--myt-soft);
-    color: var(--myt-ink);
-}
-
-html.minimal-youtube .myt-search__clear svg {
-    display: block;
-    width: 22px;
-    height: 22px;
-}
-
-html.minimal-youtube .myt-search button:focus-visible {
-    outline: 2px solid var(--myt-accent);
-    outline-offset: 3px;
-}
-
-html.minimal-youtube .myt-theme-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    min-height: 34px;
-    margin-top: 18px;
-    padding: 7px 12px;
-    border: 1px solid transparent;
-    border-radius: 999px;
-    background: transparent;
-    color: var(--myt-muted);
-    font: inherit;
-    font-size: 12px;
-    line-height: 1.5;
-    cursor: pointer;
-    transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
-}
-
-html.minimal-youtube .myt-theme-toggle:hover {
-    border-color: var(--myt-border);
-    background: var(--myt-surface);
-    color: var(--myt-ink);
-}
-
-html.minimal-youtube .myt-theme-toggle:focus-visible {
-    outline: 2px solid var(--myt-accent);
-    outline-offset: 3px;
-}
-
-html.minimal-youtube .myt-theme-toggle svg {
-    display: block;
-    width: 16px;
-    height: 16px;
-    flex: none;
-}
-
-html.minimal-youtube .myt-theme-toggle[data-theme="light"] .myt-theme-toggle__sun,
-html.minimal-youtube .myt-theme-toggle[data-theme="dark"] .myt-theme-toggle__moon {
-    display: none;
 }
 
 /* Remove guide offsets together with the guide. Never resize a generic #primary. */
@@ -1141,22 +985,6 @@ html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-sec
 
     html.minimal-youtube[data-myt-page="search"] ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) {
         gap: 24px;
-    }
-
-    html.minimal-youtube .myt-home {
-        justify-content: flex-start;
-        padding: max(80px, 20svh) 20px 40px;
-    }
-
-    html.minimal-youtube .myt-home__brand {
-        margin-bottom: 40px;
-    }
-
-    html.minimal-youtube .myt-search {
-        gap: 9px;
-        min-height: 58px;
-        padding: 5px 15px;
-        border-radius: 16px;
     }
 
     html.minimal-youtube ytd-masthead > #container {

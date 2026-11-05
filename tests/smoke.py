@@ -180,6 +180,55 @@ def assert_uniform_full_page(page):
     assert result["height"] == page.viewport_size["height"], f"Hidden native content still expands home page: {result}"
 
 
+
+def check_home_isolation(browser, theme):
+    page = setup(browser, theme=theme)
+    page.add_style_tag(content="""
+      form::before { content: ''; position: fixed; inset: 26vh 0 45vh;
+                     background: rgba(0,0,0,.15); z-index: 2147483647; }
+      input, div { filter: brightness(.4) !important; }
+    """)
+    # A separate document layer cannot be fixed by resetting main::before.
+    page.evaluate("""() => {
+      const overlay = document.createElement('div');
+      overlay.id = 'native-overlay';
+      overlay.style.cssText = 'position:fixed;inset:0 0 74vh;background:rgba(0,0,0,.15);z-index:2147483647;pointer-events:none';
+      document.documentElement.append(overlay);
+    }""")
+    assert_uniform_full_page(page)
+    page.add_style_tag(content='html { filter: brightness(.85); transform: translateY(40px); }')
+    for size in [{"width":2016,"height":1240}, {"width":390,"height":844}]:
+        page.set_viewport_size(size)
+        assert_uniform_full_page(page)
+        expected = '16,16,18,255' if theme == 'dark' else '249,249,251,255'
+        # Check the rendered pixel, not merely a computed CSS color.
+        png = page.screenshot(animations='disabled')
+        pixel = page.evaluate("""async encoded => {
+          const image = await createImageBitmap(await (await fetch('data:image/png;base64,' + encoded)).blob());
+          const context = new OffscreenCanvas(image.width,image.height).getContext('2d');
+          context.drawImage(image,0,0);
+          return [...context.getImageData(4,4,1,1).data].join(',');
+        }""", base64.b64encode(png).decode())
+        assert pixel == expected, (pixel, expected)
+    assert page.locator('#myt-query').evaluate('element => getComputedStyle(element).filter') == 'none'
+    page.locator('#myt-query').fill('a')
+    page.locator('#myt-query').press('/')
+    expect(page.locator('#myt-query')).to_have_value('a/')
+    page.locator('#myt-query').press('Escape')
+    expect(page.locator('#myt-query')).to_have_value('')
+    expect(page.locator('#myt-home')).to_be_visible()
+    page.locator('#myt-theme-toggle').click()
+    assert_uniform_full_page(page)
+    navigate_spa(page, '/results?search_query=restored')
+    expect(page.locator('#myt-home')).to_have_count(0)
+    assert page.locator('html').evaluate('element => element.inert') is False
+    # Removal of a modal must restore interaction with the native page.
+    page.evaluate("document.body.innerHTML='<button id=native-button onclick=\"this.textContent=123\">Native</button>'")
+    page.locator('#native-button').click()
+    expect(page.locator('#native-button')).to_have_text('123')
+    page.close()
+
+
 def assert_card_surface(page, selector):
     card = page.locator(selector)
     color = "element => getComputedStyle(element).backgroundColor.match(/[\\d.]+/g).map(Number)"
@@ -212,6 +261,7 @@ def main():
 
         page = setup(browser, body='<ytd-app id="native-app"><ytd-page-manager><p id="native-state">Native state</p></ytd-page-manager></ytd-app>')
         expect(page.locator("#myt-home")).to_be_visible()
+        expect(page.locator("#myt-query")).to_be_focused()
         expect(page.locator("#myt-home .myt-search__icon")).to_have_count(0)
         home_mark = page.locator("#myt-home .myt-home__mark").inner_html()
         home_wordmark = page.locator("#myt-home .myt-home__wordmark").text_content()
@@ -316,6 +366,10 @@ def main():
             assert page.locator('html').evaluate("element => getComputedStyle(element, '::before').content") == '""'
             ok(f"{theme} homepage keeps a solid background despite late native gradients/pseudo-elements, resize and theme change; disabling restores native styles")
             page.close()
+
+        for theme in ['dark', 'light']:
+            check_home_isolation(browser, theme)
+            ok(f'{theme} home isolates native overlays, root filters and form styles; keeps keyboard/theme controls and restores native interaction')
 
         page = setup(browser)
         page.locator("#myt-query").fill("remove me")

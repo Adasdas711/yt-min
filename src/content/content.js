@@ -54,6 +54,246 @@
     const searchVideoCards = new Set();
     const commentPanelStates = new Map();
     const brandedLinks = new Set();
+    // A shadow root isolates the home controls from document-wide CSS.
+    const homeStyles = `:host {
+    all: initial !important;
+    box-sizing: border-box !important;
+    position: fixed !important;
+    z-index: 2147483647 !important;
+    inset: 0 !important;
+    isolation: isolate !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: safe center !important;
+    min-height: 100svh !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    transform: none !important;
+    filter: none !important;
+    padding: 72px 24px 112px !important;
+    overflow: auto !important;
+    background: var(--myt-bg) !important;
+    color: var(--myt-ink) !important;
+    font-family: "Roboto", "Arial", sans-serif !important;
+    -webkit-font-smoothing: antialiased !important;
+}
+
+/* Theme variables are scoped to the home route and inherit into its flat backdrop. */
+:host([data-myt-theme="light"]) {
+    color-scheme: only light !important;
+    --myt-bg: #f9f9fb;
+    --myt-surface: #ffffff;
+    --myt-ink: #18181b;
+    --myt-muted: #74747d;
+    --myt-border: #e5e5ea;
+    --myt-soft: #f1f1f4;
+    --myt-shadow: none;
+}
+
+:host([data-myt-theme="dark"]) {
+    color-scheme: only dark !important;
+    --myt-bg: #101012;
+    --myt-surface: #19191d;
+    --myt-ink: #f4f4f5;
+    --myt-muted: #92929d;
+    --myt-border: #2c2c33;
+    --myt-soft: #24242a;
+    --myt-shadow: none;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+.myt-home__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 36px;
+    color: inherit;
+    text-decoration: none;
+}
+
+:host > * {
+    flex-shrink: 0;
+}
+
+.myt-home__brand:focus-visible {
+    outline: 2px solid var(--myt-accent);
+    outline-offset: 6px;
+    border-radius: 4px;
+}
+
+.myt-home__mark {
+    width: 42px;
+    height: 32px;
+    color: var(--myt-accent);
+    flex: none;
+}
+
+.myt-home__wordmark {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -1.1px;
+}
+
+.myt-search {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: min(100%, 600px);
+    min-height: 64px;
+    margin: 0;
+    padding: 7px 22px;
+    border: 1px solid var(--myt-border);
+    border-radius: 18px;
+    background: var(--myt-surface);
+    box-shadow: none;
+    transition: border-color 150ms ease;
+}
+
+.myt-search:focus-within {
+    border-color: var(--myt-muted);
+    outline: 2px solid color-mix(in srgb, var(--myt-muted) 20%, transparent);
+    outline-offset: 2px;
+}
+
+.myt-search__input {
+    min-width: 0;
+    width: 100%;
+    padding: 12px 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--myt-ink);
+    font: inherit;
+    font-size: 16px;
+    line-height: 1.3;
+    appearance: none;
+}
+
+.myt-search__input::placeholder {
+    color: var(--myt-muted);
+    opacity: 1;
+}
+
+.myt-search__input::-webkit-search-cancel-button {
+    appearance: none;
+}
+
+.myt-search__clear {
+    gap: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+    transition: background 150ms ease, transform 150ms ease;
+}
+
+.myt-search__clear {
+    width: 32px;
+    height: 36px;
+    padding: 7px;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--myt-muted);
+}
+
+.myt-search__clear[hidden] {
+    display: none;
+}
+
+.myt-search__clear:hover {
+    background: var(--myt-soft);
+    color: var(--myt-ink);
+}
+
+.myt-search__clear svg {
+    display: block;
+    width: 22px;
+    height: 22px;
+}
+
+.myt-search button:focus-visible {
+    outline: 2px solid var(--myt-accent);
+    outline-offset: 3px;
+}
+
+.myt-theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 34px;
+    margin-top: 18px;
+    padding: 7px 12px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--myt-muted);
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.5;
+    cursor: pointer;
+    transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.myt-theme-toggle:hover {
+    border-color: var(--myt-border);
+    background: var(--myt-surface);
+    color: var(--myt-ink);
+}
+
+.myt-theme-toggle:focus-visible {
+    outline: 2px solid var(--myt-accent);
+    outline-offset: 3px;
+}
+
+.myt-theme-toggle svg {
+    display: block;
+    width: 16px;
+    height: 16px;
+    flex: none;
+}
+
+.myt-theme-toggle[data-theme="light"] .myt-theme-toggle__sun,
+.myt-theme-toggle[data-theme="dark"] .myt-theme-toggle__moon {
+    display: none;
+}
+
+
+:host::before, :host::after, :host::backdrop { content: none !important; display: none !important; }
+@media (max-width: 600px) {
+    :host {
+        justify-content: flex-start !important;
+        padding: max(80px, 20svh) 20px 40px !important;
+    }
+
+    .myt-home__brand {
+        margin-bottom: 40px;
+    }
+
+    .myt-search {
+        gap: 9px;
+        min-height: 58px;
+        padding: 5px 15px;
+        border-radius: 16px;
+    }
+
+}
+`;
     const brandMarkup = '<svg class="myt-home__mark" viewBox="0 0 44 32" aria-hidden="true"><rect x="1" y="1" width="42" height="30" rx="10" fill="#ff0033"/><path d="m18 9 12 7-12 7Z" fill="white"/></svg><span class="myt-home__wordmark">YouTube</span>';
     const voteSelector = [
         "ytd-segmented-like-dislike-button-renderer", "segmented-like-dislike-button-view-model",
@@ -65,8 +305,11 @@
     function renderTheme() {
         if (enabled) root.dataset.mytTheme = theme || (root.hasAttribute("dark") ? "dark" : "light");
         else delete root.dataset.mytTheme;
-        if (home) home.dataset.mytTheme = root.dataset.mytTheme || "";
-        const button = home?.querySelector("#myt-theme-toggle");
+        if (home) {
+            home.dataset.mytTheme = root.dataset.mytTheme || "";
+            home.firstElementChild.dataset.mytTheme = root.dataset.mytTheme || "";
+        }
+        const button = home?.firstElementChild.shadowRoot.querySelector("#myt-theme-toggle");
         if (!button) return;
         const dark = theme ? theme === "dark" : root.hasAttribute("dark");
         button.dataset.theme = dark ? "dark" : "light";
@@ -389,16 +632,19 @@
 
     function createHome() {
         if (!document.body) return null;
-        const container = document.createElement("main");
+        const container = document.createElement("dialog");
         container.id = "myt-home";
         container.className = "myt-home";
         container.setAttribute("aria-label", "YouTube");
-        container.innerHTML = `
+        const surface = document.createElement("div");
+        const view = surface.attachShadow({ mode: "open" });
+        container.append(surface);
+        view.innerHTML = `<style>${homeStyles}</style>
             <a class="myt-home__brand" href="/" aria-label="YouTube">
                 ${brandMarkup}
             </a>
             <form class="myt-search" role="search" action="/results" method="get" accept-charset="UTF-8">
-                <input class="myt-search__input" id="myt-query" name="search_query" type="search" autocomplete="off" aria-label="${copy.label}" placeholder="${copy.search}">
+                <input class="myt-search__input" id="myt-query" name="search_query" type="search" autofocus autocomplete="off" aria-label="${copy.label}" placeholder="${copy.search}">
                 <button class="myt-search__clear" type="button" aria-label="${copy.clear}" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
             </form>
             <button class="myt-theme-toggle" id="myt-theme-toggle" type="button">
@@ -406,7 +652,7 @@
                 <svg class="myt-theme-toggle__moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20.8 13A9 9 0 0 1 11 3.2 9 9 0 1 0 20.8 13Z"/></svg>
                 <span></span>
             </button>`;
-        container.querySelector("#myt-theme-toggle").addEventListener("click", () => {
+        view.querySelector("#myt-theme-toggle").addEventListener("click", () => {
             const previous = theme;
             const dark = theme ? theme === "dark" : root.hasAttribute("dark");
             theme = dark ? "light" : "dark";
@@ -421,8 +667,8 @@
                 }
             });
         });
-        const input = container.querySelector("input");
-        const clear = container.querySelector(".myt-search__clear");
+        const input = view.querySelector("input");
+        const clear = view.querySelector(".myt-search__clear");
         input.value = query;
         clear.hidden = !input.value;
         input.addEventListener("input", () => {
@@ -440,7 +686,7 @@
                 clear.hidden = true;
             }
         });
-        container.querySelector("form").addEventListener("submit", event => {
+        view.querySelector("form").addEventListener("submit", event => {
             input.value = input.value.trim();
             query = input.value;
             clear.hidden = !query;
@@ -455,6 +701,10 @@
         // A fixed child of that body is no longer a viewport overlay. Keep the
         // homepage beside body so its size and color do not inherit those effects.
         root.append(container);
+        // A modal dialog is in the browser's top layer, outside native stacking
+        // contexts and ancestor transforms/filters. The hidden app stays intact.
+        container.addEventListener("cancel", event => event.preventDefault());
+        container.showModal();
         requestAnimationFrame(() => {
             if (container.isConnected && document.hasFocus() &&
                 (document.activeElement === document.body || document.activeElement.closest("ytd-app"))) {
@@ -673,10 +923,10 @@
     document.addEventListener("keydown", event => {
         if (!enabled || root.dataset.mytPage !== "home" || event.key !== "/" ||
             event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
-        const target = event.target;
+        const target = event.composedPath()[0];
         if (target instanceof Element && target.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) return;
         event.preventDefault();
-        home?.querySelector("input").focus();
+        home?.firstElementChild.shadowRoot.querySelector("input").focus();
     });
 
     // Some YouTube layouts scroll inside a centered native container. Wheel
