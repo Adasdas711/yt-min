@@ -700,8 +700,15 @@
         const mainSelector = root.dataset.mytPage === "watch" ? "ytd-watch-flexy" :
             root.dataset.mytPage === "search" ? "ytd-search" : "ytd-browse, ytd-page-manager";
         const main = [...document.querySelectorAll(mainSelector)].find(element =>
-            !element.closest("[hidden], [aria-hidden='true']") && getComputedStyle(element).display !== "none");
-        let scroller = main;
+            !element.closest("[hidden], [aria-hidden='true']") && element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
+        // Native layouts may put the main scrollport inside the renderer.
+        // Prefer its large content viewport over small nested panels.
+        const inner = main && [...main.querySelectorAll("*")].filter(element =>
+            element.getClientRects().length && canScroll(element) &&
+            element.clientHeight >= innerHeight / 2 && element.clientWidth >= main.clientWidth / 2 &&
+            !element.closest("[hidden], [aria-hidden='true'], [role='dialog'], ytd-comments, ytd-player"))
+            .sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0];
+        let scroller = inner || main;
         while (scroller && !canScroll(scroller)) scroller = scroller.parentElement;
         if (!scroller || scroller.contains(target)) return;
         const unit = event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? scroller.clientHeight :

@@ -587,6 +587,20 @@ def main():
             ok(f"gutter scrolling works on {renderer} while player-area wheel events stay untouched")
             page.close()
 
+        for path, renderer in [("/@creator/videos", "ytd-browse"), ("/results?search_query=inner", "ytd-search")]:
+            fixture = f'''<ytd-app><ytd-page-manager>
+              <div style="display:none"><{renderer}><div>Stale SPA page</div></{renderer}></div>
+              <{renderer}><div id="inner-scroll" style="position:absolute;left:120px;top:60px;width:calc(100% - 240px);height:840px;overflow-y:auto">
+              <div style="height:3000px">Native content</div></div></{renderer}>
+              </ytd-page-manager></ytd-app>'''
+            page = setup(browser, path, fixture)
+            page.evaluate("document.documentElement.style.cssText='height:100%;overflow:hidden'; document.body.style.cssText='height:100%;overflow:hidden'")
+            page.mouse.move(10, 400)
+            page.mouse.wheel(0, 300)
+            page.wait_for_function("document.querySelector('#inner-scroll').scrollTop >= 250")
+            ok(f"{renderer} detects an inner scrollport and ignores a stale hidden SPA renderer")
+            page.close()
+
         for path in ["/watch?v=header", "/results?search_query=header", "/@creator/videos", "/feed/subscriptions"]:
             page = setup(browser, path, '<ytd-app>' + MASTHEAD + '<ytd-page-manager class="ytd-app"><ytd-browse>Native content</ytd-browse></ytd-page-manager></ytd-app>')
             centered_header(page)

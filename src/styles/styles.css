@@ -614,6 +614,10 @@ html.minimal-youtube ytd-masthead .myt-masthead-brand {
     line-height: 1;
 }
 
+html.minimal-youtube ytd-masthead .myt-masthead-brand .myt-home__wordmark {
+    font-size: 24px;
+}
+
 /* These are decorative leading icons inside the input, not submit buttons.
    Native focus can absolutely position them over the first typed characters. */
 html.minimal-youtube ytd-masthead ytd-searchbox :is(#search-input #search-icon, #search-input .search-icon, #search-icon:not(button), #search-icon-container, #search-icon-wrapper),
@@ -1166,7 +1170,7 @@ html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-sec
     }
 
     html.minimal-youtube ytd-masthead .myt-masthead-brand .myt-home__wordmark {
-        font-size: 22px;
+        font-size: 20px;
     }
 
     html.minimal-youtube[data-myt-page="search"] ytd-search {
