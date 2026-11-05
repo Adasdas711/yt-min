@@ -715,6 +715,7 @@ html.minimal-youtube:is(:is([data-myt-page="search"], [data-myt-previous-page="s
 /* Search: small native cards in three columns, without changing DOM order. */
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
     --myt-search-columns: 3;
+    --myt-search-channel-span: 3;
     box-sizing: border-box;
     width: 100%;
     max-width: 1120px;
@@ -737,13 +738,13 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
 }
 
 /* JS marks safe single-video wrappers and nested shelf lists, without reparenting.
-   Unclassified rows remain full-width for genuine channel/playlist results. */
+   Unclassified playlist and continuation rows remain full-width. */
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) {
     box-sizing: border-box;
     display: grid !important;
-    grid-template-columns: repeat(var(--myt-search-columns), minmax(0, 1fr));
+    grid-template-columns: repeat(calc(var(--myt-search-columns) * 2), minmax(0, 1fr));
     align-items: start;
-    gap: 28px 24px;
+    gap: 32px 24px;
     width: 100% !important;
     min-width: 0 !important;
     max-width: none !important;
@@ -760,7 +761,7 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) > yt-lockup-view-model:has(:is(a#video-title, a#video-title-link, h3 a, .yt-lockup-view-model__content-image a, .yt-lockup-view-model-wiz__content-image a, .ytLockupViewModelContentImage a):is([href^="/watch?"], [href^="https://www.youtube.com/watch?"])):not([is-playlist]):not([content-type="playlist"]):not([data-content-type="playlist"]):not(:has(yt-collection-thumbnail-view-model, yt-collections-stack, yt-collection-thumbnail-overlay-view-model, ytd-thumbnail-overlay-side-panel-renderer, a[href^="/playlist?"])) {
     box-sizing: border-box;
     display: block;
-    grid-column: auto;
+    grid-column: span 2;
     width: 100% !important;
     min-width: 0 !important;
     max-width: none !important;
@@ -1004,6 +1005,7 @@ html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-sec
 @media (max-width: 1000px) {
     html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
         --myt-search-columns: 2;
+        --myt-search-channel-span: 2;
     }
 
     html.minimal-youtube ytd-watch-flexy:not([theater]):not([fullscreen]) #columns {
@@ -1033,6 +1035,7 @@ html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-sec
 
     html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
         --myt-search-columns: 1;
+        --myt-search-channel-span: 2;
     }
 
     html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) {
@@ -1080,4 +1083,117 @@ html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-sec
     html.minimal-youtube:is([data-myt-page="watch"], [data-myt-previous-page="watch"]) .myt-comments-toggle {
         transition: none;
     }
+}
+
+/* Center the complete searchbox chain; native wrappers may be only 40px tall
+   while the rounded field is 44px, which otherwise shifts it below the logo. */
+html.minimal-youtube ytd-masthead > #container {
+    align-items: center !important;
+}
+html.minimal-youtube ytd-masthead :is(#start, #center, ytd-searchbox, yt-searchbox, .ytSearchboxComponentHost, .ytSearchboxComponentSearchForm) {
+    box-sizing: border-box;
+    display: flex !important;
+    align-items: center !important;
+    align-self: center !important;
+    height: 44px !important;
+    min-height: 0 !important;
+    margin-block: 0 !important;
+    padding-block: 0 !important;
+}
+html.minimal-youtube ytd-masthead :is(.ytSearchboxComponentSearchForm, ytd-searchbox #search-form) {
+    height: 44px !important;
+    margin-block: 0 !important;
+    padding-block: 0 !important;
+    align-items: center !important;
+}
+html.minimal-youtube ytd-masthead :is(.ytSearchboxComponentInputBox, .yt-searchbox-input-box, .yt-searchbox__input-box, ytd-searchbox #search-input) {
+    display: flex !important;
+    align-items: center !important;
+    box-sizing: border-box;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding-block: 0 !important;
+    margin-block: 0 !important;
+}
+html.minimal-youtube ytd-masthead input {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    align-self: center !important;
+    margin-block: 0 !important;
+    padding-block: 0 !important;
+    height: 20px !important;
+    min-height: 0 !important;
+    line-height: 20px !important;
+    background-image: none !important;
+}
+html.minimal-youtube ytd-masthead input::-webkit-search-decoration,
+html.minimal-youtube ytd-masthead input::-webkit-search-results-button,
+html.minimal-youtube ytd-masthead input::-webkit-search-results-decoration,
+html.minimal-youtube [data-myt-search-decoration] {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    display: none !important;
+}
+html.minimal-youtube ytd-masthead :is(#search-input, .ytSearchboxComponentInputBox, .yt-searchbox-input-box, .yt-searchbox__input-box)::before {
+    content: none !important;
+    display: none !important;
+}
+
+/* Adjacent native result sections need the same spacing as rows within a grid. */
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-section-list-renderer > #contents {
+    display: flex !important;
+    flex-direction: column;
+    gap: 32px;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-item-section-renderer {
+    margin-block: 0 !important;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel-cell] {
+    grid-column: span var(--myt-search-channel-span) !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel] {
+    box-sizing: border-box;
+    min-width: 0;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel] :is(#content-section, #info-section) {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0 !important;
+    width: 100% !important;
+    padding: 0 !important;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel] #avatar-section {
+    flex: 0 0 80px !important;
+    width: 80px !important;
+    min-width: 0 !important;
+    margin: 0 16px 0 0 !important;
+    padding: 0 !important;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel] #avatar-section :is(yt-img-shadow, img) {
+    width: 80px !important;
+    height: 80px !important;
+    border-radius: 50%;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel] :is(#info-section, #main-link) {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+/* Native channel grids use either explicit row wrappers or a flat flex/grid
+   list. Keep one vertical gap without stacking two different spacing systems. */
+html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-rich-grid-renderer > #contents:not(:has(> ytd-rich-grid-row)) {
+    row-gap: 32px !important;
+}
+html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-rich-grid-renderer > #contents:has(> ytd-rich-grid-row) {
+    row-gap: 0 !important;
+}
+html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-rich-grid-row {
+    margin-block: 0 32px !important;
+}
+html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-rich-grid-renderer ytd-rich-item-renderer {
+    margin-block: 0 !important;
 }

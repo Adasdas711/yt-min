@@ -114,6 +114,7 @@
     const hiddenSections = new Set();
     const commentPanelStates = new Map();
     const brandedLinks = new Set();
+    const searchDecorations = new Set();
     // A shadow root isolates the home controls from document-wide CSS.
     const homeStyles = `:host {
     all: initial !important;
@@ -508,6 +509,33 @@
         voteElements.clear();
     }
 
+    function syncSearchDecorations() {
+        for (const icon of searchDecorations) {
+            if (!enabled || !icon.isConnected || !icon.closest("ytd-masthead")) {
+                icon.removeAttribute("data-myt-search-decoration");
+                searchDecorations.delete(icon);
+            }
+        }
+        if (!enabled) return;
+        for (const input of document.querySelectorAll("ytd-masthead input:not([type='hidden'])")) {
+            const scope = input.closest("ytd-searchbox, yt-searchbox, .ytSearchboxComponentHost") || input.closest("form");
+            if (!scope) continue;
+            const field = input.getBoundingClientRect();
+            if (!field.width || !field.height) continue;
+            // Native focus icons can have unnamed wrappers. Remove leading
+            // graphics by their position, leaving clear/keyboard controls at right
+            // and suggestion-row icons below the input untouched.
+            for (const icon of scope.querySelectorAll("svg, yt-icon, [role='img']")) {
+                const bounds = icon.getBoundingClientRect();
+                if (!bounds.width || !bounds.height || bounds.bottom <= field.top || bounds.top >= field.bottom ||
+                    bounds.left > field.left + 32 || bounds.right < scope.getBoundingClientRect().left) continue;
+                const decoration = icon.closest("yt-icon") || icon;
+                decoration.setAttribute("data-myt-search-decoration", "");
+                searchDecorations.add(decoration);
+            }
+        }
+    }
+
     function syncBrand() {
         if (!enabled) return;
         for (const link of brandedLinks) {
@@ -531,6 +559,7 @@
     }
 
     function restoreBrand() {
+        syncSearchDecorations();
         for (const brand of document.querySelectorAll("ytd-masthead .myt-masthead-brand")) brand.remove();
         for (const link of brandedLinks) {
             link.querySelectorAll(":scope > .myt-masthead-brand").forEach(brand => brand.remove());
@@ -573,7 +602,7 @@
     }
 
     function syncSearch(scope = document) {
-        const attributes = ["data-myt-search-video", "data-myt-search-cell", "data-myt-search-grid"];
+        const attributes = ["data-myt-search-video", "data-myt-search-cell", "data-myt-search-grid", "data-myt-search-channel", "data-myt-search-channel-cell"];
         const active = enabled && (root.dataset.mytPage === "search" || root.dataset.mytPreviousPage === "search");
         for (const element of searchVideoCards) {
             if (!active || !element.isConnected || !element.closest("ytd-search")) {
@@ -617,10 +646,17 @@
             };
             const videos = [...search.querySelectorAll(videoSelector)].filter(isVideo).filter(card =>
                 !card.parentElement.closest(videoSelector) && !card.closest("[data-myt-hidden-section]"));
+            const channels = [...search.querySelectorAll("ytd-channel-renderer")].filter(card => !card.closest("[data-myt-hidden-section]"));
+            const cells = [...videos, ...channels];
             const descendantCounts = new Map();
-            for (const card of videos) {
-                mark(card, "data-myt-search-video");
-                mark(card, "data-myt-search-cell");
+            for (const card of cells) {
+                if (channels.includes(card)) {
+                    mark(card, "data-myt-search-channel");
+                    mark(card, "data-myt-search-channel-cell");
+                } else {
+                    mark(card, "data-myt-search-video");
+                    mark(card, "data-myt-search-cell");
+                }
                 for (let parent = card.parentElement; parent && parent !== search; parent = parent.parentElement) {
                     descendantCounts.set(parent, (descendantCounts.get(parent) || 0) + 1);
                 }
@@ -629,12 +665,12 @@
                 if (descendantCounts.has(container)) mark(container, "data-myt-search-grid");
             }
             const wrappers = new Set();
-            for (const card of videos) {
+            for (const card of cells) {
                 // Keep native nodes in place. A single-video wrapper is a cell;
                 // a wrapper containing several videos gets its own nested grid.
                 for (let parent = card.parentElement; parent && parent !== search; parent = parent.parentElement) {
                     if (parent.matches("ytd-item-section-renderer > #contents")) break;
-                    if (parent.matches(`${videoSelector}, ytd-shelf-renderer, grid-shelf-view-model, ytd-rich-section-renderer, ytd-item-section-renderer, ytd-section-list-renderer`)) continue;
+                    if (parent.matches(`${videoSelector}, ${otherResults}, ytd-shelf-renderer, grid-shelf-view-model, ytd-rich-section-renderer, ytd-item-section-renderer, ytd-section-list-renderer`)) continue;
                     wrappers.add(parent);
                 }
             }
@@ -642,7 +678,8 @@
                 const count = descendantCounts.get(parent);
                 const structuralList = parent.matches(`${listContainers}, yt-horizontal-list-renderer`);
                 const mixed = parent.matches(otherResults) || parent.querySelector(`${otherResults}, ${shelves}`);
-                if (structuralList || count > 1 || mixed) mark(parent, "data-myt-search-grid");
+                if (!structuralList && count === 1 && parent.querySelector("ytd-channel-renderer") && !parent.querySelector(shelves)) mark(parent, "data-myt-search-channel-cell");
+                else if (structuralList || count > 1 || mixed) mark(parent, "data-myt-search-grid");
                 else if (count === 1) mark(parent, "data-myt-search-cell");
             }
             for (const element of searchVideoCards) {
@@ -1043,6 +1080,7 @@
             updateRoute();
             renderTheme();
             syncBrand();
+            syncSearchDecorations();
             if (!settingsReady) return;
             syncWatch();
             syncSections();
@@ -1190,6 +1228,7 @@
             location.assign(shortsDestination(anchor.href));
         }
     }, true);
+    document.addEventListener("focusin", () => { if (enabled) schedule(); });
     document.addEventListener("keydown", event => {
         if (!enabled || root.dataset.mytPage !== "home" || event.key !== "/" ||
             event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
@@ -1202,15 +1241,15 @@
     // Some YouTube layouts scroll inside a centered native container. Wheel
     // events over the empty outer gutters never reach that scrollport.
     document.addEventListener("wheel", event => {
-        if (!enabled || root.dataset.mytPage === "home" || event.defaultPrevented ||
+        if (!enabled || root.dataset.mytPage === "home" ||
             event.ctrlKey || !event.deltaY || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
         const target = event.target instanceof Element ? event.target : event.target.parentElement;
-        if (!target || target.closest("[role='dialog'], [role='listbox'], tp-yt-paper-dialog, ytd-popup-container, ytd-player, video, iframe, #movie_player, .html5-video-player, .ytp-popup")) return;
+        if (!target || target.closest("input, textarea, select, [contenteditable], dialog, [role='menu'], [role='dialog'], [role='listbox'], tp-yt-paper-dialog, ytd-popup-container, ytd-player, video, iframe, #movie_player, .html5-video-player, .ytp-popup")) return;
         const canScroll = element => {
             if (element.scrollHeight <= element.clientHeight + 1) return false;
             const overflow = getComputedStyle(element).overflowY;
             return /auto|scroll/.test(overflow) ||
-                (element === document.scrollingElement && !/hidden|clip/.test(overflow));
+                (element === document.scrollingElement && !/clip/.test(overflow));
         };
         const page = root.dataset.mytPage;
         const mainSelector = page === "watch" ? "ytd-watch-flexy" :
@@ -1226,14 +1265,10 @@
                 .find(element => visible(element) && element.clientWidth > 0 && element.clientWidth < innerWidth) || main : main;
         const bounds = rail.getBoundingClientRect();
         let gutter = event.clientX < bounds.left || event.clientX >= bounds.right;
-        // Normal content and independent scrollboxes keep their native wheel path.
-        // An ancestor such as html may be scrollable even when a gutter overlay
-        // blocks its native wheel events, so it must not veto gutter forwarding.
-        if (!gutter && main.contains(target) && target !== main) return;
-        for (let element = target; element; element = element.parentElement) {
-            if (element !== document.scrollingElement && element !== document.body &&
-                !element.contains(main) && canScroll(element)) return;
-        }
+        // An empty area can be inside the full-width renderer, not just outside
+        // its bounding box. Treat that background as part of the page scrollport.
+        const background = !target.closest("a, button, [role='button'], ytd-video-renderer, ytd-grid-video-renderer, ytd-rich-item-renderer, yt-lockup-view-model, ytd-channel-renderer, ytd-playlist-renderer");
+        if ((!gutter && !background) || (event.defaultPrevented && !background)) return;
         const inner = [...main.querySelectorAll("*")].filter(element =>
             element.clientHeight >= innerHeight / 2 && element.clientWidth >= main.clientWidth / 2 &&
             canScroll(element) && visible(element) &&
@@ -1243,10 +1278,14 @@
             const innerBounds = inner.getBoundingClientRect();
             gutter = event.clientX < innerBounds.left || event.clientX >= innerBounds.right;
         }
-        if (!gutter) return;
+        if (!gutter && !background) return;
         let scroller = inner || main;
         while (scroller && !canScroll(scroller)) scroller = scroller.parentElement;
         if (!scroller) return;
+        for (let element = target; element; element = element.parentElement) {
+            if (element !== scroller && element !== document.scrollingElement && element !== document.body &&
+                !element.contains(main) && canScroll(element)) return;
+        }
         const unit = event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? scroller.clientHeight :
             event.deltaMode === WheelEvent.DOM_DELTA_LINE ? parseFloat(getComputedStyle(scroller).lineHeight) || 16 : 1;
         const before = scroller.scrollTop;

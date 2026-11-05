@@ -120,7 +120,7 @@ def centered_header(page):
     left = min(logo["x"], search["x"])
     right = max(logo["x"] + logo["width"], search["x"] + search["width"])
     assert abs(left + right - page.viewport_size["width"]) < 3, (logo, search)
-    assert logo["y"] < search["y"] + search["height"] and search["y"] < logo["y"] + logo["height"]
+    assert abs(logo['y'] + logo['height']/2 - search['y'] - search['height']/2) < 1, (logo, search)
 
 
 def navigate_spa(page, path):
@@ -467,6 +467,115 @@ def check_settings_failures(browser):
     page.locator('#myt-settings-language').select_option('ru')
     expect(page.locator('#myt-settings-language')).to_have_value('')
     assert page.url == 'https://www.youtube.com/'
+    page.close()
+
+
+
+def check_header_alignment_and_anonymous_icons(browser, width):
+    legacy = MASTHEAD[MASTHEAD.index('<ytd-searchbox>'):MASTHEAD.index('</ytd-searchbox>')+len('</ytd-searchbox>')]
+    modern = '''<yt-searchbox style="height:40px;margin-top:5px"><div class="ytSearchboxComponentHost" style="height:40px"><form class="ytSearchboxComponentSearchForm" style="position:relative;height:40px;margin-top:4px" action="/results">
+      <div class="ytSearchboxComponentInputBox"><input id="search" type="search" name="search_query" style="margin-top:3px"></div>
+      <button type="button" id="keyboard" style="width:32px;height:32px"><svg width="16" height="16"><rect width="16" height="10"/></svg></button>
+      <button type="button" id="clear" style="width:32px;height:32px">×</button>
+      </form></div></yt-searchbox>'''
+    header = MASTHEAD.replace(legacy,modern).replace('<div id="center">','<div id="center" style="height:40px;align-items:flex-start">')
+    page = setup(browser,'/results?search_query=alignment','<ytd-app>'+header+'</ytd-app>',width=width)
+    page.locator('#search').fill('mr beast')
+    centered_header(page)
+    field = page.locator('.ytSearchboxComponentSearchForm').bounding_box()
+    text = page.locator('#search').bounding_box()
+    assert abs(field['y'] + field['height']/2 - text['y'] - text['height']/2) < 1, (field,text)
+    page.locator('.ytSearchboxComponentSearchForm').evaluate("""form => {
+      form.insertAdjacentHTML('afterbegin','<span data-anonymous-icon style="position:absolute;left:14px;top:10px"><svg width="24" height="24"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg></span>');
+    }""")
+    expect(page.locator('[data-anonymous-icon] svg')).to_be_hidden()
+    expect(page.locator('#keyboard svg')).to_be_visible()
+    expect(page.locator('#clear')).to_be_visible()
+    page.locator('#search').press('Control+a')
+    expect(page.locator('[data-anonymous-icon] svg')).to_be_hidden()
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('[data-anonymous-icon] svg')).to_be_visible()
+    page.evaluate('__setEnabled(true)')
+    expect(page.locator('[data-anonymous-icon] svg')).to_be_hidden()
+    page.locator('#search').press('Enter')
+    page.wait_for_url('**/results?**')
+    assert parse_qs(urlparse(page.url).query)['search_query']==['mr beast']
+    page.close()
+
+
+def check_search_channels_and_row_gaps(browser, width):
+    def channel(i):
+        return f'''<div class="channel-wrapper"><ytd-channel-renderer id="channel-{i}"><div id="content-section"><div id="avatar-section"><img alt="" style="width:160px;height:160px"></div><div id="info-section"><a id="main-link" href="/@creator{i}">Channel {i}</a><button id="subscribe-{i}">Subscribe</button></div></div></ytd-channel-renderer></div>'''
+    def video(i):
+        return f'<ytd-video-renderer id="video-{i}"><ytd-thumbnail><a href="/watch?v={i}"><div style="height:100px">Preview</div></a></ytd-thumbnail><h3><a id="video-title" href="/watch?v={i}">Video {i}</a></h3></ytd-video-renderer>'
+    fixture = '<ytd-app><ytd-page-manager><ytd-search><ytd-section-list-renderer><div id="contents">'
+    fixture += '<ytd-item-section-renderer><div id="contents">'+''.join(channel(i) for i in range(4))+'</div></ytd-item-section-renderer>'
+    fixture += '<ytd-item-section-renderer><div id="contents">'+''.join(video(i) for i in range(6))+'</div></ytd-item-section-renderer>'
+    fixture += '<ytd-item-section-renderer><div id="contents">'+''.join(video(i) for i in range(6,9))+'</div></ytd-item-section-renderer>'
+    fixture += '</div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>'
+    page = setup(browser,'/results?search_query=channels',fixture,width=width)
+    a,b,c = [page.locator('#channel-'+str(i)).bounding_box() for i in range(3)]
+    if width > 600:
+        assert abs(a['y']-b['y'])<1 and b['x']>a['x']+a['width'], (a,b)
+        assert c['y']>=a['y']+a['height']+31, (a,c)
+    else:
+        assert b['y']>=a['y']+a['height']+23, (a,b)
+    video_columns = 3 if width > 1000 else 2 if width > 600 else 1
+    first = page.locator('#video-0').bounding_box()
+    next_row = page.locator('#video-'+str(video_columns)).bounding_box()
+    assert next_row['y']>=first['y']+first['height']+23, (first,next_row)
+    end = page.locator('#video-5').bounding_box()
+    start = page.locator('#video-6').bounding_box()
+    assert start['y']>=end['y']+end['height']+31, (end,start)
+    for i in range(4):
+        expect(page.locator('#subscribe-'+str(i))).to_be_visible()
+        expect(page.locator('#channel-'+str(i)+' #main-link')).to_have_attribute('href','/@creator'+str(i))
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    page.evaluate('__setEnabled(false)')
+    assert page.locator('[data-myt-search-channel-cell]').count()==0
+    page.close()
+
+
+
+def check_channel_row_gaps(browser):
+    fixture = '''<ytd-app><ytd-page-manager><ytd-browse page-subtype="channels"><div id="contents"><ytd-rich-grid-renderer>
+      <div id="contents"><ytd-rich-grid-row style="display:block;margin:0"><div id="row-1" style="height:180px">First row</div></ytd-rich-grid-row><ytd-rich-grid-row style="display:block;margin:0"><div id="row-2" style="height:180px">Second row</div></ytd-rich-grid-row></div>
+      </ytd-rich-grid-renderer></div></ytd-browse></ytd-page-manager></ytd-app>'''
+    page = setup(browser,'/@creator/videos',fixture)
+    a=page.locator('#row-1').bounding_box();b=page.locator('#row-2').bounding_box()
+    assert abs(b['y']-a['y']-a['height']-32)<1, (a,b)
+    page.evaluate('__setEnabled(false)')
+    a=page.locator('#row-1').bounding_box();b=page.locator('#row-2').bounding_box()
+    assert abs(b['y']-a['y']-a['height'])<1, (a,b)
+    page.close()
+
+
+
+def check_full_width_background_scroll(browser):
+    fixture = '''<ytd-app><ytd-page-manager><ytd-search style="max-width:none!important;padding:0;position:relative">
+      <div id="contents" style="max-width:1000px;margin-inline:auto;height:3600px">Native content
+        <div id="independent-scroll" style="width:240px;height:120px;overflow:auto"><div style="height:1000px">Nested scrolling</div></div>
+      </div><div id="empty-left" style="position:fixed;left:0;top:80px;width:200px;height:80vh"></div><div id="empty-right" style="position:fixed;right:0;top:80px;width:200px;height:80vh"></div>
+      </ytd-search></ytd-page-manager></ytd-app>'''
+    page=setup(browser,'/results?search_query=scroll',fixture,width=2016)
+    page.evaluate("document.documentElement.style.overflow='hidden'; for (const id of ['empty-left','empty-right']) document.getElementById(id).addEventListener('wheel',event=>event.preventDefault(),{passive:false})")
+    for x in [26,1990]:
+        page.evaluate('window.scrollTo(0,0)')
+        page.mouse.move(x,400)
+        page.mouse.wheel(0,300)
+        page.wait_for_function('scrollY>=250')
+        page.wait_for_timeout(100)
+        assert page.evaluate('scrollY')<=350
+    page.evaluate('window.scrollTo(0,0)')
+    page.locator('#independent-scroll').hover()
+    page.mouse.wheel(0,100)
+    page.wait_for_function("document.querySelector('#independent-scroll').scrollTop>0")
+    assert page.evaluate('scrollY')==0
+    page.evaluate('__setEnabled(false)')
+    page.mouse.move(1990,400)
+    page.mouse.wheel(0,300)
+    page.wait_for_timeout(100)
+    assert page.evaluate('scrollY')==0
     page.close()
 
 
@@ -1283,7 +1392,10 @@ def main():
         centered_header(page)
         ok("desktop search uses three equal preview-top cards with title/channel and a centered logo/search header")
 
-        for selector in ["#channel-result", "#playlist-result", "#continuation"]:
+        channel_bounds = page.locator('#channel-result').bounding_box()
+        row_width = page.locator('ytd-item-section-renderer > #contents').bounding_box()['width']
+        assert abs(channel_bounds['width'] - (row_width - 24)/2) < 1
+        for selector in ["#playlist-result", "#continuation"]:
             expect(page.locator(selector)).to_be_visible()
             bounds = page.locator(selector).bounding_box()
             assert bounds["width"] > left["width"] * 2.9, (selector, bounds, left)
@@ -1296,7 +1408,7 @@ def main():
         expect(page.locator("#result-5 #description-text")).to_be_hidden()
         dynamic = page.locator("#result-5").bounding_box()
         assert abs(dynamic["width"] - left["width"]) < 2, (dynamic, left)
-        ok("mixed search channels/playlists/continuation retain full width and dynamic/modern video cards use the grid")
+        ok("mixed search channels use half rows, playlists/continuation retain full width and dynamic/modern video cards use the grid")
         page.close()
 
         def modern_result(identifier, href, avatar=False, playlist=False):
@@ -1407,6 +1519,19 @@ def main():
             ok(f'home settings at {width}px expose official account controls, confirm scoped cookie deletion, save theme/language and close accessibly')
         check_settings_failures(browser)
         ok('settings show cookie permission failures and restore theme/language after failed storage writes')
+
+        for width in [1440, 900, 390]:
+            check_search_channels_and_row_gaps(browser,width)
+            ok(f'search at {width}px lays channels in responsive pairs and keeps gaps within and between native result sections')
+        for width in [1440,390]:
+            check_header_alignment_and_anonymous_icons(browser,width)
+            ok(f'header at {width}px aligns logo/field/text centers and hides unnamed focus magnifiers while preserving keyboard/clear/Enter')
+
+        check_channel_row_gaps(browser)
+        ok('native channel row wrappers keep one 32px gap and restore original spacing on disable')
+
+        check_full_width_background_scroll(browser)
+        ok('left and right empty areas inside a full-width renderer scroll the document even when native wheel is blocked; nested scrolling and disabled mode stay native')
 
         popup_html = (ROOT / "src/popup/popup.html").read_text().replace('<script src="./popup.js"></script>', '')
         page = browser.new_page()
