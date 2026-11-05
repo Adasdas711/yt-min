@@ -404,8 +404,21 @@ def check_home_settings(browser, width):
       };
     }""")
     expect(page.locator('#myt-settings-panel')).to_be_hidden()
+    brand=page.locator('#myt-home .myt-home__brand').bounding_box()
+    theme=page.locator('#myt-theme-toggle').bounding_box()
+    assert abs((brand['y']+theme['y']+theme['height'])/2-page.viewport_size['height']/2)<1, (brand,theme)
     page.locator('#myt-settings-button').click()
     expect(page.locator('#myt-settings-panel')).to_be_visible()
+    panel=page.locator('#myt-settings-panel').bounding_box()
+    assert abs(panel['x']+panel['width']/2-width/2)<1, panel
+    assert abs(panel['y']+panel['height']/2-page.viewport_size['height']/2)<1, panel
+    expect(page.locator('#myt-home .myt-home__brand')).to_be_hidden()
+    expect(page.locator('#myt-query')).to_be_hidden()
+    assert page.locator('#myt-query').evaluate('element=>element.closest("form").inert')
+    page.locator('#myt-settings-close').press('Shift+Tab')
+    expect(page.locator('#myt-settings-theme')).to_be_focused()
+    page.locator('#myt-settings-theme').press('Tab')
+    expect(page.locator('#myt-settings-close')).to_be_focused()
     expect(page.locator('#myt-cookie-list')).to_contain_text('PREF · .youtube.com')
     assert page.locator('#myt-account-manage').get_attribute('href') == 'https://www.youtube.com/account'
     assert page.locator('#myt-account-signin').get_attribute('href').startswith('https://www.youtube.com/signin?')
@@ -436,6 +449,8 @@ def check_home_settings(browser, width):
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
     page.locator('#myt-settings-close').click()
     expect(page.locator('#myt-settings-panel')).to_be_hidden()
+    expect(page.locator('#myt-query')).to_be_visible()
+    assert not page.locator('#myt-query').evaluate('element=>element.closest("form").inert')
     expect(page.locator('#myt-settings-button')).to_be_focused()
     page.locator('#myt-settings-button').click()
     page.locator('#myt-settings-close').press('Escape')
@@ -474,7 +489,7 @@ def check_settings_failures(browser):
 def check_header_alignment_and_anonymous_icons(browser, width):
     legacy = MASTHEAD[MASTHEAD.index('<ytd-searchbox>'):MASTHEAD.index('</ytd-searchbox>')+len('</ytd-searchbox>')]
     modern = '''<yt-searchbox style="height:40px;margin-top:5px"><div class="ytSearchboxComponentHost" style="height:40px"><form class="ytSearchboxComponentSearchForm" style="position:relative;height:40px;margin-top:4px" action="/results">
-      <div class="ytSearchboxComponentInputBox"><input id="search" type="search" name="search_query" style="margin-top:3px"></div>
+      <div class="ytSearchboxComponentInputBox"><div class="ytSearchboxComponentInputContainer" style="height:100%;flex:1"><input id="search" type="search" name="search_query" style="margin-top:3px"></div></div>
       <button type="button" id="keyboard" style="width:32px;height:32px"><svg width="16" height="16"><rect width="16" height="10"/></svg></button>
       <button type="button" id="clear" style="width:32px;height:32px">×</button>
       </form></div></yt-searchbox>'''
@@ -485,6 +500,22 @@ def check_header_alignment_and_anonymous_icons(browser, width):
     field = page.locator('.ytSearchboxComponentSearchForm').bounding_box()
     text = page.locator('#search').bounding_box()
     assert abs(field['y'] + field['height']/2 - text['y'] - text['height']/2) < 1, (field,text)
+    page.locator('#logo').focus()
+    png=page.screenshot(animations='disabled')
+    ink=page.evaluate("""async data => {
+      const image=await createImageBitmap(await (await fetch('data:image/png;base64,'+data.png)).blob());
+      const ctx=new OffscreenCanvas(image.width,image.height).getContext('2d'); ctx.drawImage(image,0,0);
+      const r=data.field, text=data.text, ys=[];
+      for(let y=Math.ceil(r.y+3);y<r.y+r.height-3;y++) {
+        for(let x=Math.ceil(text.x+3);x<Math.min(text.x+120,text.x+text.width-3);x++) {
+          const p=ctx.getImageData(x,y,1,1).data;
+          if(p[0]<110 && p[1]<110 && p[2]<110) { ys.push(y);break; }
+        }
+      }
+      return {min:Math.min(...ys),max:Math.max(...ys)};
+    }""",{'png':base64.b64encode(png).decode(),'field':field,'text':text})
+    assert abs((ink['min']+ink['max'])/2-field['y']-field['height']/2)<3, (field,ink)
+    page.locator('#search').focus()
     page.locator('.ytSearchboxComponentSearchForm').evaluate("""form => {
       form.insertAdjacentHTML('afterbegin','<span data-anonymous-icon style="position:absolute;left:14px;top:10px"><svg width="24" height="24"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg></span>');
     }""")
@@ -576,6 +607,37 @@ def check_full_width_background_scroll(browser):
     page.mouse.wheel(0,300)
     page.wait_for_timeout(100)
     assert page.evaluate('scrollY')==0
+    page.close()
+
+
+
+def check_channel_first_within_sections(browser):
+    def video(i):
+        return f'<ytd-video-renderer id="video-order-{i}"><h3><a id="video-title" href="/watch?v={i}">Video {i}</a></h3></ytd-video-renderer>'
+    def channel(i):
+        return f'<div><ytd-channel-renderer id="channel-order-{i}"><a href="/@creator{i}">Channel {i}</a></ytd-channel-renderer></div>'
+    fixture='<ytd-app><ytd-page-manager><ytd-search><ytd-section-list-renderer><div id="contents">'
+    fixture+='<ytd-item-section-renderer><div id="contents">'+video(0)+'</div></ytd-item-section-renderer>'
+    fixture+='<ytd-item-section-renderer><div id="contents" id="mixed">'+video(1)+channel(1)+video(2)+channel(2)+video(3)+'</div></ytd-item-section-renderer>'
+    fixture+='<ytd-item-section-renderer><div id="contents">'+channel(3)+'</div></ytd-item-section-renderer>'
+    fixture+='</div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>'
+    page=setup(browser,'/results?search_query=mixed-order',fixture)
+    first=page.locator('#video-order-0').bounding_box()
+    c1=page.locator('#channel-order-1').bounding_box();c2=page.locator('#channel-order-2').bounding_box()
+    v1=page.locator('#video-order-1').bounding_box();v2=page.locator('#video-order-2').bounding_box()
+    last=page.locator('#channel-order-3').bounding_box()
+    assert first['y']<c1['y'], (first,c1)
+    assert abs(c1['y']-c2['y'])<1, (c1,c2)
+    assert v1['y']>=max(c1['y']+c1['height'],c2['y']+c2['height'])+31, (c1,c2,v1)
+    assert abs(v1['y']-v2['y'])<1, (v1,v2)
+    assert last['y']>v1['y']+v1['height'], (last,v1)
+    assert page.locator('#video-order-1').evaluate("element => Boolean(element.compareDocumentPosition(document.querySelector('#channel-order-1')) & Node.DOCUMENT_POSITION_FOLLOWING)")
+    page.locator('#channel-order-2').evaluate('element=>element.parentElement.remove()')
+    expect(page.locator('#channel-order-2')).to_have_count(0)
+    v1=page.locator('#video-order-1').bounding_box();c1=page.locator('#channel-order-1').bounding_box()
+    assert v1['y']>=c1['y']+c1['height']+31, (c1,v1)
+    page.evaluate('__setEnabled(false)')
+    assert page.locator('[data-myt-search-video-start]').count()==0
     page.close()
 
 
@@ -1532,6 +1594,9 @@ def main():
 
         check_full_width_background_scroll(browser)
         ok('left and right empty areas inside a full-width renderer scroll the document even when native wheel is blocked; nested scrolling and disabled mode stay native')
+
+        check_channel_first_within_sections(browser)
+        ok('mixed result blocks show channels first and start videos on a new row, without reordering separate sections or native DOM')
 
         popup_html = (ROOT / "src/popup/popup.html").read_text().replace('<script src="./popup.js"></script>', '')
         page = browser.new_page()

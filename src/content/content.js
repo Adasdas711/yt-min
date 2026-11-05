@@ -139,7 +139,7 @@
     border-radius: 0 !important;
     transform: none !important;
     filter: none !important;
-    padding: 72px 24px 112px !important;
+    padding: 72px 24px !important;
     overflow: auto !important;
     background: var(--myt-bg) !important;
     color: var(--myt-ink) !important;
@@ -354,9 +354,17 @@
 }
 .myt-settings-button:hover { color: var(--myt-ink); background: var(--myt-soft); }
 .myt-settings-button svg { width: 22px; height: 22px; }
+:host([data-settings-open]) :is(.myt-home__brand, .myt-search, .myt-theme-toggle) {
+    visibility: hidden;
+    pointer-events: none;
+}
+.myt-settings-backdrop {
+    position: fixed; inset: 0; z-index: 2; background: rgba(0, 0, 0, .3);
+}
 .myt-settings-panel {
-    position: fixed; right: 24px; top: 80px; z-index: 1;
-    width: min(360px, calc(100% - 32px)); max-height: calc(100svh - 104px);
+    position: fixed; left: 50%; top: 50%; z-index: 3;
+    transform: translate(-50%, -50%);
+    width: min(420px, calc(100% - 32px)); max-height: calc(100svh - 32px);
     overflow: auto; overscroll-behavior: contain; padding: 20px;
     border: 1px solid var(--myt-border); border-radius: 18px;
     background: var(--myt-surface); color: var(--myt-ink); text-align: start;
@@ -382,13 +390,13 @@
 .myt-settings-panel #myt-settings-error { color: var(--myt-ink); }
 @media (max-width: 600px) {
     .myt-settings-button { right: 16px; top: 16px; }
-    .myt-settings-panel { right: 16px; top: 72px; max-height: calc(100svh - 88px); }
+    .myt-settings-panel { max-height: calc(100svh - 32px); }
 }
 
 @media (max-width: 600px) {
     :host {
-        justify-content: flex-start !important;
-        padding: max(80px, 20svh) 20px 40px !important;
+        justify-content: safe center !important;
+        padding: 72px 20px !important;
     }
 
     .myt-home__brand {
@@ -602,7 +610,7 @@
     }
 
     function syncSearch(scope = document) {
-        const attributes = ["data-myt-search-video", "data-myt-search-cell", "data-myt-search-grid", "data-myt-search-channel", "data-myt-search-channel-cell"];
+        const attributes = ["data-myt-search-video", "data-myt-search-cell", "data-myt-search-grid", "data-myt-search-channel", "data-myt-search-channel-cell", "data-myt-search-video-start"];
         const active = enabled && (root.dataset.mytPage === "search" || root.dataset.mytPreviousPage === "search");
         for (const element of searchVideoCards) {
             if (!active || !element.isConnected || !element.closest("ytd-search")) {
@@ -681,6 +689,16 @@
                 if (!structuralList && count === 1 && parent.querySelector("ytd-channel-renderer") && !parent.querySelector(shelves)) mark(parent, "data-myt-search-channel-cell");
                 else if (structuralList || count > 1 || mixed) mark(parent, "data-myt-search-grid");
                 else if (count === 1) mark(parent, "data-myt-search-cell");
+            }
+            const grids = new Set(search.querySelectorAll("ytd-item-section-renderer > #contents"));
+            for (const [element, names] of wanted) {
+                if (names.has("data-myt-search-grid")) grids.add(element);
+            }
+            for (const grid of grids) {
+                const children = [...grid.children];
+                if (!children.some(child => wanted.get(child)?.has("data-myt-search-channel-cell"))) continue;
+                const firstVideo = children.find(child => wanted.get(child)?.has("data-myt-search-cell"));
+                if (firstVideo) mark(firstVideo, "data-myt-search-video-start");
             }
             for (const element of searchVideoCards) {
                 if (!search.contains(element)) continue;
@@ -862,8 +880,9 @@
             <button class="myt-settings-button" id="myt-settings-button" type="button" aria-label="${copy.settings}" title="${copy.settings}" aria-expanded="${settingsOpen}" aria-controls="myt-settings-panel">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m9 3-.6 2.3-2 .9L4.3 5.5 2.8 8.1l1.7 1.6-.2 2.3-1.7 1.5 1.5 2.7 2.3-.7 1.9 1.1.6 2.4h3l.6-2.4 1.9-1.1 2.3.7 1.5-2.7-1.7-1.5-.2-2.3 1.7-1.6-1.5-2.6-2.1.7-2-.9L12 3Z" transform="translate(1 1)"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
-            <aside class="myt-settings-panel" id="myt-settings-panel" role="region" aria-label="${copy.settings}" ${settingsOpen ? "" : "hidden"}>
-                <header><h2>${copy.settings}</h2><button type="button" id="myt-settings-close" aria-label="${copy.close}">×</button></header>
+            <div class="myt-settings-backdrop" id="myt-settings-backdrop" ${settingsOpen ? "" : "hidden"}></div>
+            <aside class="myt-settings-panel" id="myt-settings-panel" role="dialog" aria-modal="true" aria-labelledby="myt-settings-title" ${settingsOpen ? "" : "hidden"}>
+                <header><h2 id="myt-settings-title">${copy.settings}</h2><button type="button" id="myt-settings-close" aria-label="${copy.close}">×</button></header>
                 <section><h3>${copy.account}</h3><p>${copy.accountInfo}</p><div class="myt-settings-actions">
                     <a id="myt-account-manage" href="https://www.youtube.com/account">${copy.manage}</a>
                     <a id="myt-account-signin" href="https://www.youtube.com/signin?next=%2F">${copy.signin}</a>
@@ -892,6 +911,9 @@
         const setPanel = open => {
             settingsOpen = open;
             panel.hidden = !open;
+            view.querySelector("#myt-settings-backdrop").hidden = !open;
+            surface.toggleAttribute("data-settings-open", open);
+            for (const element of view.querySelectorAll(".myt-home__brand, .myt-search, .myt-theme-toggle")) element.inert = open;
             settingsButton.setAttribute("aria-expanded", String(open));
             confirmation.hidden = true;
             if (open) {
@@ -925,7 +947,17 @@
         };
         settingsButton.addEventListener("click", () => setPanel(panel.hidden));
         view.querySelector("#myt-settings-close").addEventListener("click", () => setPanel(false));
+        view.querySelector("#myt-settings-backdrop").addEventListener("click", () => setPanel(false));
         view.addEventListener("keydown", event => {
+            if (event.key === "Tab" && !panel.hidden) {
+                const controls = [...panel.querySelectorAll("a[href], button:not(:disabled), select:not(:disabled)")]
+                    .filter(element => element.getClientRects().length && !element.closest("[hidden]"));
+                const first = controls[0], last = controls[controls.length - 1];
+                if ((event.shiftKey && view.activeElement === first) || (!event.shiftKey && view.activeElement === last)) {
+                    event.preventDefault();
+                    (event.shiftKey ? last : first)?.focus();
+                }
+            }
             if (event.key === "Escape" && !panel.hidden) {
                 event.preventDefault();
                 event.stopPropagation();

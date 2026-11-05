@@ -1106,7 +1106,7 @@ html.minimal-youtube ytd-masthead :is(.ytSearchboxComponentSearchForm, ytd-searc
     padding-block: 0 !important;
     align-items: center !important;
 }
-html.minimal-youtube ytd-masthead :is(.ytSearchboxComponentInputBox, .yt-searchbox-input-box, .yt-searchbox__input-box, ytd-searchbox #search-input) {
+html.minimal-youtube ytd-masthead :is(.ytSearchboxComponentInputBox, .yt-searchbox-input-box, .yt-searchbox__input-box, .ytSearchboxComponentInputContainer, .yt-searchbox-input-container, .yt-searchbox__input-container, ytd-searchbox #search-input) {
     display: flex !important;
     align-items: center !important;
     box-sizing: border-box;
@@ -1121,9 +1121,10 @@ html.minimal-youtube ytd-masthead input {
     align-self: center !important;
     margin-block: 0 !important;
     padding-block: 0 !important;
-    height: 20px !important;
+    box-sizing: border-box;
+    height: 100% !important;
     min-height: 0 !important;
-    line-height: 20px !important;
+    line-height: normal !important;
     background-image: none !important;
 }
 html.minimal-youtube ytd-masthead input::-webkit-search-decoration,
@@ -1196,4 +1197,13 @@ html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="chan
 }
 html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-rich-grid-renderer ytd-rich-item-renderer {
     margin-block: 0 !important;
+}
+
+/* Reorder within each native result block; separate sections retain their order. */
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]):has(> [data-myt-search-channel-cell]):has([data-myt-search-video]) > [data-myt-search-channel-cell] {
+    order: -1;
+}
+
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-video-start] {
+    grid-column: 1 / span 2 !important;
 }
