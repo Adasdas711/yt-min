@@ -218,22 +218,19 @@ def main():
         assert page.locator("#native-state").count() == 1, "Homepage must preserve YouTube's native DOM"
         expect(page).to_have_title("YouTube")
         centered(page, ".myt-search")
-        submit = page.locator(".myt-search__submit")
-        assert submit.text_content().strip() == "", "Homepage search should use an icon-only submit button"
-        assert submit.get_attribute("aria-label"), "Icon-only search needs an accessible name"
-        expect(submit.locator("svg")).to_have_count(1)
+        expect(page.locator(".myt-search button[type=submit], .myt-search circle")).to_have_count(0)
         assert page.locator(".myt-search").evaluate("element => getComputedStyle(element).boxShadow") == "none"
         home_bg = page.locator("#myt-home").evaluate("element => getComputedStyle(element).backgroundColor")
         for selector in ["html", "body", "#native-app"]:
             background = page.locator(selector).evaluate("element => getComputedStyle(element).backgroundColor")
             assert background in [home_bg, "rgba(0, 0, 0, 0)"], (selector, background, home_bg)
         page.locator("#myt-query").fill("    ")
-        page.locator(".myt-search__submit").click()
+        page.locator("#myt-query").press("Enter")
         assert page.url == "https://www.youtube.com/", "Empty search must stay on home"
         ok("homepage preserves native DOM, centers search and ignores blank query")
 
         page.locator("#myt-query").fill("  кот & C++ #музыка  ")
-        page.locator(".myt-search__submit").click()
+        page.locator("#myt-query").press("Enter")
         page.wait_for_url("**/results?**")
         assert parse_qs(urlparse(page.url).query)["search_query"] == ["кот & C++ #музыка"], page.url
         ok("search encodes Unicode, ampersands, plus signs and hash")
@@ -292,6 +289,34 @@ def main():
             ok(f"{theme} home escapes transformed/filtered body, removes tall native flow, stays flat full-page after resize and restores on disable")
             page.close()
 
+        for theme in ["dark", "light"]:
+            page = setup(browser, theme=theme)
+            # Late native styles can paint stripes above the home background,
+            # even when its computed backgroundColor is already correct.
+            page.add_style_tag(content="""
+              html::before, main::before, main::after {
+                content: ''; position: fixed; pointer-events: none;
+                left: 0; right: 0; height: 27vh; z-index: 9999;
+                background: rgba(0, 0, 0, .15);
+              }
+              html::before { top: 0; }
+              main::before { top: 27vh; }
+              main::after { bottom: 0; }
+              main { background-image: linear-gradient(#111, #222) !important;
+                     box-shadow: inset 0 200px 0 rgba(0, 0, 0, .1) !important; }
+            """)
+            page.emulate_media(reduced_motion="reduce")
+            assert_uniform_full_page(page)
+            for size in [{"width":1996,"height":1248}, {"width":390,"height":844}]:
+                page.set_viewport_size(size)
+                assert_uniform_full_page(page)
+            page.locator('#myt-theme-toggle').click()
+            assert_uniform_full_page(page)
+            page.evaluate('__setEnabled(false)')
+            assert page.locator('html').evaluate("element => getComputedStyle(element, '::before').content") == '""'
+            ok(f"{theme} homepage keeps a solid background despite late native gradients/pseudo-elements, resize and theme change; disabling restores native styles")
+            page.close()
+
         page = setup(browser)
         page.locator("#myt-query").fill("remove me")
         page.locator(".myt-search__clear").click()
@@ -310,8 +335,7 @@ def main():
         assert brand["y"] >= 0, "Short viewport must keep the start of the home screen reachable"
         page.locator("#myt-query").scroll_into_view_if_needed()
         expect(page.locator("#myt-query")).to_be_in_viewport()
-        page.locator(".myt-search__submit").scroll_into_view_if_needed()
-        expect(page.locator(".myt-search__submit")).to_be_in_viewport()
+        expect(page.locator("#myt-query")).to_be_in_viewport()
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         ok("320px-tall desktop homepage keeps its brand and search reachable")
         page.close()
@@ -607,7 +631,8 @@ def main():
             expect(page.locator("#create")).to_be_hidden()
             expect(page.locator("#avatar-btn")).to_be_hidden()
             page.locator("#search").fill("кот & C++")
-            page.locator("#search-icon-legacy").click()
+            expect(page.locator("#search-icon-legacy")).to_be_hidden()
+            page.locator("#search").press("Enter")
             page.wait_for_url("**/results?**")
             assert parse_qs(urlparse(page.url).query)["search_query"] == ["кот & C++"], page.url
             ok(f"logo and functional native search stay centered together on {path.split('?')[0]}")
@@ -619,7 +644,8 @@ def main():
         page = setup(browser, "/results?search_query=modern", '<ytd-app>' + modern_header + '<ytd-page-manager class="ytd-app"><ytd-search>Modern results</ytd-search></ytd-page-manager></ytd-app>')
         centered_header(page)
         page.locator("#search").fill("modern & search")
-        page.locator(".ytSearchboxComponentSearchButton").click()
+        expect(page.locator(".ytSearchboxComponentSearchButton")).to_be_hidden()
+        page.locator("#search").press("Enter")
         page.wait_for_url("**/results?**")
         assert parse_qs(urlparse(page.url).query)["search_query"] == ["modern & search"]
         ok("modern native searchbox keeps its visible logo/form group centered and submits normally")
@@ -642,14 +668,15 @@ def main():
                 page.locator('#search').fill('Савельев Сергей & C++')
                 expect(page.locator('#search')).to_have_value('Савельев Сергей & C++')
                 submit = page.locator('#search-icon-legacy' if variant == 'legacy' else '.ytSearchboxComponentSearchButton')
+                expect(submit).to_be_hidden()
+                page.evaluate('__setEnabled(false)')
                 expect(submit).to_be_visible()
-                if width == 1440:
-                    page.locator('#search').press('Enter')
-                else:
-                    submit.click()
+                page.evaluate('__setEnabled(true)')
+                expect(submit).to_be_hidden()
+                page.locator('#search').press('Enter')
                 page.wait_for_url('**/results?**')
                 assert parse_qs(urlparse(page.url).query)['search_query'] == ['Савельев Сергей & C++']
-                ok(f'{variant} search at {width}px removes overlapping leading icon, retains native submit and uses homepage brand')
+                ok(f'{variant} search at {width}px removes all search magnifiers, restores native buttons on disable and submits with Enter')
                 page.close()
 
         page = setup(browser, '/results?search_query=brand', '<ytd-app>' + MASTHEAD + '<ytd-page-manager class="ytd-app"><ytd-search>Results</ytd-search></ytd-page-manager></ytd-app>')

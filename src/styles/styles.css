@@ -39,8 +39,15 @@ html.minimal-youtube[data-myt-page="home"] ytd-app {
     background-image: none !important;
 }
 
+/* Native/global pseudo-elements can paint horizontal bands above the flat
+   background. Suppress them only on the active home route. */
+html.minimal-youtube[data-myt-page="home"]::before,
+html.minimal-youtube[data-myt-page="home"]::after,
+html.minimal-youtube[data-myt-page="home"] > #myt-home::before,
+html.minimal-youtube[data-myt-page="home"] > #myt-home::after,
 html.minimal-youtube[data-myt-page="home"] body::before,
 html.minimal-youtube[data-myt-page="home"] body::after {
+    content: none !important;
     display: none !important;
 }
 
@@ -64,8 +71,8 @@ html.minimal-youtube .myt-home {
     width: 100%;
     height: 100%;
     max-width: none;
-    background-image: none;
-    box-shadow: none;
+    background-image: none !important;
+    box-shadow: none !important;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -79,7 +86,7 @@ html.minimal-youtube .myt-home {
     filter: none;
     padding: 72px 24px 112px;
     overflow: auto;
-    background: var(--myt-bg);
+    background: var(--myt-bg) !important;
     color: var(--myt-ink);
     font-family: "Roboto", "Arial", sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -156,7 +163,7 @@ html.minimal-youtube .myt-search {
     width: min(100%, 600px);
     min-height: 64px;
     margin: 0;
-    padding: 7px 7px 7px 22px;
+    padding: 7px 22px;
     border: 1px solid var(--myt-border);
     border-radius: 18px;
     background: var(--myt-surface);
@@ -193,8 +200,7 @@ html.minimal-youtube .myt-search__input::-webkit-search-cancel-button {
     appearance: none;
 }
 
-html.minimal-youtube .myt-search__clear,
-html.minimal-youtube .myt-search__submit {
+html.minimal-youtube .myt-search__clear {
     gap: 8px;
     display: inline-flex;
     align-items: center;
@@ -224,22 +230,6 @@ html.minimal-youtube .myt-search__clear:hover {
     color: var(--myt-ink);
 }
 
-html.minimal-youtube .myt-search__submit {
-    width: 48px;
-    min-width: 48px;
-    height: 48px;
-    padding: 12px;
-    border-radius: 12px;
-    background: var(--myt-ink);
-    color: var(--myt-bg);
-}
-
-html.minimal-youtube .myt-search__submit:hover {
-    transform: translateY(-1px);
-    background: color-mix(in srgb, var(--myt-ink) 85%, var(--myt-bg));
-}
-
-html.minimal-youtube .myt-search__submit svg,
 html.minimal-youtube .myt-search__clear svg {
     display: block;
     width: 22px;
@@ -618,8 +608,7 @@ html.minimal-youtube ytd-masthead .myt-masthead-brand .myt-home__wordmark {
     font-size: 24px;
 }
 
-/* These are decorative leading icons inside the input, not submit buttons.
-   Native focus can absolutely position them over the first typed characters. */
+/* Remove leading magnifiers as well as the native submit icons below. */
 html.minimal-youtube ytd-masthead ytd-searchbox :is(#search-input #search-icon, #search-input .search-icon, #search-icon:not(button), #search-icon-container, #search-icon-wrapper),
 html.minimal-youtube ytd-masthead :is(yt-searchbox, .ytSearchboxComponentHost) :is(.ytSearchboxComponentInputBox, .yt-searchbox-input-box, .yt-searchbox__input-box) :is(.ytSearchboxComponentSearchIcon, .ytSearchboxComponentSearchIconContainer, .yt-searchbox-search-icon, .yt-searchbox-search-icon-container, .yt-searchbox__search-icon, .yt-searchbox__search-icon-container) {
     display: none !important;
@@ -670,28 +659,15 @@ html.minimal-youtube ytd-masthead ytd-searchbox #container {
     min-width: 0;
     height: 100%;
     margin: 0;
-    padding-inline: 16px 6px;
+    padding-inline: 16px;
     border: 0 !important;
-    border-radius: 14px 0 0 14px;
+    border-radius: 14px;
     background: transparent !important;
     box-shadow: none !important;
 }
 
 html.minimal-youtube ytd-masthead ytd-searchbox #search-icon-legacy {
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: none;
-    width: 46px;
-    min-width: 46px;
-    height: 36px;
-    margin: 3px;
-    padding: 8px 12px;
-    border: 0;
-    border-radius: 10px;
-    background: var(--myt-soft);
-    color: var(--myt-ink);
+    display: none !important;
 }
 
 html.minimal-youtube ytd-masthead ytd-searchbox input {
@@ -713,29 +689,15 @@ html.minimal-youtube ytd-masthead :is(yt-searchbox, .ytSearchboxComponentHost) :
     min-width: 0;
     min-height: 44px;
     margin: 0;
-    padding-inline: 16px 8px;
+    padding-inline: 16px;
     border: 1px solid var(--myt-border) !important;
-    border-radius: 14px 0 0 14px !important;
+    border-radius: 14px !important;
     background: var(--myt-surface) !important;
     box-shadow: none !important;
 }
 
 html.minimal-youtube ytd-masthead :is(yt-searchbox, .ytSearchboxComponentHost) :is(.ytSearchboxComponentSearchButton, .yt-searchbox-search-button, .yt-searchbox__search-button) {
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: none;
-    width: 48px;
-    min-width: 48px;
-    height: 44px;
-    margin: 0;
-    border: 1px solid var(--myt-border);
-    border-left: 0;
-    border-radius: 0 14px 14px 0;
-    background: var(--myt-soft);
-    color: var(--myt-ink);
-    box-shadow: none;
+    display: none !important;
 }
 
 html.minimal-youtube ytd-masthead :is(yt-searchbox, .ytSearchboxComponentHost) input {
@@ -754,10 +716,6 @@ html.minimal-youtube ytd-masthead :is(yt-searchbox, .ytSearchboxComponentHost) :
     border-color: var(--myt-muted) !important;
     outline: 2px solid color-mix(in srgb, var(--myt-muted) 16%, transparent);
     outline-offset: 2px;
-}
-
-html.minimal-youtube ytd-masthead :is(#search-icon-legacy, .ytSearchboxComponentSearchButton, .yt-searchbox-search-button, .yt-searchbox__search-button):hover {
-    background: color-mix(in srgb, var(--myt-muted) 20%, var(--myt-soft));
 }
 
 /* A quieter text column below the full-size native player. */
@@ -1197,14 +1155,8 @@ html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-sec
     html.minimal-youtube .myt-search {
         gap: 9px;
         min-height: 58px;
-        padding: 5px 5px 5px 15px;
+        padding: 5px 15px;
         border-radius: 16px;
-    }
-
-    html.minimal-youtube .myt-search__submit {
-        width: 44px;
-        min-width: 44px;
-        height: 44px;
     }
 
     html.minimal-youtube ytd-masthead > #container {

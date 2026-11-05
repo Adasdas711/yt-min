@@ -25,11 +25,11 @@
     const channelShorts = /^(\/(?:@[^/]+|(?:channel|c|user)\/[^/]+))\/shorts\/?$/;
     const ru = (document.documentElement.lang || navigator.language).toLowerCase().startsWith("ru");
     const copy = ru ? {
-        search: "Поиск на YouTube", submit: "Найти", clear: "Очистить поиск",
+        search: "Поиск на YouTube", clear: "Очистить поиск",
         label: "Поиск видео", light: "Светлая тема", dark: "Тёмная тема",
         comments: "Комментарии", hideComments: "Скрыть комментарии",
     } : {
-        search: "Search YouTube", submit: "Search", clear: "Clear search",
+        search: "Search YouTube", clear: "Clear search",
         label: "Search videos", light: "Light theme", dark: "Dark theme",
         comments: "Comments", hideComments: "Hide comments",
     };
@@ -400,7 +400,6 @@
             <form class="myt-search" role="search" action="/results" method="get" accept-charset="UTF-8">
                 <input class="myt-search__input" id="myt-query" name="search_query" type="search" autocomplete="off" aria-label="${copy.label}" placeholder="${copy.search}">
                 <button class="myt-search__clear" type="button" aria-label="${copy.clear}" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
-                <button class="myt-search__submit" type="submit" aria-label="${copy.submit}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></svg></button>
             </form>
             <button class="myt-theme-toggle" id="myt-theme-toggle" type="button">
                 <svg class="myt-theme-toggle__sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
