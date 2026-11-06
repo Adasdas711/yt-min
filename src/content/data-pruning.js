@@ -164,6 +164,18 @@
     document.addEventListener("minimal-youtube:optimization", event => {
         if (typeof event.detail?.enabled === "boolean") configure(event.detail.enabled);
     });
+    // DOM geometry comes from the isolated layout, while YouTube's sizing API
+    // lives in MAIN. Updating it also recalculates chapter/seekbar pixel widths.
+    document.addEventListener("minimal-youtube:player-resize", event => {
+        if (!enabled) return;
+        const width = event.detail?.width, height = event.detail?.height;
+        if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0 || width > 32768 || height > 32768) return;
+        try {
+            const player = event.target?.matches?.("ytd-watch-flexy") ? event.target.querySelector("#movie_player") : document.querySelector("ytd-watch-flexy:not([hidden]) #movie_player");
+            const api = typeof player?.setSize === "function" ? player : player?.closest("ytd-player")?.getApiInterface?.();
+            if (typeof api?.setSize === "function") api.setSize(Math.round(width), Math.round(height));
+        } catch { /* Native controls keep working when an API variant differs. */ }
+    });
     // This script is registered only while focus mode is enabled.
     configure(true);
 })();

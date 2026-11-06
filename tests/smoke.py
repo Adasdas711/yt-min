@@ -1211,6 +1211,99 @@ def check_player_ad_controls(browser):
     page.close()
 
 
+def check_fullscreen_timeline(browser,width,api):
+    page=setup(browser,'/watch?v=timeline',native_watch_fixture(),native_dark=True,width=width,prune_data=True)
+    if width<600:page.set_viewport_size({'width':width,'height':600})
+    encoded=base64.b64encode((ROOT/'tests/fixtures/seek.webm').read_bytes()).decode()
+    page.evaluate("""async encoded=>{
+      const video=document.querySelector('video');window.__timelineVideo=video;
+      video.src='data:video/webm;base64,'+encoded;video.muted=true;video.load();
+      await new Promise(resolve=>video.addEventListener('loadeddata',resolve,{once:true}));
+    }""",encoded)
+    page.evaluate("""api=>{
+      const player=document.querySelector('#movie_player');
+      const chrome=document.createElement('div');chrome.className='ytp-chrome-bottom';chrome.style.cssText='position:absolute;left:12px;bottom:0;height:48px;width:140px;z-index:2';
+      chrome.innerHTML='<div class="ytp-progress-bar-container" style="position:absolute;top:0;height:14px;width:140px"><div class="ytp-progress-bar" role="slider" tabindex="0" aria-label="Seek" style="position:relative;height:14px;width:140px"><div class="ytp-chapters-container" style="display:flex;height:7px;width:140px"></div></div></div>';
+      player.append(chrome);const bar=chrome.querySelector('.ytp-progress-bar'),chapters=chrome.querySelector('.ytp-chapters-container');
+      if(api)for(const ratio of [1,2,1]){const segment=document.createElement('div');segment.className='ytp-chapter-hover-container';segment.dataset.ratio=ratio;segment.style.cssText='height:7px;background:red;width:'+35*ratio+'px';chapters.append(segment);}
+      const resize=(width,height)=>{
+        window.__timelineResize=[width,height];
+        const inset=document.fullscreenElement? (width<=600?12:24):12,available=width-2*inset;
+        chrome.style.width=available+'px';
+        for(const child of chrome.querySelectorAll('.ytp-progress-bar-container,.ytp-progress-bar,.ytp-chapters-container'))child.style.width=available+'px';
+        for(const segment of chapters.children)segment.style.width=available*Number(segment.dataset.ratio)/4+'px';
+      };
+      if(api==='direct')player.setSize=resize;
+      if(api==='wrapper')player.closest('ytd-player').getApiInterface=()=>({setSize:resize});
+      let down=false;
+      const seek=event=>{const box=bar.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,(event.clientX-box.x)/box.width));document.querySelector('video').currentTime=fraction*document.querySelector('video').duration;};
+      bar.addEventListener('pointerdown',event=>{down=true;bar.setPointerCapture(event.pointerId);seek(event);});
+      bar.addEventListener('pointermove',event=>{if(down)seek(event);});bar.addEventListener('pointerup',()=>down=false);
+      bar.addEventListener('keydown',event=>{if(event.key==='ArrowLeft'){event.preventDefault();const video=document.querySelector('video');video.currentTime=Math.max(0,video.currentTime-.4);}});
+      window.__nativeSeek=bar;
+    }""",api)
+    page.locator('#native-fullscreen').click()
+    page.wait_for_function('!!document.fullscreenElement')
+    height=page.viewport_size['height'];inset=12 if width<=600 else 24;expected=width-2*inset
+    page.wait_for_function("width=>Math.abs(document.querySelector('.ytp-progress-bar').getBoundingClientRect().width-width)<2",arg=expected)
+    bar=page.locator('.ytp-progress-bar');box=bar.bounding_box()
+    assert abs(box['x']-inset)<1 and abs(box['width']-expected)<1,(box,expected)
+    if api:
+        page.wait_for_function("width=>window.__timelineResize?.[0]===width",arg=width)
+        segments=page.locator('.ytp-chapter-hover-container').all()
+        for segment,ratio in zip(segments,[1,2,1]):assert abs(segment.bounding_box()['width']-expected*ratio/4)<1
+    for fraction,color in [(.125,[200,30,30,255]),(.5,[30,60,200,255]),(.875,[230,190,24,255])]:
+        page.mouse.click(box['x']+box['width']*fraction,box['y']+box['height']/2)
+        page.wait_for_function("fraction=>{const v=document.querySelector('video');return !v.seeking&&Math.abs(v.currentTime-v.duration*fraction)<.08;}",arg=fraction)
+        page.wait_for_timeout(60)
+        pixel=rendered_pixel(page,width/2,height/2)
+        assert all(abs(a-b)<=10 for a,b in zip(pixel,color)),(fraction,pixel,color)
+    page.mouse.move(box['x']+box['width']*.25,box['y']+box['height']/2)
+    page.mouse.down();page.mouse.move(box['x']+box['width']*.75,box['y']+box['height']/2,steps=8);page.mouse.up()
+    page.wait_for_function("()=>{const v=document.querySelector('video');return !v.seeking&&Math.abs(v.currentTime-v.duration*.75)<.08;}")
+    bar.focus();page.keyboard.press('ArrowLeft')
+    page.wait_for_function("()=>{const v=document.querySelector('video');return !v.seeking&&Math.abs(v.currentTime-(v.duration*.75-.4))<.08;}")
+    assert page.evaluate("window.__nativeSeek===document.querySelector('.ytp-progress-bar')&&window.__timelineVideo===document.querySelector('video')")
+    page.locator('#native-fullscreen').click()
+    page.wait_for_function('!document.fullscreenElement')
+    expect(page.locator('#myt-watch')).to_be_visible()
+    expect(page.locator('[data-myt-fullscreen-part]')).to_have_count(0)
+    if api:
+        page.wait_for_function("()=>document.querySelector('.ytp-progress-bar').getBoundingClientRect().width<document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.media').getBoundingClientRect().width")
+    assert_stable(page)
+    page.close()
+
+
+def check_theater_edges(browser,width,source_height):
+    page=setup(browser,'/watch?v=theater-edges',native_watch_fixture(True),native_dark=True,width=width,prune_data=True)
+    if width<600:page.set_viewport_size({'width':width,'height':600})
+    stream=VIDEO_STREAM.replace('canvas.height=360','canvas.height='+str(source_height)).replace('640,360','640,'+str(source_height))
+    page.evaluate(stream)
+    page.wait_for_function("height=>Math.abs(document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.media').getBoundingClientRect().height-document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.viewport').clientWidth*height/640)<1",arg=source_height)
+    media=page.locator('#myt-watch .media').bounding_box();video=page.locator('video').bounding_box()
+    geometry=page.locator('#myt-watch .header').bounding_box()
+    content_width=page.locator('#myt-watch .viewport').evaluate('e=>e.clientWidth')
+    assert media['x']==0 and media['width']==content_width and media['y']==geometry['y']+geometry['height'],media
+    assert video==media,(video,media)
+    assert page.locator('#ytd-player').evaluate('e=>getComputedStyle(e).borderRadius')=='0px'
+    for x in [1,content_width-2]:
+        pixel=rendered_pixel(page,x,media['y']+min(160,media['height']/2))
+        assert all(abs(a-b)<=6 for a,b in zip(pixel,[24,180,96,255])),(x,pixel)
+    # A native playlist goes below the full-width theater player.
+    page.locator('#secondary-inner').evaluate("e=>e.insertAdjacentHTML('beforeend','<ytd-playlist-panel-renderer id=playlist><ytd-playlist-panel-video-renderer>Playlist</ytd-playlist-panel-video-renderer></ytd-playlist-panel-renderer>')")
+    expect(page.locator('#myt-watch .sidecar')).to_be_visible()
+    assert page.locator('#myt-watch .media').bounding_box()['width']==content_width
+    sidecar=page.locator('#myt-watch .sidecar').bounding_box()
+    assert sidecar['y']>=media['y']+media['height'],(sidecar,media)
+    page.locator('#playlist').evaluate('e=>e.remove()')
+    page.locator('ytd-watch-flexy').evaluate("e=>e.removeAttribute('theater')")
+    page.wait_for_function("document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.media').getBoundingClientRect().x>0")
+    assert page.locator('#myt-watch .details').evaluate('e=>e.getBoundingClientRect().x>0')
+    assert_stable(page)
+    page.evaluate('clearInterval(window.__frames);window.__stream.getTracks().forEach(track=>track.stop())')
+    page.close()
+
+
 def check_background_work(browser):
     results={}
     probe="""async () => {
@@ -1339,8 +1432,7 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
         assert page.evaluate('window.__share') is True
         expect(page.locator('#share-dialog')).to_be_visible()
         page.get_by_role('button',name='Close share dialog').click()
-        page.get_by_role('button',name='Save',exact=True).filter(visible=True).click()
-        assert page.evaluate('window.__save') is True
+        expect(page.locator('#myt-watch .actions').get_by_role('button',name='Save',exact=True)).to_have_count(0)
         # Keyboard navigation and light dismissal must retain native More actions.
         page.locator('.more-toggle').press('Enter')
         expect(page.locator('.more-popup button').first).to_be_focused()
@@ -1979,6 +2071,12 @@ def main():
         ok('homepage-style masthead brand repairs native rerenders without duplicates, restores native logo on disable and keeps its home link')
         page.close()
 
+        for width,api in [(1440,'direct'),(390,'wrapper'),(1440,None)]:
+            check_fullscreen_timeline(browser,width,api)
+            ok(f'native fullscreen timeline at {width}px (API={api}) spans the frame, keeps proportional chapters and seeks decoded video by click/drag/keyboard')
+        for width,height in [(1440,480),(390,360)]:
+            check_theater_edges(browser,width,height)
+            ok(f'theater at {width}px is edge-to-edge at native aspect ratio, with no top gap, rounded corners or playlist side gutter')
         check_fast_fullscreen(browser)
         ok('native video fills the viewport in the same click before the fullscreen handler, without waiting or replacing media')
         check_player_ad_data(browser)

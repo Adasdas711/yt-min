@@ -5,18 +5,30 @@ const vm = require("node:vm");
 const path = require("node:path");
 
 async function main() {
-    const handlers = new Map(), attributes = new Map();
+    const handlers = new Map(), attributes = new Map(), resizes = [];
+    let playerAPI = { setSize: (...size) => resizes.push(size) };
     class Response { constructor(data) { this.data = data; } async json() { return this.data; } }
     const context = vm.createContext({
         Response, location: { pathname: "/watch" },
         document: {
             documentElement: { hasAttribute: name => attributes.has(name), setAttribute: (name, value) => attributes.set(name, value) },
             addEventListener: (name, handler) => handlers.set(name, handler),
+            querySelector: () => playerAPI,
         },
     });
     context.window = context;
     const originalParse = vm.runInContext("JSON.parse", context), originalResponseJSON = Response.prototype.json;
     vm.runInContext(fs.readFileSync(path.join(__dirname, "../src/content/data-pruning.js"), "utf8"), context);
+    const resize = (detail,target) => handlers.get('minimal-youtube:player-resize')({ detail,target });
+    resize({ width: 1920.4, height: 1080.1 });assert.deepEqual(resizes.pop(), [1920, 1080]);
+    playerAPI = { closest: () => ({ getApiInterface: () => ({ setSize: (...size) => resizes.push(size) }) }) };
+    resize({ width: 390, height: 600 });assert.deepEqual(resizes.pop(), [390, 600]);
+    resize({width:1280,height:720},{matches:()=>true,querySelector:()=>({setSize:(...size)=>resizes.push(size)})});assert.deepEqual(resizes.pop(),[1280,720]);
+    for (const detail of [{width:0,height:100},{width:1e9,height:100},{width:NaN,height:100},{width:'1920',height:1080},{width:100,height:Infinity}]) resize(detail);
+    assert.equal(resizes.length,0);
+    playerAPI = { setSize: () => { throw new Error('Native API variant'); } };
+    assert.doesNotThrow(() => resize({width:1920,height:1080}));
+    playerAPI = { setSize: (...size) => resizes.push(size) };
     const parse = data => vm.runInContext("JSON.parse", context)(JSON.stringify(data));
     const command = enabled => handlers.get("minimal-youtube:optimization")({ detail: { enabled } });
     const secondary = data => data.contents.twoColumnWatchNextResults.secondaryResults.secondaryResults.results;
@@ -138,6 +150,7 @@ async function main() {
     ] } } }).contents.twoColumnSearchResultsRenderer.contents.length, 0);
 
     command(false);
+    resize({width:1920,height:1080});assert.equal(resizes.length,0,'Disabled mode must not resize native controls');
     assert.equal(vm.runInContext("JSON.parse", context), originalParse);
     assert.equal(Response.prototype.json, originalResponseJSON);
     const playerDescriptor = Object.getOwnPropertyDescriptor(context, 'ytInitialPlayerResponse');

@@ -1294,6 +1294,26 @@ html.minimal-youtube[data-myt-watch-ui] video[data-myt-fullscreen-part="video"]:
 html.minimal-youtube[data-myt-watch-ui] video[data-myt-fullscreen-part="video"] {
     object-fit: contain !important;
 }
+/* Native controls sometimes keep pre-fullscreen inline pixel widths. Keep the
+   bar in bounds while the native sizing API recalculates its chapter segments. */
+html.minimal-youtube[data-myt-watch-ui] #movie_player[data-myt-fullscreen-part="container"] .ytp-chrome-bottom {
+    left: 24px !important; right: 24px !important; bottom: 0 !important;
+    width: calc(100% - 48px) !important; max-width: calc(100% - 48px) !important;
+}
+html.minimal-youtube[data-myt-watch-ui] #movie_player[data-myt-fullscreen-part="container"] :is(.ytp-progress-bar-container, .ytp-progress-bar, .ytp-progress-list, .ytp-chapters-container) {
+    width: 100% !important; max-width: 100% !important;
+}
+html.minimal-youtube[data-myt-watch-ui] ytd-watch-flexy[theater] [data-myt-watch-island="media"] { border-radius: 0 !important; }
+html.minimal-youtube[data-myt-watch-ui] ytd-watch-flexy[theater] [data-myt-watch-island="media"] :is(#container, #movie_player, .html5-video-container, video.html5-main-video) {
+    position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important;
+    min-width: 0 !important; min-height: 0 !important; max-width: none !important; max-height: none !important;
+    margin: 0 !important; padding: 0 !important; transform: none !important;
+}
+@media (max-width: 600px) {
+    html.minimal-youtube[data-myt-watch-ui] #movie_player[data-myt-fullscreen-part="container"] .ytp-chrome-bottom {
+        left: 12px !important; right: 12px !important; width: calc(100% - 24px) !important; max-width: calc(100% - 24px) !important;
+    }
+}
 
 /* Immediate native-player preview while its own fullscreen request starts. */
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="media"][data-myt-fullscreen-pending] {
