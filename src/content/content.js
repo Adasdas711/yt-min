@@ -126,6 +126,7 @@
     const voteElements = new Set();
     const searchVideoCards = new Set();
     const hiddenSections = new Set();
+    const watchDetailNodes = new Set();
     const commentPanelStates = new Map();
     const brandedLinks = new Set();
     const searchDecorations = new Set();
@@ -816,6 +817,66 @@
         }
     }
 
+    function syncWatchDetails() {
+        const attributes = ["data-myt-description", "data-myt-description-section", "data-myt-description-card", "data-myt-description-heading", "data-myt-native-panel"];
+        const wanted = new Map();
+        const mark = (element, name, value = "") => {
+            if (!wanted.has(element)) wanted.set(element, new Map());
+            wanted.get(element).set(name, value);
+        };
+        if (enabled && (root.dataset.mytPage === "watch" || root.dataset.mytPreviousPage === "watch")) {
+            for (const watch of document.querySelectorAll("ytd-watch-flexy:not([hidden])")) {
+                if (watch.closest("[hidden], [aria-hidden='true']")) continue;
+                const descriptions = [...watch.querySelectorAll("ytd-watch-metadata #description, ytd-video-secondary-info-renderer #description, ytd-structured-description-content-renderer")];
+                for (const description of descriptions.filter(node => !descriptions.some(other => other !== node && other.contains(node)))) {
+                    mark(description, "data-myt-description");
+                    const sections = [...description.querySelectorAll("*")].filter(node =>
+                        /^(?:ytd|yt)-.*description.*section-(?:renderer|view-model)$/.test(node.localName));
+                    for (const section of sections.filter(node => !sections.some(other => other !== node && node.contains(other)))) {
+                        const heading = section.querySelector("h2, h3, [role='heading'], #title");
+                        const title = `${section.localName} ${heading?.textContent || ""}`.toLowerCase();
+                        const kind = /chapter|macro-marker|эпизод|главы/.test(title) ? "chapters" :
+                            /people|mention|упомянут|люди/.test(title) ? "people" :
+                            /transcript|расшифров|текст видео/.test(title) ? "transcript" :
+                            /channel|social|канал/.test(title) ? "channel" : "other";
+                        mark(section, "data-myt-description-section", kind);
+                        if (heading) mark(heading, "data-myt-description-heading");
+                        const cards = [...section.querySelectorAll("ytd-macro-markers-list-item-renderer, ytd-info-card-contents-renderer, #items > *, [role='list'] > *")];
+                        for (const card of cards.filter(node => !cards.some(other => other !== node && node.contains(other)))) {
+                            if (card.matches("ytd-macro-markers-list-item-renderer, ytd-info-card-contents-renderer") ||
+                                (card.querySelector("a[href], button, [role='button'], [role='link']") && card.querySelector("img, yt-img-shadow, ytd-thumbnail"))) {
+                                mark(card, "data-myt-description-card", kind);
+                            }
+                        }
+                    }
+                }
+                const secondary = watch.querySelector("#secondary");
+                if (secondary) {
+                    const expanded = [...secondary.querySelectorAll("ytd-engagement-panel-section-list-renderer")].some(panel => {
+                        const target = panel.getAttribute("target-id") || panel.getAttribute("data-target-id") || "";
+                        if (target.includes("comments") || panel.closest("[hidden], [aria-hidden='true']")) return false;
+                        const visibility = panel.getAttribute("visibility");
+                        return visibility === "ENGAGEMENT_PANEL_VISIBILITY_EXPANDED" ||
+                            (!visibility && panel.getAttribute("aria-hidden") === "false");
+                    });
+                    if (expanded) mark(secondary, "data-myt-native-panel");
+                }
+            }
+        }
+        for (const element of watchDetailNodes) {
+            for (const name of attributes) {
+                if (!wanted.get(element)?.has(name)) element.removeAttribute(name);
+            }
+            if (!wanted.has(element)) watchDetailNodes.delete(element);
+        }
+        for (const [element, names] of wanted) {
+            for (const [name, value] of names) {
+                if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+            }
+            watchDetailNodes.add(element);
+        }
+    }
+
     function syncWatch() {
         if (!enabled || root.dataset.mytPage !== "watch") {
             if (commentsButton || watchVideo !== null) resetWatch();
@@ -1242,6 +1303,7 @@
         }
         renderTheme();
         syncWatch();
+        syncWatchDetails();
         syncSections();
         if (urlChanged || force) {
             refreshHidden([document]);
@@ -1267,6 +1329,7 @@
             syncSearchDecorations();
             if (!settingsReady) return;
             syncWatch();
+            syncWatchDetails();
             syncSections();
             refreshHidden([...pendingRoots]);
             for (const node of pendingRoots) {
@@ -1344,6 +1407,7 @@
             home = null;
             resetWatch();
             restoreBrand();
+            syncWatchDetails();
             syncSections();
             syncSearch();
             delete root.dataset.mytTheme;

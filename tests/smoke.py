@@ -743,6 +743,165 @@ def assert_card_surface(page, selector):
     page.evaluate("document.activeElement?.blur()")
 
 
+def check_watch_details(browser, dark, width=1440, legacy=False):
+    image = 'data:image/svg+xml;base64,' + base64.b64encode(b'<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#414450"/><circle cx="160" cy="72" r="35" fill="#9b9dab"/><path d="M95 180q0-85 65-85t65 85" fill="#7b7d8a"/></svg>').decode()
+    description = f'''
+      <div id="description" class="ytd-watch-metadata">
+        <div id="description-inner"><div id="info-container">906,359 views · Mar 8, 2025</div>
+        <div id="snippet">A conversation about music, life and creativity.</div>
+        <button id="expand" onclick="document.querySelector('#expanded').hidden=false;document.querySelector('#snippet').hidden=true;this.hidden=true">Show more</button>
+        <div id="expanded" hidden>
+          <p>A conversation about music, life and creativity. Discover the stories behind the songs and the people who inspired them.</p>
+          <p>Follow the show: <a id="plain-link" href="https://example.com/show">https://example.com/show</a><br>
+          <a id="inline-social" class="yt-core-attributed-string__link" href="https://example.com/profile"><yt-icon><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg></yt-icon><span>Instagram</span></a><br>
+          Jump to <a id="time-link" href="/watch?v=details&amp;t=165">2:45</a> for the next story.</p>
+          <ytd-structured-description-content-renderer><ytd-video-description-section-renderer><div id="structured-description">
+            <ytd-video-description-chapters-section-renderer id="chapters"><h2>Эпизоды</h2>
+              <ytd-horizontal-card-list-renderer><div id="items">
+                <ytd-macro-markers-list-item-renderer><a id="chapter-link" href="/watch?v=details&amp;t=0" onclick="event.preventDefault();window.__chapter=0"><img src="{image}"><div id="time">0:00</div><h3 id="title">Introduction</h3></a></ytd-macro-markers-list-item-renderer>
+                <ytd-macro-markers-list-item-renderer><a id="chapter-two" href="/watch?v=details&amp;t=165" onclick="event.preventDefault();window.__chapter=165"><img src="{image}"><div id="time">2:45</div><h3 id="title">The story behind the music</h3></a></ytd-macro-markers-list-item-renderer>
+              </div></ytd-horizontal-card-list-renderer>
+            </ytd-video-description-chapters-section-renderer>
+            <ytd-video-description-infocards-section-renderer id="people"><h2>Упомянутые люди</h2><div id="subtitle">2 people</div>
+              <ytd-horizontal-card-list-renderer><div id="items">
+                <ytd-info-card-contents-renderer><a id="person-link" href="/results?search_query=Nelly" onclick="event.preventDefault();window.__person=true"><img src="{image}"><h3 id="title">Nelly</h3></a></ytd-info-card-contents-renderer>
+                <ytd-info-card-contents-renderer><a href="/results?search_query=KRS-One"><img src="{image}"><h3 id="title">KRS-One</h3></a></ytd-info-card-contents-renderer>
+              </div></ytd-horizontal-card-list-renderer>
+            </ytd-video-description-infocards-section-renderer>
+            <ytd-video-description-transcript-section-renderer id="transcript"><h2>Расшифровка видео</h2>
+              <p>Find the information you need in this video.</p>
+              <ytd-button-renderer><button id="open-transcript" onclick="document.querySelector('#transcript-panel').setAttribute('visibility','ENGAGEMENT_PANEL_VISIBILITY_EXPANDED')">Show transcript</button></ytd-button-renderer>
+            </ytd-video-description-transcript-section-renderer>
+            <ytd-video-description-channel-section-renderer id="creator"><h2>REVOLT</h2><p id="subtitle">3.33M subscribers</p>
+              <yt-button-shape><a id="social-link" class="yt-spec-button-shape-next" href="https://example.com/social" onclick="event.preventDefault();window.__social=true">Instagram ↗</a></yt-button-shape>
+              <yt-button-shape><button id="about-channel">About channel</button></yt-button-shape>
+            </ytd-video-description-channel-section-renderer>
+          </div></ytd-video-description-section-renderer></ytd-structured-description-content-renderer>
+          <button id="collapse" onclick="document.querySelector('#expanded').hidden=true;document.querySelector('#snippet').hidden=false;document.querySelector('#expand').hidden=false">Show less</button>
+        </div></div>
+      </div>'''
+    metadata = 'ytd-video-secondary-info-renderer' if legacy else 'ytd-watch-metadata'
+    body = '<ytd-app>' + MASTHEAD + f'''
+      <style>
+        body {{ background:#090909; }} ytd-app {{ background:#0e0e0e; }}
+        ytd-page-manager {{ background:#131313; }} ytd-watch-flexy {{ background:#0a0a0a; }}
+        #columns {{ background:#101010; }} #primary {{ background:#151515; }} #below {{ background:#080808; }}
+        ytd-watch-metadata, ytd-video-secondary-info-renderer {{ background:#131313; }}
+        body::before, ytd-watch-flexy::after {{ content:'';position:fixed;inset:28vh 0 40vh;
+          background:rgba(0,0,0,.25);box-shadow:0 200px 0 100px rgba(0,0,0,.15);pointer-events:none;z-index:9999; }}
+        #cinematics {{ position:fixed;inset:0;background:linear-gradient(#293b4b,transparent);pointer-events:none; }}
+        #player {{ background:#000; }} video {{ width:100%;height:auto;aspect-ratio:16/9; }}
+        #description.ytd-watch-metadata {{ padding:12px;border-radius:12px;background:#272727; }}
+        #description.ytd-watch-metadata:hover {{ background:#333; }}
+        #description h2 {{ font:700 24px/1.5 Arial; }}
+        #description #title {{ font:700 22px/1.5 Arial; }}
+        #description p {{ margin-block:16px; }}
+        #description ytd-horizontal-card-list-renderer {{ display:block;max-width:100%;overflow:hidden; }}
+        #description #items {{ display:flex;overflow:auto; }}
+        #people #items {{ flex-wrap:wrap; }}
+        #description ytd-info-card-contents-renderer {{ display:block; }}
+        #description ytd-info-card-contents-renderer img {{ width:240px;height:240px;object-fit:cover; }}
+        #description ytd-macro-markers-list-item-renderer {{ display:block;flex-shrink:0; }}
+        #description a {{ color:#3ea6ff; }}
+        #description .yt-spec-button-shape-next {{ display:inline-flex;align-items:center; }}
+      </style>
+      <ytd-page-manager class="ytd-app"><ytd-watch-flexy>
+        <div id="cinematics"></div><div id="columns"><div id="primary"><div id="player"><video></video></div>
+        <div id="below"><{metadata}><h1>Music, life and the stories behind it</h1>{description}</{metadata}></div></div>
+        <div id="secondary"><div id="secondary-inner"><div id="related">Recommendations</div>
+          <ytd-engagement-panel-section-list-renderer id="transcript-panel" target-id="engagement-panel-searchable-transcript" visibility="ENGAGEMENT_PANEL_VISIBILITY_HIDDEN">
+            <button id="close-transcript" onclick="document.querySelector('#transcript-panel').setAttribute('visibility','ENGAGEMENT_PANEL_VISIBILITY_HIDDEN')">Close transcript</button>
+            <ytd-transcript-renderer><ytd-transcript-segment-list-renderer><ytd-transcript-segment-renderer>0:00 Introduction</ytd-transcript-segment-renderer></ytd-transcript-segment-list-renderer></ytd-transcript-renderer>
+          </ytd-engagement-panel-section-list-renderer>
+        </div></div></div>
+      </ytd-watch-flexy></ytd-page-manager></ytd-app>'''
+    page = setup(browser, '/watch?v=details', body, native_dark=dark, width=width)
+    expect(page.locator('[data-myt-description]')).to_have_count(1)
+    expect(page.locator('#expanded')).to_be_hidden()
+    expect(page.locator('#cinematics')).to_be_hidden()
+    expect(page.locator('#secondary')).to_be_hidden()
+    page.locator('#expand').click()
+    expect(page.locator('#expanded')).to_be_visible()
+    for selector, kind in [('#chapters','chapters'),('#people','people'),('#transcript','transcript'),('#creator','channel')]:
+        expect(page.locator(selector)).to_have_attribute('data-myt-description-section',kind)
+    expect(page.locator('[data-myt-description-card="people"]')).to_have_count(2)
+    expect(page.locator('[data-myt-description-card="chapters"]')).to_have_count(2)
+    background = 'rgb(16, 16, 18)' if dark else 'rgb(249, 249, 251)'
+    for selector in ['html','body','ytd-app','ytd-page-manager','ytd-watch-flexy','#columns','#primary','#below']:
+        expect(page.locator(selector)).to_have_css('background-color',background)
+    expect(page.locator('#description')).to_have_css('background-color','rgb(25, 25, 29)' if dark else 'rgb(255, 255, 255)')
+    page.locator('#description').hover(position={'x':5,'y':5})
+    expect(page.locator('#description')).to_have_css('background-color','rgb(25, 25, 29)' if dark else 'rgb(255, 255, 255)')
+    expect(page.locator('#people img').first).to_have_css('width','48px')
+    expect(page.locator('#people #title').first).to_have_css('font-size','14px')
+    expect(page.locator('#chapters h2')).to_have_css('font-size','16px')
+    expect(page.locator('#inline-social')).to_have_css('display','inline-flex')
+    expect(page.locator('#inline-social yt-icon')).to_have_css('filter','grayscale(1)')
+    expect(page.locator('#player')).to_have_css('background-color','rgb(0, 0, 0)')
+    page.locator('#chapter-two').click()
+    assert page.evaluate('window.__chapter') == 165
+    page.locator('#person-link').click()
+    assert page.evaluate('window.__person') is True
+    page.locator('#social-link').click()
+    assert page.evaluate('window.__social') is True
+    expect(page.locator('#plain-link')).to_have_attribute('href','https://example.com/show')
+    page.locator('#open-transcript').click()
+    expect(page.locator('#transcript-panel')).to_be_visible()
+    expect(page.locator('#secondary')).to_have_attribute('data-myt-native-panel','')
+    expect(page.locator('#related')).to_be_hidden()
+    page.locator('#close-transcript').click()
+    expect(page.locator('#secondary')).to_be_hidden()
+    assert page.locator('#secondary[data-myt-native-panel]').count() == 0
+    # Sample both margins throughout the rendered full page, beyond the viewport.
+    png = page.screenshot(full_page=True, animations='disabled')
+    colors = page.evaluate("""async encoded => {
+      const image = await createImageBitmap(await (await fetch('data:image/png;base64,'+encoded)).blob());
+      const context = new OffscreenCanvas(image.width,image.height).getContext('2d');
+      context.drawImage(image,0,0);
+      const colors=[];
+      for(let y=0;y<image.height;y+=50) for(const x of [1,image.width-2]) colors.push([...context.getImageData(x,y,1,1).data].join(','));
+      return {colors:[...new Set(colors)],width:image.width};
+    }""",base64.b64encode(png).decode())
+    assert colors['colors'] == ['16,16,18,255' if dark else '249,249,251,255'], colors
+    assert colors['width'] == width, f"Description creates horizontal page overflow: {colors}"
+    if width == 1440 and not legacy:
+        page.locator('#description').screenshot(path=f'/tmp/yt-min-watch-description-{ "dark" if dark else "light"}.png')
+
+    # Compare the actual rendered home backdrop with the watch canvas, rather
+    # than maintaining an independent color expectation for each page.
+    home = setup(browser, theme='dark' if dark else 'light')
+    expect(home.locator('#myt-home')).to_have_css('background-color', background)
+    assert home.locator('#myt-home').evaluate('element => getComputedStyle(element).backgroundColor') == page.locator('body').evaluate('element => getComputedStyle(element).backgroundColor')
+    home.close()
+    for selector, pseudo in [('body','::before'), ('ytd-watch-flexy','::after')]:
+        assert page.locator(selector).evaluate('(element,pseudo) => getComputedStyle(element,pseudo).content', pseudo) == 'none'
+    page.evaluate("document.documentElement.toggleAttribute('dark')")
+    expect(page.locator('body')).to_have_css('background-color','rgb(249, 249, 251)' if dark else 'rgb(16, 16, 18)')
+    page.evaluate("document.documentElement.toggleAttribute('dark')")
+    expect(page.locator('body')).to_have_css('background-color',background)
+    page.evaluate("document.querySelector('#description').__original = true")
+    page.locator('#collapse').click()
+    expect(page.locator('#expanded')).to_be_hidden()
+    page.locator('#expand').click()
+    page.evaluate("document.querySelector('#structured-description').insertAdjacentHTML('beforeend','<ytd-video-description-transcript-section-renderer id=late-section><h2>Transcript</h2><button>Show</button></ytd-video-description-transcript-section-renderer>')")
+    expect(page.locator('#late-section')).to_have_attribute('data-myt-description-section','transcript')
+    assert_stable(page)
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('[data-myt-description], [data-myt-description-section], [data-myt-description-heading], [data-myt-description-card], [data-myt-native-panel]')).to_have_count(0)
+    expect(page.locator('#cinematics')).to_be_visible()
+    assert page.locator('body').evaluate("element => getComputedStyle(element,'::before').content") != 'none'
+    expect(page.locator('#description')).to_have_css('padding','12px')
+    expect(page.locator('#people img').first).to_have_css('width','240px')
+    assert page.evaluate('document.querySelector("#description").__original') is True
+    page.evaluate('__setEnabled(true)')
+    expect(page.locator('[data-myt-description]')).to_have_count(1)
+    page.evaluate("document.querySelector('ytd-watch-flexy').hidden=true;document.querySelector('ytd-page-manager').insertAdjacentHTML('beforeend','<ytd-search>Results</ytd-search>')")
+    navigate_spa(page,'/results?search_query=details')
+    expect(page.locator('[data-myt-description], [data-myt-description-section], [data-myt-native-panel]')).to_have_count(0)
+    assert_stable(page)
+    page.close()
+
+
 def main():
     passed = 0
 
@@ -1263,6 +1422,13 @@ def main():
         page.wait_for_url('https://www.youtube.com/')
         ok('homepage-style masthead brand repairs native rerenders without duplicates, restores native logo on disable and keeps its home link')
         page.close()
+
+        for dark in [False, True]:
+            for width in [1440, 390]:
+                check_watch_details(browser, dark, width)
+                ok(f'watch description at {width}px ({"dark" if dark else "light"}) keeps uniform margins, restyles native sections and preserves expand/chapter/person/social/transcript actions and cleanup')
+        check_watch_details(browser, True, legacy=True)
+        ok('legacy secondary-info description supports structured sections, reversible styles and native transcript panels')
 
         watch = '<ytd-app>' + MASTHEAD + '''
           <ytd-page-manager class="ytd-app"><ytd-watch-flexy>
