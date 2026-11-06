@@ -16,6 +16,9 @@ assert ROOT / manifest['action']['default_popup'] in files, 'Missing popup'
 assert ROOT / manifest['background']['service_worker'] in files, 'Missing background worker'
 for required in ['src/optimization.js', 'src/content/data-pruning.js', 'src/home/index.html', 'src/home/home.js', 'src/home/home.css']:
     assert ROOT / required in files, f'Missing memory-optimization resource: {required}'
+assert any('src/home/index.html' in entry.get('resources', []) and '<all_urls>' in entry.get('matches', [])
+           for entry in manifest.get('web_accessible_resources', [])), 'Homepage must be accessible to browser redirects'
+
 
 output = ROOT / 'articafts' / f'minimal-youtube-{manifest["version"]}.zip'
 output.parent.mkdir(exist_ok=True)

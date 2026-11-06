@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Minimal YouTube",
-    "version": "1.9.3",
+    "version": "1.9.4",
     "minimum_chrome_version": "114",
     "description": "A focused YouTube experience: clean search, centered channels and video pages, without recommendations or Shorts.",
     "author": "Ephraim Atta-Duncan",

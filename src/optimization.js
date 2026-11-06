@@ -1,10 +1,29 @@
 "use strict";
 
-// Persistent browser configuration: the landing page never loads YouTube's app.
+// Persistent pruning/chat rules; the verified local homepage redirect is session-only.
 (() => {
     const ruleId = 470001;
     const chatRuleId = 470002;
     const scriptId = "minimal-youtube-data-pruning";
+    const homePath = "src/home/index.html";
+    const homeFiles = [homePath, "src/home/home.js", "src/home/home.css", "src/content/content.js", "src/styles/styles.css"];
+    async function localHomeAvailable() {
+        try {
+            const manifest = chrome.runtime.getManifest();
+            const exposed = manifest.web_accessible_resources?.some(entry =>
+                entry.resources?.includes(homePath) && entry.matches?.includes("<all_urls>"));
+            if (!exposed) return false;
+            const available = await Promise.all(homeFiles.map(async path => {
+                try {
+                    const response = await fetch(chrome.runtime.getURL(path), { cache: "no-store" });
+                    const ok = response.ok;
+                    await response.body?.cancel();
+                    return ok;
+                } catch { return false; }
+            }));
+            return available.every(Boolean);
+        } catch { return false; }
+    }
     let revision = 0;
     let configuration = Promise.resolve();
     const supported = Boolean(chrome.declarativeNetRequest && chrome.scripting);
@@ -17,16 +36,6 @@
             await chrome.declarativeNetRequest.updateDynamicRules({
                 removeRuleIds: [ruleId, chatRuleId],
                 addRules: enabled ? [{
-                    id: ruleId,
-                    priority: 1,
-                    action: { type: "redirect", redirect: {
-                        regexSubstitution: chrome.runtime.getURL("src/home/index.html") + "\\2",
-                    } },
-                    condition: {
-                        regexFilter: "^https://(www\\.)?youtube\\.com/(\\?.*)?$",
-                        resourceTypes: ["main_frame"],
-                    },
-                }, {
                     id: chatRuleId,
                     priority: 1,
                     action: { type: "block" },
@@ -38,6 +47,10 @@
                     },
                 }] : [],
             });
+            // Old releases kept a redirect across updates/restarts, even if its
+            // target disappeared. Remove it above before checking any local file.
+            const sessionRules = chrome.declarativeNetRequest.updateSessionRules;
+            if (sessionRules) await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [ruleId], addRules: [] });
             const registered = await chrome.scripting.getRegisteredContentScripts({ ids: [scriptId] });
             if (!enabled) {
                 if (registered.length) await chrome.scripting.unregisterContentScripts({ ids: [scriptId] });
@@ -55,6 +68,16 @@
             };
             if (registered.length) await chrome.scripting.updateContentScripts([script]);
             else await chrome.scripting.registerContentScripts([script]);
+            if (sessionRules && await localHomeAvailable() && current === revision) {
+                await chrome.declarativeNetRequest.updateSessionRules({
+                    removeRuleIds: [ruleId],
+                    addRules: [{
+                        id: ruleId, priority: 1,
+                        action: { type: "redirect", redirect: { regexSubstitution: chrome.runtime.getURL(homePath) + "\\2" } },
+                        condition: { regexFilter: "^https://(www\\.)?youtube\\.com/(\\?.*)?$", resourceTypes: ["main_frame"] },
+                    }],
+                });
+            }
         });
         return configuration;
     }

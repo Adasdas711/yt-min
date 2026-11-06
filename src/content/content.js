@@ -1312,13 +1312,9 @@
         root.dataset.mytPage = nextPage;
         renderTheme();
         if (!settingsReady) return;
-        if (path === "/" && !standaloneHome && chrome.runtime.getURL) {
-            if (!homeRedirecting) {
-                homeRedirecting = true;
-                location.replace(chrome.runtime.getURL("src/home/index.html") + url.search);
-            }
-            return;
-        }
+        // A verified browser rule may open the lightweight local home. Native
+        // and SPA arrivals always have this own UI as a fallback: never blindly
+        // navigate to an extension file that could be missing after an update.
         if (path === "/") {
             if (!home?.isConnected) {
                 home = createHome();

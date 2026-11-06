@@ -1253,7 +1253,7 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island] {
 }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="media"] {
     display: block !important; overflow: clip !important;
-    transition: none !important;
+    transition: none !important; contain: layout paint !important;
     clip-path: inset(var(--myt-island-clip, 0px) 0 0) !important;
     border-radius: 18px !important; background: #000 !important;
 }

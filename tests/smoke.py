@@ -87,7 +87,7 @@ MOCK = """(initial) => {
 }"""
 
 
-def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, native_dark=False, language="en", watch_ui=True, prune_data=False):
+def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, native_dark=False, language="en", watch_ui=True, prune_data=False, runtime_id=None):
     page = browser.new_page(viewport={"width": width, "height": 960}, reduced_motion="reduce")
     if prune_data:
         page.add_init_script(path=str(ROOT / "src/content/data-pruning.js"))
@@ -98,6 +98,8 @@ def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, nati
     if theme is not None:
         initial["theme"] = theme
     page.evaluate(MOCK, initial)
+    if runtime_id:
+        page.evaluate("id=>{chrome.runtime.id=id;chrome.runtime.getURL=path=>'chrome-extension://'+id+'/'+path;}",runtime_id)
     page.evaluate("language => document.documentElement.lang = language", language)
     if native_dark:
         page.evaluate("document.documentElement.setAttribute('dark', '')")
@@ -1059,6 +1061,57 @@ def check_fullscreen_cached_layout(browser,target,theater=False,width=1440):
     page.close()
 
 
+def check_native_home_fallback(browser):
+    fixture='<ytd-app><ytd-page-manager><div id="native-feed">Native home feed</div></ytd-page-manager></ytd-app>'
+    page=setup(browser,'/',fixture,runtime_id='dofmohajpfnbbpdkmcpmahkpedpingmn')
+    expect(page.locator('#myt-home')).to_be_visible()
+    assert page.url=='https://www.youtube.com/'
+    expect(page.locator('#native-feed')).to_have_count(1)
+    page.locator('#myt-settings-button').click()
+    expect(page.locator('#myt-settings-panel')).to_be_visible()
+    page.keyboard.press('Escape')
+    page.locator('#myt-query').fill('fallback home')
+    page.locator('#myt-query').press('Enter')
+    page.wait_for_url('**/results?search_query=fallback+home')
+    page.close()
+    page=setup(browser,'/results?search_query=home',fixture,runtime_id='dofmohajpfnbbpdkmcpmahkpedpingmn')
+    navigate_spa(page,'/')
+    expect(page.locator('#myt-home')).to_be_visible()
+    assert page.url=='https://www.youtube.com/'
+    assert_stable(page)
+    page.close()
+
+
+def check_short_watch_scroll(browser,width):
+    page=setup(browser,'/watch?v=short-description',native_watch_fixture(),native_dark=True,width=width)
+    if width<600:page.set_viewport_size({'width':width,'height':600})
+    # A native fixed video layer must follow its own player rectangle, too.
+    page.add_style_tag(content='#movie_player { position:fixed!important;inset:0!important;width:100%!important;height:100%!important; }')
+    page.evaluate(VIDEO_STREAM)
+    viewport=page.locator('#myt-watch .viewport')
+    video=page.locator('video')
+    initial=video.bounding_box()
+    assert initial==page.locator('#myt-watch .media').bounding_box()
+    page.mouse.move(initial['x']+initial['width']/2,initial['y']+initial['height']/2)
+    page.mouse.wheel(0,150)
+    page.wait_for_function("document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.viewport').scrollTop>=150")
+    after=video.bounding_box()
+    assert after==page.locator('#myt-watch .media').bounding_box() and after['y']<=initial['y']-149,(initial,after)
+    viewport.evaluate("e=>e.scrollTo({top:e.scrollHeight,behavior:'instant'})")
+    page.wait_for_function("document.querySelector('video').getBoundingClientRect().bottom<=document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.header').getBoundingClientRect().bottom")
+    expect(page.locator('#myt-watch .description')).to_be_visible()
+    viewport.evaluate("e=>e.scrollTo({top:0,behavior:'instant'})")
+    page.wait_for_function("document.querySelector('video').getBoundingClientRect().y===document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.media').getBoundingClientRect().y")
+    assert video.bounding_box()==initial
+    pixel=rendered_pixel(page,initial['x']+initial['width']/2,initial['y']+initial['height']/2)
+    assert all(abs(a-b)<=6 for a,b in zip(pixel,[24,180,96,255])),pixel
+    assert_stable(page)
+    page.evaluate('__setEnabled(false)')
+    assert page.locator('#ytd-player').evaluate("e=>getComputedStyle(e).contain")=='none'
+    page.evaluate('clearInterval(window.__frames);window.__stream.getTracks().forEach(track=>track.stop())')
+    page.close()
+
+
 def check_background_work(browser):
     results={}
     probe="""async () => {
@@ -1827,6 +1880,11 @@ def main():
         ok('homepage-style masthead brand repairs native rerenders without duplicates, restores native logo on disable and keeps its home link')
         page.close()
 
+        check_native_home_fallback(browser)
+        ok('native and SPA home stay usable when local extension files are unavailable; settings and search still work without a blind redirect')
+        for width in [1440,390]:
+            check_short_watch_scroll(browser,width)
+            ok(f'short description at {width}px permits scrolling the whole player offscreen and back; native fixed video descendants track the page')
         for theater,width in [(False,1440),(True,1440),(False,390)]:
             check_native_watch(browser,theater,width)
             ok(f'native YouTube player at {width}px (theater={theater}) paints decoded frames, keeps controls/fullscreen and restores its nodes; channel and modern description render correctly; chapters scroll in one row')
