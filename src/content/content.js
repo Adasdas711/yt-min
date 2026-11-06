@@ -126,7 +126,7 @@
     const voteElements = new Set();
     const searchVideoCards = new Set();
     const hiddenSections = new Set();
-    const watchDetailNodes = new Set();
+    let watchView = null;
     const commentPanelStates = new Map();
     const brandedLinks = new Set();
     const searchDecorations = new Set();
@@ -818,63 +818,20 @@
     }
 
     function syncWatchDetails() {
-        const attributes = ["data-myt-description", "data-myt-description-section", "data-myt-description-card", "data-myt-description-heading", "data-myt-native-panel"];
-        const wanted = new Map();
-        const mark = (element, name, value = "") => {
-            if (!wanted.has(element)) wanted.set(element, new Map());
-            wanted.get(element).set(name, value);
-        };
-        if (enabled && (root.dataset.mytPage === "watch" || root.dataset.mytPreviousPage === "watch")) {
-            for (const watch of document.querySelectorAll("ytd-watch-flexy:not([hidden])")) {
-                if (watch.closest("[hidden], [aria-hidden='true']")) continue;
-                const descriptions = [...watch.querySelectorAll("ytd-watch-metadata #description, ytd-video-secondary-info-renderer #description, ytd-structured-description-content-renderer")];
-                for (const description of descriptions.filter(node => !descriptions.some(other => other !== node && other.contains(node)))) {
-                    mark(description, "data-myt-description");
-                    const sections = [...description.querySelectorAll("*")].filter(node =>
-                        /^(?:ytd|yt)-.*description.*section-(?:renderer|view-model)$/.test(node.localName));
-                    for (const section of sections.filter(node => !sections.some(other => other !== node && node.contains(other)))) {
-                        const heading = section.querySelector("h2, h3, [role='heading'], #title");
-                        const title = `${section.localName} ${heading?.textContent || ""}`.toLowerCase();
-                        const kind = /chapter|macro-marker|эпизод|главы/.test(title) ? "chapters" :
-                            /people|mention|упомянут|люди/.test(title) ? "people" :
-                            /transcript|расшифров|текст видео/.test(title) ? "transcript" :
-                            /channel|social|канал/.test(title) ? "channel" : "other";
-                        mark(section, "data-myt-description-section", kind);
-                        if (heading) mark(heading, "data-myt-description-heading");
-                        const cards = [...section.querySelectorAll("ytd-macro-markers-list-item-renderer, ytd-info-card-contents-renderer, #items > *, [role='list'] > *")];
-                        for (const card of cards.filter(node => !cards.some(other => other !== node && node.contains(other)))) {
-                            if (card.matches("ytd-macro-markers-list-item-renderer, ytd-info-card-contents-renderer") ||
-                                (card.querySelector("a[href], button, [role='button'], [role='link']") && card.querySelector("img, yt-img-shadow, ytd-thumbnail"))) {
-                                mark(card, "data-myt-description-card", kind);
-                            }
-                        }
-                    }
-                }
-                const secondary = watch.querySelector("#secondary");
-                if (secondary) {
-                    const expanded = [...secondary.querySelectorAll("ytd-engagement-panel-section-list-renderer")].some(panel => {
-                        const target = panel.getAttribute("target-id") || panel.getAttribute("data-target-id") || "";
-                        if (target.includes("comments") || panel.closest("[hidden], [aria-hidden='true']")) return false;
-                        const visibility = panel.getAttribute("visibility");
-                        return visibility === "ENGAGEMENT_PANEL_VISIBILITY_EXPANDED" ||
-                            (!visibility && panel.getAttribute("aria-hidden") === "false");
-                    });
-                    if (expanded) mark(secondary, "data-myt-native-panel");
-                }
-            }
+        const active = enabled && (root.dataset.mytPage === "watch" || root.dataset.mytPreviousPage === "watch");
+        const watch = active && [...document.querySelectorAll("ytd-watch-flexy:not([hidden])")].find(node =>
+            !node.closest("[hidden], [aria-hidden='true']") && node.querySelector("video, ytd-player"));
+        if (watchView && (!watch || watchView.native !== watch)) {
+            watchView.destroy();
+            watchView = null;
         }
-        for (const element of watchDetailNodes) {
-            for (const name of attributes) {
-                if (!wanted.get(element)?.has(name)) element.removeAttribute(name);
-            }
-            if (!wanted.has(element)) watchDetailNodes.delete(element);
-        }
-        for (const [element, names] of wanted) {
-            for (const [name, value] of names) {
-                if (element.getAttribute(name) !== value) element.setAttribute(name, value);
-            }
-            watchDetailNodes.add(element);
-        }
+        if (!watch || !globalThis.MinimalYouTubeWatch || !watch.querySelector("ytd-watch-metadata, ytd-video-primary-info-renderer, ytd-video-secondary-info-renderer")) return;
+        if (!watchView) watchView = new globalThis.MinimalYouTubeWatch({ native: watch });
+        watchView.sync({
+            native: watch, language: language || defaultLanguage,
+            dark: root.hasAttribute("dark"), video: new URL(location.href).searchParams.get("v") || "",
+            commentsButton, commentsOpen,
+        });
     }
 
     function syncWatch() {
@@ -887,7 +844,7 @@
             watchVideo = video;
             setCommentsOpen(false);
         }
-        const active = element => !element.closest("[hidden], [aria-hidden='true']") && getComputedStyle(element).display !== "none";
+        const active = element => !element.closest("[hidden], [aria-hidden='true']") && (watchView || getComputedStyle(element).display !== "none");
         const watch = [...document.querySelectorAll("ytd-watch-flexy:not([hidden])")].find(active);
         const metadata = watch && [...watch.querySelectorAll("ytd-watch-metadata, ytd-video-primary-info-renderer")].find(active);
         if (!metadata) {
@@ -923,6 +880,7 @@
             commentsButton.addEventListener("click", () => {
                 setCommentsOpen(!commentsOpen);
                 syncWatch();
+                syncWatchDetails();
             });
         }
         const comments = watch.querySelector("ytd-comments[id]");
@@ -934,7 +892,7 @@
         // button occupies its slot; share/save/menu buttons remain in their order.
         let slot = votes.find(element => row.contains(element));
         while (slot && slot.parentElement !== row) slot = slot.parentElement;
-        if (commentsButton.parentElement !== row || (slot && commentsButton.nextElementSibling !== slot)) {
+        if (!watchView && (commentsButton.parentElement !== row || (slot && commentsButton.nextElementSibling !== slot))) {
             row.insertBefore(commentsButton, slot || row.firstChild);
         }
     }
@@ -1390,7 +1348,7 @@
             classObserver.observe(root, { attributes: true, attributeFilter: ["class"] });
             observer.observe(document.documentElement, {
                 subtree: true, childList: true, characterData: true,
-                attributes: true, attributeFilter: ["href", "aria-label", "aria-hidden", "visibility", "is-shorts", "dark", "hidden"],
+                attributes: true, attributeFilter: ["href", "aria-label", "aria-hidden", "visibility", "is-shorts", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "aria-pressed"],
             });
             updateRoute(true);
             syncBrand();
@@ -1489,6 +1447,7 @@
     // Some YouTube layouts scroll inside a centered native container. Wheel
     // events over the empty outer gutters never reach that scrollport.
     document.addEventListener("wheel", event => {
+        if (watchView && (event.composedPath().includes(watchView.host) || event.target.closest?.("[data-myt-watch-island]"))) return;
         if (!enabled || root.dataset.mytPage === "home" ||
             event.ctrlKey || !event.deltaY || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
         const target = event.target instanceof Element ? event.target : event.target.parentElement;

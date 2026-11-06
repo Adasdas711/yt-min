@@ -87,7 +87,7 @@ MOCK = """(initial) => {
 }"""
 
 
-def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, native_dark=False, language="en"):
+def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, native_dark=False, language="en", watch_ui=True):
     page = browser.new_page(viewport={"width": width, "height": 960}, reduced_motion="reduce")
     page.route("https://www.youtube.com/**", lambda route: route.fulfill(
         status=200, content_type="text/html", body=document(body)))
@@ -100,6 +100,8 @@ def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, nati
     if native_dark:
         page.evaluate("document.documentElement.setAttribute('dark', '')")
     page.add_style_tag(path=str(ROOT / "src/styles/styles.css"))
+    if watch_ui:
+        page.add_script_tag(path=str(ROOT / "src/content/watch.js"))
     page.add_script_tag(path=str(ROOT / "src/content/content.js"))
     return page
 
@@ -150,7 +152,7 @@ def setup_at_document_start(browser, path, enabled=True, defer_settings=False):
     page = browser.new_page(viewport={"width": 1440, "height": 960})
     page.errors = []
     page.on("pageerror", lambda error: page.errors.append(str(error)))
-    code = (ROOT / "src/content/content.js").read_text()
+    code = (ROOT / "src/content/watch.js").read_text() + "\n" + (ROOT / "src/content/content.js").read_text()
     initial = json.dumps({"enabled": enabled})
     script = f"({MOCK})({initial});\n"
     if defer_settings:
@@ -743,7 +745,7 @@ def assert_card_surface(page, selector):
     page.evaluate("document.activeElement?.blur()")
 
 
-def check_watch_details(browser, dark, width=1440, legacy=False):
+def watch_details_fixture(legacy=False):
     image = 'data:image/svg+xml;base64,' + base64.b64encode(b'<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#414450"/><circle cx="160" cy="72" r="35" fill="#9b9dab"/><path d="M95 180q0-85 65-85t65 85" fill="#7b7d8a"/></svg>').decode()
     description = f'''
       <div id="description" class="ytd-watch-metadata">
@@ -751,7 +753,7 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
         <div id="snippet">A conversation about music, life and creativity.</div>
         <button id="expand" onclick="document.querySelector('#expanded').hidden=false;document.querySelector('#snippet').hidden=true;this.hidden=true">Show more</button>
         <div id="expanded" hidden>
-          <p>A conversation about music, life and creativity. Discover the stories behind the songs and the people who inspired them.</p>
+          <p>A conversation about music, life and creativity. Discover the stories behind the songs and the people who inspired them. We explore the early performances, important collaborations, creative decisions and memorable conversations that shaped the artist’s career, with chapters and a complete transcript below.</p>
           <p>Follow the show: <a id="plain-link" href="https://example.com/show">https://example.com/show</a><br>
           <a id="inline-social" class="yt-core-attributed-string__link" href="https://example.com/profile"><yt-icon><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg></yt-icon><span>Instagram</span></a><br>
           Jump to <a id="time-link" href="/watch?v=details&amp;t=165">2:45</a> for the next story.</p>
@@ -815,91 +817,135 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
           </ytd-engagement-panel-section-list-renderer>
         </div></div></div>
       </ytd-watch-flexy></ytd-page-manager></ytd-app>'''
-    page = setup(browser, '/watch?v=details', body, native_dark=dark, width=width)
-    expect(page.locator('[data-myt-description]')).to_have_count(1)
-    expect(page.locator('#expanded')).to_be_hidden()
-    expect(page.locator('#cinematics')).to_be_hidden()
-    expect(page.locator('#secondary')).to_be_hidden()
-    page.locator('#expand').click()
-    expect(page.locator('#expanded')).to_be_visible()
-    for selector, kind in [('#chapters','chapters'),('#people','people'),('#transcript','transcript'),('#creator','channel')]:
-        expect(page.locator(selector)).to_have_attribute('data-myt-description-section',kind)
-    expect(page.locator('[data-myt-description-card="people"]')).to_have_count(2)
-    expect(page.locator('[data-myt-description-card="chapters"]')).to_have_count(2)
-    background = 'rgb(16, 16, 18)' if dark else 'rgb(249, 249, 251)'
-    for selector in ['html','body','ytd-app','ytd-page-manager','ytd-watch-flexy','#columns','#primary','#below']:
-        expect(page.locator(selector)).to_have_css('background-color',background)
-    expect(page.locator('#description')).to_have_css('background-color','rgb(25, 25, 29)' if dark else 'rgb(255, 255, 255)')
-    page.locator('#description').hover(position={'x':5,'y':5})
-    expect(page.locator('#description')).to_have_css('background-color','rgb(25, 25, 29)' if dark else 'rgb(255, 255, 255)')
-    expect(page.locator('#people img').first).to_have_css('width','48px')
-    expect(page.locator('#people #title').first).to_have_css('font-size','14px')
-    expect(page.locator('#chapters h2')).to_have_css('font-size','16px')
-    expect(page.locator('#inline-social')).to_have_css('display','inline-flex')
-    expect(page.locator('#inline-social yt-icon')).to_have_css('filter','grayscale(1)')
-    expect(page.locator('#player')).to_have_css('background-color','rgb(0, 0, 0)')
-    page.locator('#chapter-two').click()
-    assert page.evaluate('window.__chapter') == 165
-    page.locator('#person-link').click()
-    assert page.evaluate('window.__person') is True
-    page.locator('#social-link').click()
-    assert page.evaluate('window.__social') is True
-    expect(page.locator('#plain-link')).to_have_attribute('href','https://example.com/show')
-    page.locator('#open-transcript').click()
-    expect(page.locator('#transcript-panel')).to_be_visible()
-    expect(page.locator('#secondary')).to_have_attribute('data-myt-native-panel','')
-    expect(page.locator('#related')).to_be_hidden()
-    page.locator('#close-transcript').click()
-    expect(page.locator('#secondary')).to_be_hidden()
-    assert page.locator('#secondary[data-myt-native-panel]').count() == 0
-    # Sample both margins throughout the rendered full page, beyond the viewport.
-    png = page.screenshot(full_page=True, animations='disabled')
-    colors = page.evaluate("""async encoded => {
-      const image = await createImageBitmap(await (await fetch('data:image/png;base64,'+encoded)).blob());
-      const context = new OffscreenCanvas(image.width,image.height).getContext('2d');
-      context.drawImage(image,0,0);
-      const colors=[];
-      for(let y=0;y<image.height;y+=50) for(const x of [1,image.width-2]) colors.push([...context.getImageData(x,y,1,1).data].join(','));
-      return {colors:[...new Set(colors)],width:image.width};
-    }""",base64.b64encode(png).decode())
-    assert colors['colors'] == ['16,16,18,255' if dark else '249,249,251,255'], colors
-    assert colors['width'] == width, f"Description creates horizontal page overflow: {colors}"
-    if width == 1440 and not legacy:
-        page.locator('#description').screenshot(path=f'/tmp/yt-min-watch-description-{ "dark" if dark else "light"}.png')
+    return body
 
-    # Compare the actual rendered home backdrop with the watch canvas, rather
-    # than maintaining an independent color expectation for each page.
-    home = setup(browser, theme='dark' if dark else 'light')
-    expect(home.locator('#myt-home')).to_have_css('background-color', background)
-    assert home.locator('#myt-home').evaluate('element => getComputedStyle(element).backgroundColor') == page.locator('body').evaluate('element => getComputedStyle(element).backgroundColor')
-    home.close()
-    for selector, pseudo in [('body','::before'), ('ytd-watch-flexy','::after')]:
-        assert page.locator(selector).evaluate('(element,pseudo) => getComputedStyle(element,pseudo).content', pseudo) == 'none'
-    page.evaluate("document.documentElement.toggleAttribute('dark')")
-    expect(page.locator('body')).to_have_css('background-color','rgb(249, 249, 251)' if dark else 'rgb(16, 16, 18)')
-    page.evaluate("document.documentElement.toggleAttribute('dark')")
-    expect(page.locator('body')).to_have_css('background-color',background)
-    page.evaluate("document.querySelector('#description').__original = true")
-    page.locator('#collapse').click()
-    expect(page.locator('#expanded')).to_be_hidden()
-    page.locator('#expand').click()
-    page.evaluate("document.querySelector('#structured-description').insertAdjacentHTML('beforeend','<ytd-video-description-transcript-section-renderer id=late-section><h2>Transcript</h2><button>Show</button></ytd-video-description-transcript-section-renderer>')")
-    expect(page.locator('#late-section')).to_have_attribute('data-myt-description-section','transcript')
+def check_watch_details(browser, dark, width=1440, legacy=False):
+    fixture = watch_details_fixture(legacy)
+    actions = '''<div id="top-row"><div id="owner"><a href="/@revolt"><img alt="" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="><span id="channel-name">REVOLT</span></a><div id="subscribe-button"><button onclick="window.__subscribe=true">Subscribe</button></div></div><div id="actions"><div id="top-level-buttons-computed"><segmented-like-dislike-button-view-model id="video-votes"><button>Like</button><button>Dislike</button></segmented-like-dislike-button-view-model><button id="share" onclick="window.__share=true;document.querySelector('#share-dialog').hidden=false">Share</button><button id="save" onclick="window.__save=true">Save</button></div></div></div>'''
+    fixture = fixture.replace('<div id="description" class=', actions + '<div id="description" class=',1)
+    fixture = fixture.replace('</div></div>\n        <div id="secondary">', '<ytd-comments id="comments"><input id="reply-draft" aria-label="Reply"></ytd-comments></div></div>\n        <div id="secondary">',1)
+    fixture += '<ytd-popup-container><div id="share-dialog" role="dialog" hidden style="position:fixed;inset:100px auto auto 100px;padding:30px;background:white;color:black"><button onclick="this.parentElement.hidden=true">Close share dialog</button></div></ytd-popup-container>'
+    page = setup(browser, '/watch?v=details', fixture, native_dark=dark, width=width)
+    expect(page.locator('#myt-watch')).to_be_visible()
+    expect(page.locator('#watch-title')).to_have_text('Music, life and the stories behind it')
+    assert page.locator('#myt-watch').evaluate("e => e.matches(':popover-open')")
+    assert page.locator('ytd-watch-flexy').evaluate("e => e.matches(':popover-open') && e.parentElement.matches('ytd-page-manager')")
+    page.evaluate("window.__originalWatch=document.querySelector('ytd-watch-flexy');window.__originalVideo=document.querySelector('video');window.__playerParent=document.querySelector('video').parentElement")
+    assert page.locator('#myt-watch').bounding_box() == {'x':0,'y':0,'width':width,'height':960}
+    assert page.locator('#watch-description').evaluate('e => !e.querySelector("[style],script,yt-formatted-string,ytd-structured-description-content-renderer")')
+    expect(page.locator('#watch-description')).to_have_css('font-size','16px' if width <= 600 else '17px')
+    page.locator('.expand').click()
+    expect(page.locator('.expand')).to_have_attribute('aria-expanded','true')
+    expect(page.locator('#expanded')).to_be_hidden()  # Native UI remains covered.
+    expect(page.locator('#watch-description')).to_contain_text('Discover the stories')
+    expect(page.locator('#watch-chapters .chapter')).to_have_count(2)
+    expect(page.locator('#watch-chapters img')).to_have_count(0)
+    cards = page.locator('.chapter').all()
+    first, second = [card.bounding_box() for card in cards]
+    assert second['y'] >= first['y']+first['height']+9 and abs(second['x']-first['x']) < 1
+    assert cards[0].evaluate('e=>getComputedStyle(e).backgroundColor') != page.locator('#myt-watch .viewport').evaluate('e=>getComputedStyle(e).backgroundColor')
+    cards[1].click()
+    assert page.evaluate('window.__chapter') == 165
+    page.locator('.person').first.click()
+    assert page.evaluate('window.__person') is True
+    page.locator('.socials a').click()
+    assert page.evaluate('window.__social') is True
+    expect(page.locator('#watch-description a').first).to_have_attribute('href','https://example.com/show')
+    page.locator('.transcript-toggle').click()
+    expect(page.locator('.transcript-toggle')).to_have_attribute('aria-expanded','true')
+    expect(page.locator('.segment')).to_have_count(1)
+    expect(page.locator('.segment')).to_contain_text('Introduction')
+    page.locator('.transcript-search').fill('missing phrase')
+    expect(page.locator('.segment')).to_have_count(0)
+    expect(page.locator('.transcript-status')).to_have_text('No matches')
+    page.locator('.transcript-search').fill('Intro')
+    expect(page.locator('.segment')).to_have_count(1)
+    page.locator('.transcript-toggle').click()
+    expect(page.locator('#watch-transcript-content')).to_be_hidden()
+    expect(page.locator('#transcript-panel')).to_have_attribute('visibility','ENGAGEMENT_PANEL_VISIBILITY_HIDDEN')
+    if dark and width == 1440 and not legacy:
+        # Real YouTube can create the panel only after the first request.
+        page.locator('#transcript-panel').evaluate('e=>e.remove()')
+        page.locator('#open-transcript').evaluate("e=>e.onclick=()=>document.querySelector('#secondary-inner').insertAdjacentHTML('beforeend','<ytd-engagement-panel-section-list-renderer id=transcript-panel target-id=engagement-panel-searchable-transcript visibility=ENGAGEMENT_PANEL_VISIBILITY_EXPANDED><ytd-transcript-renderer><ytd-transcript-segment-renderer>2:45 Introduction after late loading</ytd-transcript-segment-renderer></ytd-transcript-renderer></ytd-engagement-panel-section-list-renderer>')")
+        page.locator('.transcript-toggle').click()
+        expect(page.locator('.segment')).to_contain_text('Introduction after late loading')
+        page.locator('.transcript-toggle').click()
+        expect(page.locator('#transcript-panel')).to_have_attribute('visibility','ENGAGEMENT_PANEL_VISIBILITY_HIDDEN')
+    toggle = page.locator('#myt-comments-toggle')
+    if not legacy:
+        toggle.click()
+        expect(page.locator('#comments')).to_be_visible()
+        page.locator('#reply-draft').fill('Keep this native reply')
+        toggle.click()
+        expect(page.locator('#comments')).to_be_hidden()
+        toggle.click()
+        expect(page.locator('#reply-draft')).to_have_value('Keep this native reply')
+        toggle.click()
+        page.locator('.owner button').click()
+        assert page.evaluate('window.__subscribe') is True
+        page.get_by_role('button',name='Share',exact=True).filter(visible=True).click()
+        assert page.evaluate('window.__share') is True
+        expect(page.locator('#share-dialog')).to_be_visible()
+        page.get_by_role('button',name='Close share dialog').click()
+        page.get_by_role('button',name='Save',exact=True).filter(visible=True).click()
+        assert page.evaluate('window.__save') is True
+    # Dynamic native data refreshes only the own view; original components stay put.
+    page.locator('ytd-watch-flexy h1').evaluate("e=>e.textContent='Updated video title'")
+    expect(page.locator('#watch-title')).to_have_text('Updated video title')
+    assert page.evaluate('window.__originalVideo===document.querySelector("video") && window.__playerParent===document.querySelector("video").parentElement')
+    if dark and width == 1440 and not legacy:
+        page.locator('#player').evaluate('e=>e.requestFullscreen()')
+        assert page.evaluate('document.fullscreenElement.id') == 'player'
+        assert page.locator('#player').bounding_box() == {'x':0,'y':0,'width':width,'height':960}
+        page.evaluate('document.exitFullscreen()')
+        expect(page.locator('#myt-watch')).to_be_visible()
+        assert page.locator('ytd-watch-flexy').evaluate("e=>e.matches(':popover-open')")
+        page.locator('ytd-watch-flexy').evaluate("e=>e.setAttribute('theater','')")
+        expect(page.locator('#myt-watch > div')).to_have_attribute('theater','')
+        page.locator('ytd-watch-flexy').evaluate("e=>e.removeAttribute('theater')")
+        page.locator('#secondary-inner').evaluate("e=>e.insertAdjacentHTML('beforeend','<ytd-playlist-panel-renderer id=playlist><ytd-playlist-panel-video-renderer>Playlist video</ytd-playlist-panel-video-renderer></ytd-playlist-panel-renderer>')")
+        expect(page.locator('#myt-watch .sidecar')).to_be_visible()
+        expect(page.locator('#playlist')).to_be_visible()
+        assert page.locator('#playlist').evaluate("e=>e.matches(':popover-open')&&e.parentElement.id==='secondary-inner'")
+        page.locator('#playlist').evaluate('e=>e.remove()')
+        expect(page.locator('#myt-watch .sidecar')).to_be_hidden()
+    # Adversarial native styling reproduces the backdrop/ancestor problem that
+    # plain recoloring failed to fix. The own top layer must remain unaffected.
+    page.add_style_tag(content='''body { transform:translateY(80px);filter:brightness(.5);min-height:3200px;background:linear-gradient(red,blue)!important; } div { filter:brightness(.4)!important; }''')
+    page.evaluate("""() => {const band=document.createElement('div');band.id='external-band';band.style.cssText='position:fixed;inset:20vh 0 30vh;background:#000;z-index:2147483647;pointer-events:none';document.documentElement.append(band);} """)
+    expected = '16,16,18,255' if dark else '249,249,251,255'
+    for offset in [0,450,1100,2200,6000]:
+        page.locator('#myt-watch .viewport').evaluate('(e,y)=>e.scrollTop=y',offset)
+        png=page.screenshot(animations='disabled')
+        pixels=page.evaluate("""async encoded => {
+          const image=await createImageBitmap(await(await fetch('data:image/png;base64,'+encoded)).blob());
+          const context=new OffscreenCanvas(image.width,image.height).getContext('2d');context.drawImage(image,0,0);
+          const pixels=[];for(let y=0;y<image.height;y+=60) for(const x of [2,document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.viewport').clientWidth-2]) pixels.push([...context.getImageData(x,y,1,1).data].join(','));
+          return [...new Set(pixels)];
+        }""",base64.b64encode(png).decode())
+        assert pixels == [expected], (width,offset,pixels)
+    assert page.locator('#myt-watch .viewport').evaluate('e=>e.scrollWidth<=e.clientWidth'), 'Own buttons or cards cause horizontal overflow'
+    assert page.locator('#myt-watch button').evaluate_all("nodes=>nodes.filter(e=>e.getClientRects().length).every(e=>e.getBoundingClientRect().height>=43.5 && e.clientWidth>=e.scrollWidth-1)"), 'Own button text clips or the touch target is too short'
+
+    if width==1440 and not legacy:
+        page.locator('#watch-chapters').scroll_into_view_if_needed()
+        page.screenshot(path=f'/tmp/yt-min-own-watch-{"dark" if dark else "light"}.png')
     assert_stable(page)
     page.evaluate('__setEnabled(false)')
-    expect(page.locator('[data-myt-description], [data-myt-description-section], [data-myt-description-heading], [data-myt-description-card], [data-myt-native-panel]')).to_have_count(0)
-    expect(page.locator('#cinematics')).to_be_visible()
-    assert page.locator('body').evaluate("element => getComputedStyle(element,'::before').content") != 'none'
-    expect(page.locator('#description')).to_have_css('padding','12px')
-    expect(page.locator('#people img').first).to_have_css('width','240px')
-    assert page.evaluate('document.querySelector("#description").__original') is True
+    expect(page.locator('#myt-watch,[data-myt-watch-island]')).to_have_count(0)
+    assert page.evaluate('window.__originalWatch===document.querySelector("ytd-watch-flexy") && window.__originalVideo===document.querySelector("video")')
+    assert page.locator('ytd-watch-flexy').get_attribute('popover') is None
+    assert page.locator('ytd-watch-flexy').get_attribute('style') is None
     page.evaluate('__setEnabled(true)')
-    expect(page.locator('[data-myt-description]')).to_have_count(1)
+    expect(page.locator('#myt-watch')).to_be_visible()
+    navigate_spa(page,'/watch?v=another')
+    expect(page.locator('#myt-watch')).to_have_count(1)
+    if not legacy: expect(page.locator('#myt-comments-toggle')).to_have_attribute('aria-expanded','false')
     page.evaluate("document.querySelector('ytd-watch-flexy').hidden=true;document.querySelector('ytd-page-manager').insertAdjacentHTML('beforeend','<ytd-search>Results</ytd-search>')")
     navigate_spa(page,'/results?search_query=details')
-    expect(page.locator('[data-myt-description], [data-myt-description-section], [data-myt-native-panel]')).to_have_count(0)
-    assert_stable(page)
+    expect(page.locator('#myt-watch,[data-myt-watch-island]')).to_have_count(0)
     page.close()
+
 
 
 def main():
@@ -974,6 +1020,7 @@ def main():
             body_style = page.locator("body").get_attribute("style")
             page.evaluate(MOCK, {"theme":theme})
             page.add_style_tag(path=str(ROOT / "src/styles/styles.css"))
+            page.add_script_tag(path=str(ROOT / "src/content/watch.js"))
             page.add_script_tag(path=str(ROOT / "src/content/content.js"))
             page.emulate_media(reduced_motion="reduce")
             expect(page.locator("#myt-home")).to_be_visible()
@@ -1426,10 +1473,12 @@ def main():
         for dark in [False, True]:
             for width in [1440, 390]:
                 check_watch_details(browser, dark, width)
-                ok(f'watch description at {width}px ({"dark" if dark else "light"}) keeps uniform margins, restyles native sections and preserves expand/chapter/person/social/transcript actions and cleanup')
+                ok(f'watch description at {width}px ({"dark" if dark else "light"}) uses an isolated canvas with readable controls, chapter cards and transcript; preserves native player, actions, replies and cleanup')
         check_watch_details(browser, True, legacy=True)
-        ok('legacy secondary-info description supports structured sections, reversible styles and native transcript panels')
+        ok('legacy secondary-info data feeds the own isolated watch UI and restores native components on disable')
 
+        # Exercise the native comment engine independently; own renderer integration
+        # (including replies, player, menus and playlists) is checked above.
         watch = '<ytd-app>' + MASTHEAD + '''
           <ytd-page-manager class="ytd-app"><ytd-watch-flexy>
           <div id="columns"><div id="primary"><div id="player"><video></video></div>
@@ -1443,7 +1492,7 @@ def main():
           <ytd-comments id="comments"><div id="native-thread">Comment and replies <input id="reply-draft"></div></ytd-comments></div>
           <div id="secondary"><div id="secondary-inner"><div id="related">Recommendations</div></div></div></div>
         </ytd-watch-flexy></ytd-page-manager></ytd-app>'''
-        page = setup(browser, "/watch?v=abc", watch)
+        page = setup(browser, "/watch?v=abc", watch, watch_ui=False)
         centered(page, "#columns")
         expect(page.locator("#related")).to_be_hidden()
         expect(page.locator("ytd-comments")).to_be_hidden()
@@ -1456,7 +1505,7 @@ def main():
         ok("watch page centers, collapses comments, retains playlist and leaves native video dimensions intact")
         page.close()
 
-        page = setup(browser, "/watch?v=abc", watch)
+        page = setup(browser, "/watch?v=abc", watch, watch_ui=False)
         toggle = page.locator("#myt-comments-toggle")
         expect(toggle).to_have_count(1)
         expect(toggle).to_have_attribute("aria-expanded", "false")
@@ -1531,7 +1580,7 @@ def main():
         page.close()
 
         legacy = watch.replace('''<div id="actions"><div id="top-level-buttons-computed">''', '''<div id="menu-container"><div id="top-level-buttons-computed">''').replace("segmented-like-dislike-button-view-model", "ytd-segmented-like-dislike-button-renderer")
-        page = setup(browser, "/watch?v=legacy", legacy)
+        page = setup(browser, "/watch?v=legacy", legacy, watch_ui=False)
         expect(page.locator("#myt-comments-toggle")).to_have_count(1)
         expect(page.locator("#video-votes")).to_be_hidden()
         expect(page.locator("#share")).to_be_visible()
@@ -1542,7 +1591,7 @@ def main():
         page.close()
 
         classic = legacy.replace('ytd-watch-metadata', 'ytd-video-primary-info-renderer')
-        page = setup(browser, "/watch?v=classic", classic, language="ru")
+        page = setup(browser, "/watch?v=classic", classic, language="ru", watch_ui=False)
         expect(page.locator("#myt-comments-toggle")).to_have_count(1)
         expect(page.locator("#myt-comments-toggle")).to_contain_text("Комментарии")
         expect(page.locator("#video-votes")).to_be_hidden()
@@ -1555,7 +1604,7 @@ def main():
           <segmented-like-dislike-button-view-model id="video-votes"><button>Like</button><button>Dislike</button></segmented-like-dislike-button-view-model>
           <button id="share">Share</button><button id="save">Save</button></div></div>''', '<div id="actions"></div>')
         assert 'id="top-level-buttons-computed"' not in delayed, "Delayed fixture must start without the action row"
-        page = setup(browser, "/watch?v=delayed", delayed)
+        page = setup(browser, "/watch?v=delayed", delayed, watch_ui=False)
         page.locator("#actions").evaluate("element => element.innerHTML = '<div id=top-level-buttons-computed><segmented-like-dislike-button-view-model id=video-votes><button>Like</button><button>Dislike</button></segmented-like-dislike-button-view-model><button id=share>Share</button><button id=save>Save</button></div>'")
         expect(page.locator("#myt-comments-toggle")).to_have_count(1)
         expect(page.locator("#video-votes")).to_be_hidden()
@@ -1565,7 +1614,7 @@ def main():
         page.close()
 
         panel = '<ytd-engagement-panel-section-list-renderer target-id="engagement-panel-comments-section" visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED">Side comments</ytd-engagement-panel-section-list-renderer>'
-        page = setup(browser, "/watch?v=panel", watch.replace('</ytd-watch-flexy>', panel + '</ytd-watch-flexy>'))
+        page = setup(browser, "/watch?v=panel", watch.replace('</ytd-watch-flexy>', panel + '</ytd-watch-flexy>'), watch_ui=False)
         expect(page.locator('ytd-engagement-panel-section-list-renderer')).to_be_hidden()
         page.locator("#myt-comments-toggle").click()
         expect(page.locator("ytd-comments")).to_be_visible()
@@ -1576,7 +1625,7 @@ def main():
 
         panel_only = watch.replace('<ytd-comments id="comments"><div id="native-thread">Comment and replies <input id="reply-draft"></div></ytd-comments>', '')
         collapsed_panel = '<ytd-engagement-panel-section-list-renderer id="native-comment-panel" target-id="engagement-panel-comments-section" visibility="ENGAGEMENT_PANEL_VISIBILITY_HIDDEN" hidden="native" aria-hidden="true"><div id="panel-threads">Native panel comments</div></ytd-engagement-panel-section-list-renderer>'
-        page = setup(browser, "/watch?v=panel-only", panel_only.replace('</ytd-watch-flexy>', collapsed_panel + '</ytd-watch-flexy>'))
+        page = setup(browser, "/watch?v=panel-only", panel_only.replace('</ytd-watch-flexy>', collapsed_panel + '</ytd-watch-flexy>'), watch_ui=False)
         panel = page.locator("#native-comment-panel")
         original_attributes = panel.evaluate("element => Object.fromEntries(['visibility', 'hidden', 'aria-hidden'].map(name => [name, element.getAttribute(name)]))")
         expect(panel).to_be_hidden()
@@ -1611,7 +1660,7 @@ def main():
         page.close()
 
         inactive_metadata = watch.replace('<ytd-watch-metadata>', '<ytd-watch-metadata aria-hidden="true">')
-        page = setup(browser, "/watch?v=activating", inactive_metadata)
+        page = setup(browser, "/watch?v=activating", inactive_metadata, watch_ui=False)
         expect(page.locator("#myt-comments-toggle")).to_have_count(0)
         page.locator("ytd-watch-metadata").evaluate("element => element.setAttribute('aria-hidden', 'false')")
         expect(page.locator("#myt-comments-toggle")).to_have_count(1)
@@ -1623,7 +1672,7 @@ def main():
 
         unavailable = watch.replace('<ytd-comments id="comments"><div id="native-thread">Comment and replies <input id="reply-draft"></div></ytd-comments>', '<p id="comments-disabled">Comments are disabled</p>')
         assert '<ytd-comments ' not in unavailable, "Unavailable fixture must omit native comment threads"
-        page = setup(browser, "/watch?v=disabled-comments", unavailable)
+        page = setup(browser, "/watch?v=disabled-comments", unavailable, watch_ui=False)
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         toggle = page.locator("#myt-comments-toggle")
@@ -1635,7 +1684,7 @@ def main():
         ok("videos with disabled/unavailable comments keep the page usable without script errors")
         page.close()
 
-        page = setup(browser, "/watch?v=abc&list=fixture", watch)
+        page = setup(browser, "/watch?v=abc&list=fixture", watch, watch_ui=False)
         page.evaluate("document.querySelector('#secondary-inner').insertAdjacentHTML('beforeend', '<ytd-playlist-panel-renderer id=playlist><ytd-playlist-panel-video-renderer>Playlist video</ytd-playlist-panel-video-renderer></ytd-playlist-panel-renderer>')")
         expect(page.locator("#secondary")).to_be_visible()
         expect(page.locator("#playlist")).to_be_visible()
@@ -1649,7 +1698,7 @@ def main():
         ok("native playlist renderer and live chat retain sidebar; hidden/collapsed panels leave no blank sidebar")
         page.close()
 
-        page = setup(browser, "/watch?v=abc&list=fixture", watch, width=390)
+        page = setup(browser, "/watch?v=abc&list=fixture", watch, width=390, watch_ui=False)
         page.locator("video").evaluate("element => element.style.cssText = 'width: 100%; max-width: 640px; height: auto; aspect-ratio: 16 / 9'")
         page.evaluate("document.querySelector('#secondary-inner').insertAdjacentHTML('beforeend', '<ytd-playlist-panel-renderer id=playlist><ytd-playlist-panel-video-renderer>Playlist video</ytd-playlist-panel-video-renderer></ytd-playlist-panel-renderer>')")
         expect(page.locator("#playlist")).to_be_visible()
