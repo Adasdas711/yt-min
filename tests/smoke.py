@@ -990,10 +990,10 @@ def check_background_work(browser):
 
 def check_watch_details(browser, dark, width=1440, legacy=False):
     fixture = watch_details_fixture(legacy)
-    actions = '''<div id="top-row"><div id="owner"><a href="/@revolt"><img alt="" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="><span id="channel-name">REVOLT</span></a><div id="subscribe-button"><button onclick="window.__subscribe=true">Subscribe</button></div></div><div id="actions"><div id="top-level-buttons-computed"><segmented-like-dislike-button-view-model id="video-votes"><button>Like</button><button>Dislike</button></segmented-like-dislike-button-view-model><button id="share" onclick="window.__share=true;document.querySelector('#share-dialog').hidden=false">Share</button><button id="save" onclick="window.__save=true">Save</button></div></div></div>'''
+    actions = '''<div id="top-row"><div id="owner"><a href="/@revolt"><img alt="" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="><span id="channel-name">REVOLT</span></a><div id="subscribe-button"><button onclick="window.__subscribe=true">Subscribe</button></div></div><div id="actions"><div id="top-level-buttons-computed"><segmented-like-dislike-button-view-model id="video-votes"><button>Like</button><button>Dislike</button></segmented-like-dislike-button-view-model><button id="share" onclick="window.__share=true;document.querySelector('#share-dialog').hidden=false">Share</button><button id="save" onclick="window.__save=true">Save</button><button id="more" onclick="window.__other=true;document.querySelector('#native-more-dialog').hidden=false">More</button></div></div></div>'''
     fixture = fixture.replace('<div id="description" class=', actions + '<div id="description" class=',1)
     fixture = fixture.replace('</div></div>\n        <div id="secondary">', '<ytd-comments id="comments"><input id="reply-draft" aria-label="Reply"></ytd-comments></div></div>\n        <div id="secondary">',1)
-    fixture += '<ytd-popup-container><div id="share-dialog" role="dialog" hidden style="position:fixed;inset:100px auto auto 100px;padding:30px;background:white;color:black"><button onclick="this.parentElement.hidden=true">Close share dialog</button></div></ytd-popup-container>'
+    fixture += '<ytd-popup-container><div id="share-dialog" role="dialog" hidden style="position:fixed;inset:100px auto auto 100px;padding:30px;background:white;color:black"><button onclick="this.parentElement.hidden=true">Close share dialog</button></div><div id="native-more-dialog" role="menu" hidden style="position:fixed;inset:100px auto auto 100px;padding:30px;background:white;color:black"><button onclick="this.parentElement.hidden=true">Close native menu</button></div></ytd-popup-container>'
     page = setup(browser, '/watch?v=details', fixture, native_dark=dark, width=width)
     expect(page.locator('#myt-watch')).to_be_visible()
     expect(page.locator('#watch-title')).to_have_text('Music, life and the stories behind it')
@@ -1053,12 +1053,37 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
         toggle.click()
         page.locator('.owner button').click()
         assert page.evaluate('window.__subscribe') is True
-        page.get_by_role('button',name='Share',exact=True).filter(visible=True).click()
+        expect(page.locator('.actions > button').filter(has_text='Share')).to_have_count(0)
+        expect(page.locator('.more-popup')).to_be_hidden()
+        page.locator('.more-toggle').click()
+        expect(page.locator('.more-toggle')).to_have_attribute('aria-expanded','true')
+        expect(page.locator('.more-popup button').first).to_be_focused()
+        popup=page.locator('.more-popup').bounding_box()
+        assert 0 <= popup['x'] and popup['x']+popup['width'] <= width
+        assert 0 <= popup['y'] and popup['y']+popup['height'] <= 960
+        page.locator('.more-popup').get_by_role('menuitem',name='Share',exact=True).click()
+        expect(page.locator('.more-popup')).to_be_hidden()
         assert page.evaluate('window.__share') is True
         expect(page.locator('#share-dialog')).to_be_visible()
         page.get_by_role('button',name='Close share dialog').click()
         page.get_by_role('button',name='Save',exact=True).filter(visible=True).click()
         assert page.evaluate('window.__save') is True
+        # Keyboard navigation and light dismissal must retain native More actions.
+        page.locator('.more-toggle').press('Enter')
+        expect(page.locator('.more-popup button').first).to_be_focused()
+        page.locator('.more-popup button').first.press('ArrowUp')
+        expect(page.locator('.more-popup button').last).to_be_focused()
+        page.locator('.more-popup button').last.press('Enter')
+        assert page.evaluate('window.__other') is True
+        expect(page.locator('#native-more-dialog')).to_be_visible()
+        page.get_by_role('button',name='Close native menu').click()
+        page.locator('.more-toggle').click()
+        page.locator('.more-popup button').first.press('Escape')
+        expect(page.locator('.more-popup')).to_be_hidden()
+        expect(page.locator('.more-toggle')).to_be_focused()
+        page.locator('.more-toggle').click()
+        page.locator('#watch-title').click()
+        expect(page.locator('.more-popup')).to_be_hidden()
     # Dynamic native data refreshes only the own view; original components stay put.
     page.locator('ytd-watch-flexy h1').evaluate("e=>e.textContent='Updated video title'")
     expect(page.locator('#watch-title')).to_have_text('Updated video title')
@@ -1116,6 +1141,47 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
     expect(page.locator('#myt-watch,[data-myt-watch-island]')).to_have_count(0)
     page.close()
 
+
+
+def check_removed_chat(browser, replay):
+    page=setup(browser, '/watch?v=chat', native_watch_fixture())
+    errors=[]
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    page.route('**/live_chat**', lambda route: route.fulfill(status=200,content_type='text/html',body='<p>Chat document</p>'))
+    # Share also moves under More when YouTube exposes no native More control.
+    expect(page.locator('.actions > button').filter(has_text='Share')).to_have_count(0)
+    page.locator('#share').evaluate('e=>e.onclick=()=>window.__shareOnly=true')
+    page.locator('.more-toggle').click()
+    expect(page.locator('.more-popup button')).to_have_count(1)
+    page.locator('.more-popup button').click()
+    assert page.evaluate('window.__shareOnly') is True
+    source='/live_chat_replay?v=chat' if replay else '/live_chat?v=chat'
+    page.evaluate("""source => {
+        window.__player=document.querySelector('video');
+        const chat=document.createElement('ytd-live-chat-frame');chat.id='chat';
+        const frame=document.createElement('iframe');frame.id='chatframe';frame.src=source;
+        chat.append(frame);document.querySelector('#secondary-inner').append(chat);
+        const unrelated=document.createElement('iframe');unrelated.id='unrelated-embed';unrelated.src='about:blank#keep';
+        document.querySelector('#secondary-inner').append(unrelated);
+    }""",source)
+    expect(page.locator('#chatframe')).to_have_attribute('src','about:blank')
+    expect(page.locator('#chat')).to_be_hidden()
+    expect(page.locator('.sidecar')).to_be_hidden()
+    assert page.locator('#chat').get_attribute('data-myt-watch-island') is None
+    expect(page.locator('#unrelated-embed')).to_have_attribute('src','about:blank#keep')
+    # Late source changes must also release the chat browsing context.
+    page.locator('#chatframe').evaluate('(e,src)=>e.src=src',source+'&continuation=late')
+    expect(page.locator('#chatframe')).to_have_attribute('src','about:blank')
+    assert_stable(page)
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('#chatframe')).to_have_attribute('src',source+'&continuation=late')
+    expect(page.locator('#chat')).to_be_visible()
+    page.evaluate('__setEnabled(true)')
+    expect(page.locator('#chatframe')).to_have_attribute('src','about:blank')
+    expect(page.locator('#chat')).to_be_hidden()
+    assert page.evaluate("window.__player===document.querySelector('video')")
+    assert not errors,errors
+    page.close()
 
 
 def main():
@@ -1643,6 +1709,9 @@ def main():
         for theater,width in [(False,1440),(True,1440),(False,390)]:
             check_native_watch(browser,theater,width)
             ok(f'native YouTube player at {width}px (theater={theater}) paints decoded frames, keeps controls/fullscreen and restores its nodes; channel and modern description render correctly; chapters scroll in one row')
+        for replay in [False,True]:
+            check_removed_chat(browser,replay)
+            ok(f'live chat (replay={replay}) is hidden and its iframe unloaded; late mounts, disabled mode, native player and unrelated embeds remain safe')
         check_background_work(browser)
         ok('player clock and hidden home mutations do not rescan/rebuild UI; metadata still updates and hidden homepage previews pause')
 
@@ -1867,11 +1936,9 @@ def main():
         page.locator("#playlist").evaluate("element => element.hidden = true")
         expect(page.locator("#secondary")).to_be_hidden()
         page.evaluate("document.querySelector('#secondary-inner').insertAdjacentHTML('beforeend', '<ytd-live-chat-frame id=chat>Live chat</ytd-live-chat-frame>')")
-        expect(page.locator("#secondary")).to_be_visible()
-        expect(page.locator("#chat")).to_be_visible()
-        page.locator("#chat").evaluate("element => element.setAttribute('collapsed', '')")
         expect(page.locator("#secondary")).to_be_hidden()
-        ok("native playlist renderer and live chat retain sidebar; hidden/collapsed panels leave no blank sidebar")
+        expect(page.locator("#chat")).to_be_hidden()
+        ok("native playlist retains its sidebar; hidden playlist and removed live chat leave no blank sidebar")
         page.close()
 
         page = setup(browser, "/watch?v=abc&list=fixture", watch, width=390, watch_ui=False)

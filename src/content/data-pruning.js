@@ -31,6 +31,13 @@
         const url = item.videoRenderer?.navigationEndpoint?.commandMetadata?.webCommandMetadata?.url;
         return typeof url === "string" && /^\/shorts(?:\/|$)/.test(url);
     }
+    const chatKeys = new Set(["liveChatRenderer", "liveChatReplayRenderer", "liveChatViewModel", "liveChatContinuation"]);
+    function chatItem(item) {
+        if (!item || typeof item !== "object") return false;
+        if (Object.keys(item).some(key => chatKeys.has(key))) return true;
+        const panel = item.engagementPanelSectionListRenderer;
+        return Boolean(panel && [panel.targetId, panel.panelIdentifier].some(id => /live[-_]?chat/i.test(id || "")));
+    }
     function hiddenShelf(item) {
         const content = item?.richSectionRenderer?.content || item;
         const shelf = content?.shelfRenderer || content?.richShelfRenderer;
@@ -87,10 +94,14 @@
                 if (!node || typeof node !== "object" || seen.has(node)) continue;
                 seen.add(node);
                 if (Array.isArray(node)) {
-                    removed += compact(node, item => shortItem(item) || hiddenShelf(item));
+                    removed += compact(node, item => shortItem(item) || hiddenShelf(item) || chatItem(item));
                     for (const child of node) if (child && typeof child === "object") stack.push(child);
                     continue;
                 }
+                // Discard both live and archived chat before an iframe/polling
+                // controller is created; player streaming metadata is excluded.
+                if (chatItem(node.conversationBar)) { delete node.conversationBar; removed++; }
+                for (const key of chatKeys) if (Object.hasOwn(node, key)) { delete node[key]; removed++; }
                 // These fields are only used to start hover/animated previews.
                 // Static thumbnails and the click/navigation endpoint stay intact.
                 if (node.inlinePlaybackEndpoint) { delete node.inlinePlaybackEndpoint; removed++; }

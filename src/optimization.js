@@ -3,6 +3,7 @@
 // Persistent browser configuration: the landing page never loads YouTube's app.
 (() => {
     const ruleId = 470001;
+    const chatRuleId = 470002;
     const scriptId = "minimal-youtube-data-pruning";
     let revision = 0;
     let configuration = Promise.resolve();
@@ -14,7 +15,7 @@
         configuration = configuration.catch(() => {}).then(async () => {
             if (!supported || current !== revision) return;
             await chrome.declarativeNetRequest.updateDynamicRules({
-                removeRuleIds: [ruleId],
+                removeRuleIds: [ruleId, chatRuleId],
                 addRules: enabled ? [{
                     id: ruleId,
                     priority: 1,
@@ -24,6 +25,16 @@
                     condition: {
                         regexFilter: "^https://(www\\.)?youtube\\.com/(\\?.*)?$",
                         resourceTypes: ["main_frame"],
+                    },
+                }, {
+                    id: chatRuleId,
+                    priority: 1,
+                    action: { type: "block" },
+                    condition: {
+                        regexFilter: "^https://([a-z0-9-]+\\.)?youtube\\.com/(live_chat(_replay)?([/?].*)?|youtubei/v1/live_chat/.*)$",
+                        resourceTypes: ["sub_frame", "xmlhttprequest"],
+                        excludedInitiatorDomains: ["music.youtube.com"],
+                        excludedRequestDomains: ["music.youtube.com"],
                     },
                 }] : [],
             });

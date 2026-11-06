@@ -21,11 +21,12 @@ async function main() {
     const command = enabled => handlers.get("minimal-youtube:optimization")({ detail: { enabled } });
     const secondary = data => data.contents.twoColumnWatchNextResults.secondaryResults.secondaryResults.results;
     const playlist = { playlistPanelRenderer: { contents: [{ playlistPanelVideoRenderer: { videoId: "keep-playlist" } }] } };
-    const chat = { liveChatRenderer: { continuations: [{ token: "keep-chat" }] } };
+    const chat = { liveChatRenderer: { continuations: [{ token: "drop-chat" }] } };
     const primary = { videoPrimaryInfoRenderer: { title: { runs: [{ text: "Keep title" }] } } };
     const watch = { contents: { twoColumnWatchNextResults: {
         results: { results: { contents: [primary] } },
         playlist: { playlist: { playlistId: "keep-active-playlist" } },
+        conversationBar: { liveChatRenderer: { continuations: [{ token: 'drop-primary-chat' }] } },
         secondaryResults: { secondaryResults: { results: [
             { compactVideoRenderer: { videoId: "drop-related", cache: new Array(100).fill(1) } },
             { lockupViewModel: { contentId: "drop-related-modern" } }, playlist, chat,
@@ -34,11 +35,28 @@ async function main() {
     } }, engagementPanels: [{ transcript: "Keep transcript" }] };
     context.ytInitialData = watch;
     assert.equal(context.ytInitialData, watch, "Pruning must not clone/retain another response");
-    assert.deepEqual(secondary(watch), [playlist, chat]);
+    assert.deepEqual(secondary(watch), [playlist]);
+    assert.equal(watch.contents.twoColumnWatchNextResults.conversationBar, undefined);
     assert.equal(watch.contents.twoColumnWatchNextResults.results.results.contents[0], primary);
     assert.equal(watch.contents.twoColumnWatchNextResults.playlist.playlist.playlistId, "keep-active-playlist");
     assert.equal(watch.engagementPanels[0].transcript, "Keep transcript");
     assert(attributes.has("data-myt-pruned"));
+
+    for (const key of ['liveChatRenderer', 'liveChatReplayRenderer', 'liveChatViewModel']) {
+        const replay = parse({ contents: { twoColumnWatchNextResults: {
+            conversationBar: { [key]: { continuations: [{ token: 'drop-chat' }] } },
+        } }, engagementPanels: [
+            { engagementPanelSectionListRenderer: { targetId: 'engagement-panel-live-chat', content: { [key]: {} } } },
+            { engagementPanelSectionListRenderer: { targetId: 'engagement-panel-comments', content: { text: 'Keep comments' } } },
+            { engagementPanelSectionListRenderer: { targetId: 'engagement-panel-searchable-transcript', content: { text: 'Keep transcript' } } },
+        ] });
+        assert.equal(replay.contents.twoColumnWatchNextResults.conversationBar, undefined);
+        assert.equal(replay.engagementPanels.length, 2);
+        assert.equal(replay.engagementPanels[0].engagementPanelSectionListRenderer.content.text, 'Keep comments');
+        assert.equal(replay.engagementPanels[1].engagementPanelSectionListRenderer.content.text, 'Keep transcript');
+    }
+    const chatResponse = await new Response({ continuationContents: { liveChatContinuation: { actions: [{ addChatItemAction: { text: 'Discard message' } }] } } }).json();
+    assert.equal(chatResponse.continuationContents.liveChatContinuation, undefined);
 
     const nested = parse({contents:{twoColumnWatchNextResults:{secondaryResults:{secondaryResults:{results:[
         {itemSectionRenderer:{targetId:"watch-next-feed",contents:[{compactVideoRenderer:{videoId:"nested-drop"}}],continuations:[{nextContinuationData:{token:"drop-paging"}}]}},
@@ -98,10 +116,12 @@ async function main() {
     assert.equal(Response.prototype.json, originalResponseJSON);
     const native = parse({ contents: { twoColumnSearchResultsRenderer: { contents: [{ reelShelfRenderer: {} }] } } });
     assert.equal(native.contents.twoColumnSearchResultsRenderer.contents.length, 1);
+    const nativeChat = parse({ contents: { twoColumnWatchNextResults: { conversationBar: chat } } });
+    assert.deepEqual(JSON.parse(JSON.stringify(nativeChat.contents.twoColumnWatchNextResults.conversationBar)), chat);
     context.ytInitialData = native;
     command(true);
     assert.equal(native.contents.twoColumnSearchResultsRenderer.contents.length, 0);
     command(false);
-    console.log("PASS initial/fetch/parse feed pruning; native player, playlist, chat, comments, static thumbnails and disabled mode preserved");
+    console.log("PASS initial/fetch/parse feed pruning and live/replay chat removal; native player, playlist, comments, transcript, static thumbnails and disabled mode preserved");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

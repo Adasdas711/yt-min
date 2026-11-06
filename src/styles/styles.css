@@ -343,11 +343,11 @@ html.minimal-youtube ytd-watch-flexy:not([theater]):not([fullscreen]) #primary {
     padding: 0 !important;
 }
 
-html.minimal-youtube ytd-watch-flexy #secondary:not([data-myt-native-panel]):not(:has(ytd-playlist-panel-renderer#playlist:not([hidden]), #playlist:not([hidden]) ytd-playlist-panel-renderer:not([hidden]), #chat:not([hidden]):not([collapsed]))) {
+html.minimal-youtube ytd-watch-flexy #secondary:not([data-myt-native-panel]):not(:has(ytd-playlist-panel-renderer#playlist:not([hidden]), #playlist:not([hidden]) ytd-playlist-panel-renderer:not([hidden]))) {
     display: none !important;
 }
 
-html.minimal-youtube ytd-watch-flexy:not([theater]):not([fullscreen]) #columns:has(#secondary ytd-playlist-panel-renderer#playlist:not([hidden]), #secondary #playlist:not([hidden]) ytd-playlist-panel-renderer:not([hidden]), #secondary #chat:not([hidden]):not([collapsed])) {
+html.minimal-youtube ytd-watch-flexy:not([theater]):not([fullscreen]) #columns:has(#secondary ytd-playlist-panel-renderer#playlist:not([hidden]), #secondary #playlist:not([hidden]) ytd-playlist-panel-renderer:not([hidden])) {
     max-width: 1648px;
 }
 
@@ -1270,3 +1270,9 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="anchor"] { displ
 html.minimal-youtube[data-myt-watch-ui] :fullscreen { clip-path: none !important; border-radius: 0 !important; }
 
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island]::backdrop { background: transparent !important; backdrop-filter: none !important; }
+
+/* Chat and archived chat are excluded from data/network too. This covers
+   already-mounted native widgets while those early protections take effect. */
+html.minimal-youtube ytd-watch-flexy :is(#chat, #chat-container, ytd-live-chat-frame, ytd-live-chat-renderer, ytd-live-chat-replay-renderer, ytd-engagement-panel-section-list-renderer[target-id*="live-chat"], ytd-engagement-panel-section-list-renderer[data-target-id*="live-chat"]) {
+    display: none !important;
+}

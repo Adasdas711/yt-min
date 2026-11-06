@@ -17,6 +17,7 @@
     const hiddenAttribute = "data-myt-hidden";
     const hiddenElements = new Set();
     const pendingRoots = new Set();
+    const suspendedChatFrames = new Map();
     const nativeShorts = [
         "ytd-reel-shelf-renderer", "ytd-reel-item-renderer",
         "ytd-reel-video-renderer", "yt-shorts-lockup-view-model", "ytm-shorts-lockup-view-model",
@@ -830,7 +831,30 @@
         }
     }
 
+    function syncChatFrames() {
+        for (const [frame, source] of suspendedChatFrames) {
+            if (!frame.isConnected) suspendedChatFrames.delete(frame);
+            else if (!enabled) {
+                if (frame.getAttribute("src") === "about:blank") frame.setAttribute("src", source);
+                suspendedChatFrames.delete(frame);
+            }
+        }
+        if (!enabled) return;
+        for (const frame of document.querySelectorAll("ytd-live-chat-frame iframe, iframe#chatframe, iframe[src*='/live_chat']")) {
+            const source = frame.getAttribute("src");
+            if (!source || source === "about:blank") continue;
+            try {
+                const url = new URL(source, pageLocation());
+                if (url.protocol !== "https:" || !(url.hostname === "youtube.com" || url.hostname.endsWith(".youtube.com")) ||
+                    !/^\/live_chat(?:_replay)?(?:\/|$)/.test(url.pathname)) continue;
+                suspendedChatFrames.set(frame, source);
+                frame.setAttribute("src", "about:blank");
+            } catch { /* Unrelated embeds are not chat. */ }
+        }
+    }
+
     function syncWatchDetails() {
+        syncChatFrames();
         const active = enabled && (root.dataset.mytPage === "watch" || root.dataset.mytPreviousPage === "watch");
         const watch = active && [...document.querySelectorAll("ytd-watch-flexy:not([hidden])")].find(node =>
             !node.closest("[hidden], [aria-hidden='true']") && node.querySelector("video, ytd-player"));

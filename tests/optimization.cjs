@@ -32,8 +32,8 @@ async function main() {
     vm.runInContext(fs.readFileSync(path.join(__dirname, "../src/optimization.js"), "utf8"), context);
     vm.runInContext(fs.readFileSync(path.join(__dirname, "../src/background.js"), "utf8"), context);
     await new Promise(setImmediate);
-    assert.equal(rules.size, 1);assert.equal(registered.size, 1);
-    const rule = [...rules.values()][0], script = [...registered.values()][0];
+    assert.equal(rules.size, 2);assert.equal(registered.size, 1);
+    const rule = [...rules.values()].find(rule => rule.action.type === 'redirect'), script = [...registered.values()][0];
     assert.equal(script.world, "MAIN");assert.equal(script.runAt, "document_start");assert.equal(script.persistAcrossSessions, true);
     assert.deepEqual([...script.excludeMatches], ["https://music.youtube.com/*"]);
     assert.deepEqual([...rule.condition.resourceTypes], ["main_frame"]);
@@ -44,6 +44,16 @@ async function main() {
     assert.equal(redirect("https://www.youtube.com/"), chrome.runtime.getURL("src/home/index.html"));
     assert.equal(redirect("https://youtube.com/?hl=ru&persist_hl=1"), chrome.runtime.getURL("src/home/index.html") + "?hl=ru&persist_hl=1");
     for (const url of ["https://www.youtube.com/watch?v=keep", "https://www.youtube.com/results?search_query=keep", "https://www.youtube.com/@channel", "https://www.youtube.com/signin", "https://www.youtube.com/account", "https://www.youtube.com/logout", "https://music.youtube.com/", "https://youtube.com.example/"]) assert.equal(redirect(url), null, url);
+    const chatRule = [...rules.values()].find(rule => rule.action.type === 'block');
+    assert.deepEqual([...chatRule.condition.resourceTypes], ['sub_frame', 'xmlhttprequest']);
+    assert.deepEqual([...chatRule.condition.excludedInitiatorDomains], ['music.youtube.com']);
+    assert.deepEqual([...chatRule.condition.excludedRequestDomains], ['music.youtube.com']);
+    const chatURL = new RegExp(chatRule.condition.regexFilter);
+    for (const path of ['/live_chat?v=live', '/live_chat_replay?continuation=replay', '/youtubei/v1/live_chat/get_live_chat?key=live', '/youtubei/v1/live_chat/get_live_chat_replay?key=replay']) {
+        assert(chatURL.test('https://www.youtube.com' + path), path);
+        assert(chatURL.test('https://youtube.com' + path), path);
+    }
+    for (const url of ['https://www.youtube.com/watch?v=keep', 'https://www.youtube.com/youtubei/v1/player', 'https://www.youtube.com/youtubei/v1/next', 'https://www.youtube.com/live/keep', 'https://www.youtube.com/live_chat_settings', 'https://youtube.com.example/live_chat', 'https://media.example/video']) assert(!chatURL.test(url), url);
     const home = { id: chrome.runtime.id, url: chrome.runtime.getURL("src/home/index.html") + "?hl=ru", frameId: 0 };
     const request = (action, sender = home, extra = {}) => new Promise(resolve => {
         assert.equal(messageListener({ action, ...extra }, sender, resolve), true);
@@ -60,11 +70,11 @@ async function main() {
     const native = await request("minimal-youtube:open-native-home");
     assert.equal(native.url, "https://www.youtube.com/");assert.equal(rules.size, 0);assert.equal(registered.size, 0);
     state.enabled = true;storageListener({ enabled: { newValue: true } }, "local");
-    await new Promise(setImmediate);assert.equal(rules.size, 1);assert.equal(registered.size, 1);
+    await new Promise(setImmediate);assert.equal(rules.size, 2);assert.equal(registered.size, 1);
     await Promise.all([context.MinimalYouTubeOptimization.configure(false), context.MinimalYouTubeOptimization.configure(true), context.MinimalYouTubeOptimization.configure(false)]);
     assert.equal(rules.size, 0);assert.equal(registered.size, 0);
     state.enabled = true;events.startup();await new Promise(setImmediate);
-    assert.equal(rules.size, 1);assert.equal(registered.size, 1);
-    console.log("PASS homepage-only browser redirect, query preservation, persistent MAIN script, disabled/racing settings and exact sender/cookie-profile scope");
+    assert.equal(rules.size, 2);assert.equal(registered.size, 1);
+    console.log("PASS homepage redirect, live/replay chat network blocking with Music/player exceptions, persistent MAIN script, disabled/racing settings and exact sender/cookie-profile scope");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
