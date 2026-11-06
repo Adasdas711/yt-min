@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Minimal YouTube",
-    "version": "1.9.4",
+    "version": "1.10.0",
     "minimum_chrome_version": "114",
     "description": "A focused YouTube experience: clean search, centered channels and video pages, without recommendations or Shorts.",
     "author": "Ephraim Atta-Duncan",
@@ -16,6 +16,7 @@
                 "src/styles/styles.css"
             ],
             "js": [
+                "src/content/ads.js",
                 "src/content/watch.js",
                 "src/content/content.js"
             ],
@@ -35,7 +36,10 @@
         "service_worker": "src/background.js"
     },
     "host_permissions": [
-        "https://*.youtube.com/*"
+        "https://*.youtube.com/*",
+        "https://*.doubleclick.net/*",
+        "https://*.googleadservices.com/*",
+        "https://*.googlesyndication.com/*"
     ],
     "permissions": [
         "storage",

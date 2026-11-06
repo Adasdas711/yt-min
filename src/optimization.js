@@ -1,9 +1,10 @@
 "use strict";
 
-// Persistent pruning/chat rules; the verified local homepage redirect is session-only.
+// Persistent scoped ad/chat filters and pruning; the verified local homepage redirect is session-only.
 (() => {
     const ruleId = 470001;
     const chatRuleId = 470002;
+    const adRuleIds = [470003, 470004];
     const scriptId = "minimal-youtube-data-pruning";
     const homePath = "src/home/index.html";
     const homeFiles = [homePath, "src/home/home.js", "src/home/home.css", "src/content/content.js", "src/styles/styles.css"];
@@ -34,7 +35,7 @@
         configuration = configuration.catch(() => {}).then(async () => {
             if (!supported || current !== revision) return;
             await chrome.declarativeNetRequest.updateDynamicRules({
-                removeRuleIds: [ruleId, chatRuleId],
+                removeRuleIds: [ruleId, chatRuleId, ...adRuleIds],
                 addRules: enabled ? [{
                     id: chatRuleId,
                     priority: 1,
@@ -44,6 +45,20 @@
                         resourceTypes: ["sub_frame", "xmlhttprequest"],
                         excludedInitiatorDomains: ["music.youtube.com"],
                         excludedRequestDomains: ["music.youtube.com"],
+                    },
+                }, {
+                    id: adRuleIds[0], priority: 1, action: { type: "block" },
+                    condition: {
+                        regexFilter: "^https://([a-z0-9-]+\\.)*(doubleclick\\.net|googleadservices\\.com|googlesyndication\\.com)/(pagead/|gampad/|pcs/|ddm/|simgad/)",
+                        initiatorDomains: ["youtube.com"], excludedInitiatorDomains: ["music.youtube.com"],
+                        resourceTypes: ["script", "xmlhttprequest", "sub_frame", "image", "media", "ping"],
+                    },
+                }, {
+                    id: adRuleIds[1], priority: 1, action: { type: "block" },
+                    condition: {
+                        regexFilter: "^https://([a-z0-9-]+\\.)?youtube\\.com/(pagead/|api/stats/ads([/?]|$)|youtubei/v1/player/ad_break([/?]|$))",
+                        initiatorDomains: ["youtube.com"], excludedInitiatorDomains: ["music.youtube.com"],
+                        resourceTypes: ["script", "xmlhttprequest", "sub_frame", "image", "media", "ping"],
                     },
                 }] : [],
             });

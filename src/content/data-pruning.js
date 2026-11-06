@@ -1,6 +1,6 @@
-/* Runs in YouTube's MAIN world before its bootstrap. Feed data is discarded
-   before renderers/cache retain it. No player responses, credentials or media
-   requests are intercepted and no copy of removed data is kept. */
+/* Runs in YouTube's MAIN world before bootstrap. Discards hidden feed data
+   and explicit player ad placements. Stream URLs, formats, authorization and
+   playability stay native; discarded data is never copied or backed up. */
 (() => {
     "use strict";
     if (globalThis.__minimalYouTubeDataPruning) return;
@@ -12,15 +12,35 @@
     const relatedTargets = new Set(["watch-next-feed", "watch-next-feed-recommendations", "watch-secondary-results"]);
     let processed = new WeakSet();
     let enabled = false;
-    let initialDescriptor;
-    let initialValue;
-    let initialHook = false;
-
-    function initialGet() { return initialDescriptor?.get ? initialDescriptor.get.call(window) : initialValue; }
-    function initialSet(value) {
-        const result = trim(value);
-        if (initialDescriptor?.set) initialDescriptor.set.call(window, result);
-        else initialValue = result;
+    const initialHooks = new Map();
+    function hookInitial(name) {
+        let descriptor = Object.getOwnPropertyDescriptor(window, name);
+        if (descriptor && !descriptor.configurable) return;
+        let value = descriptor?.value;
+        const original = descriptor ? { ...descriptor } : { configurable: true, enumerable: true, writable: true };
+        delete original.value;descriptor = undefined;
+        const get = () => original.get ? original.get.call(window) : value;
+        const set = incoming => {
+            const result = trim(incoming);
+            if (original.set) original.set.call(window, result);
+            else value = result;
+        };
+        Object.defineProperty(window, name, { configurable: true, enumerable: original.enumerable, get, set });
+        initialHooks.set(name, () => {
+            if (Object.getOwnPropertyDescriptor(window, name)?.set === set) {
+                const current = get();
+                Object.defineProperty(window, name, (Object.hasOwn(original, "get") || Object.hasOwn(original, "set")) ? original : { ...original, value: current });
+            }
+            value = undefined;
+        });
+        const current = get();if (current) set(current);
+    }
+    const playerAdKeys = ["playerAds", "adPlacements", "adSlots"];
+    function stripPlayerAds(player) {
+        if (!player || typeof player !== "object") return;
+        const adResponse = player.responseContext && playerAdKeys.some(key => Array.isArray(player[key]));
+        if (!(player.playabilityStatus || player.streamingData || player.videoDetails || adResponse)) return;
+        for (const key of playerAdKeys) if (Object.hasOwn(player, key)) delete player[key];
     }
     function shortItem(item) {
         if (!item || typeof item !== "object") return false;
@@ -82,7 +102,9 @@
             data?.continuationContents);
     }
     function trim(data) {
-        if (!enabled || !data || typeof data !== "object" || !feed(data) || processed.has(data)) return data;
+        if (!enabled || !data || typeof data !== "object") return data;
+        try { stripPlayerAds(data);stripPlayerAds(data.playerResponse); } catch { /* Immutable/revived player data stays native. */ }
+        if (!feed(data) || processed.has(data)) return data;
         try {
             let removed = 0;
             const secondary = data.contents?.twoColumnWatchNextResults?.secondaryResults;
@@ -124,27 +146,14 @@
     function install() {
         JSON.parse = parse;
         Response.prototype.json = responseJSON;
-        const descriptor = Object.getOwnPropertyDescriptor(window, "ytInitialData");
-        if (!descriptor || descriptor.configurable) {
-            initialDescriptor = descriptor;
-            initialValue = descriptor?.value;
-            Object.defineProperty(window, "ytInitialData", { configurable: true, enumerable: true, get: initialGet, set: initialSet });
-            initialHook = true;
-            const value = initialGet();
-            if (value) initialSet(value);
-        }
+        hookInitial("ytInitialData");
+        hookInitial("ytInitialPlayerResponse");
     }
     function uninstall() {
         if (JSON.parse === parse) JSON.parse = nativeParse;
         if (Response.prototype.json === responseJSON) Response.prototype.json = nativeResponseJSON;
-        if (initialHook && Object.getOwnPropertyDescriptor(window, "ytInitialData")?.set === initialSet) {
-            const value = initialGet();
-            if (initialDescriptor?.get || initialDescriptor?.set) Object.defineProperty(window, "ytInitialData", initialDescriptor);
-            else Object.defineProperty(window, "ytInitialData", { ...(initialDescriptor || { configurable: true, enumerable: true, writable: true }), value });
-            initialValue = undefined;
-            initialDescriptor = undefined;
-        }
-        initialHook = false;
+        for (const restore of initialHooks.values()) restore();
+        initialHooks.clear();
     }
     function configure(value) {
         if (enabled === value) return;

@@ -104,6 +104,7 @@ def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, nati
     if native_dark:
         page.evaluate("document.documentElement.setAttribute('dark', '')")
     page.add_style_tag(path=str(ROOT / "src/styles/styles.css"))
+    page.add_script_tag(path=str(ROOT / "src/content/ads.js"))
     if watch_ui:
         page.add_script_tag(path=str(ROOT / "src/content/watch.js"))
     page.add_script_tag(path=str(ROOT / "src/content/content.js"))
@@ -1112,6 +1113,104 @@ def check_short_watch_scroll(browser,width):
     page.close()
 
 
+def check_fast_fullscreen(browser):
+    page=setup(browser,'/watch?v=instant-fullscreen',native_watch_fixture(),native_dark=True)
+    page.evaluate(VIDEO_STREAM)
+    page.evaluate("""() => {
+      const button=document.querySelector('#native-fullscreen'),handler=button.onclick;
+      button.onclick=function(event){
+        const player=this.closest('ytd-player'),video=player.querySelector('video'),box=video.getBoundingClientRect();
+        if(!document.fullscreenElement)window.__immediateFullscreen={pending:player.hasAttribute('data-myt-fullscreen-pending'),x:box.x,y:box.y,width:box.width,height:box.height,ready:video.readyState,video:video===window.__nativeVideo};
+        return handler.call(this,event);
+      };
+    }""")
+    page.locator('#native-fullscreen').click()
+    page.wait_for_function('!!document.fullscreenElement')
+    immediate=page.evaluate('window.__immediateFullscreen')
+    assert immediate['pending'] and immediate['video'] and immediate['ready']>=2,immediate
+    assert [immediate[key] for key in ['x','y','width','height']]==[0,0,1440,960],immediate
+    pixel=rendered_pixel(page,720,480)
+    assert all(abs(a-b)<=6 for a,b in zip(pixel,[24,180,96,255])),pixel
+    page.locator('#native-fullscreen').click()
+    page.wait_for_function('!document.fullscreenElement')
+    expect(page.locator('[data-myt-fullscreen-pending],[data-myt-fullscreen-part]')).to_have_count(0)
+    expect(page.locator('#myt-watch')).to_be_visible()
+    assert page.evaluate('window.__nativeVideo===document.querySelector("video")&&window.__nativeVideoParent===document.querySelector("video").parentElement')
+    page.evaluate('clearInterval(window.__frames);window.__stream.getTracks().forEach(track=>track.stop())')
+    page.close()
+
+
+def check_player_ad_data(browser):
+    player={'playabilityStatus':{'status':'OK'},'videoDetails':{'videoId':'native'},'streamingData':{'formats':[{'url':'https://media.example/content?signature=keep'}]},'playerAds':[{'id':'ad'}],'adPlacements':[{'slot':'preroll'}],'adSlots':[{'slot':'midroll'}]}
+    script='<script>var ytInitialPlayerResponse='+json.dumps(player)+';window.__bootAds=[ytInitialPlayerResponse.playerAds,ytInitialPlayerResponse.adPlacements,ytInitialPlayerResponse.adSlots].filter(Boolean).length;</script>'
+    page=setup(browser,'/watch?v=native',script+native_watch_fixture(),prune_data=True)
+    assert page.evaluate('window.__bootAds')==0
+    assert page.evaluate('ytInitialPlayerResponse.streamingData.formats[0].url')==player['streamingData']['formats'][0]['url']
+    actual=page.evaluate("""async player=>{
+      const data=await new Response(JSON.stringify(player)).json();
+      return {ads:[data.playerAds,data.adPlacements,data.adSlots].filter(Boolean).length,status:data.playabilityStatus.status,url:data.streamingData.formats[0].url};
+    }""",player)
+    assert actual=={'ads':0,'status':'OK','url':player['streamingData']['formats'][0]['url']},actual
+    page.evaluate('__setEnabled(false)')
+    assert page.evaluate('(player=>JSON.parse(JSON.stringify(player)).playerAds.length)',player)==1
+    assert page.evaluate("Object.getOwnPropertyDescriptor(window,'ytInitialPlayerResponse').get===undefined")
+    page.close()
+
+
+def check_player_ad_controls(browser):
+    page=setup(browser,'/watch?v=ad-controls',native_watch_fixture(),native_dark=True)
+    page.evaluate(VIDEO_STREAM)
+    page.evaluate("""() => {
+      window.__skips=0;const player=document.querySelector('#movie_player');
+      const button=document.createElement('button');button.id='native-ad-skip';button.className='ytp-ad-skip-button-modern';button.textContent='Skip ads';button.disabled=true;
+      button.onclick=()=>window.__skips++;const container=document.createElement('div');container.className='ytp-ad-skip-button-container';container.append(button);player.append(container);
+      const overlay=document.createElement('div');overlay.className='ytp-ad-overlay-container';overlay.textContent='Ad banner';player.append(overlay);
+      const video=player.querySelector('video');window.__originalMedia={video,parent:video.parentElement,muted:video.muted,volume:video.volume,rate:video.playbackRate,time:video.currentTime};
+    }""")
+    page.wait_for_timeout(60)
+    assert page.evaluate('window.__skips')==0
+    page.locator('#movie_player').evaluate("e=>e.classList.add('ad-showing')")
+    page.wait_for_timeout(60)
+    assert page.evaluate('window.__skips')==0,'A disabled skip button was clicked'
+    page.locator('.ytp-ad-skip-button-container').evaluate("e=>e.style.opacity='0'")
+    page.locator('#native-ad-skip').evaluate('e=>e.disabled=false')
+    page.wait_for_timeout(60)
+    assert page.evaluate('window.__skips')==0,'A transparent/pre-countdown control was clicked'
+    page.locator('.ytp-ad-skip-button-container').evaluate("e=>e.style.opacity='1'")
+    page.wait_for_function('window.__skips===1')
+    page.locator('#native-ad-skip').evaluate("e=>e.style.color='white'")
+    page.wait_for_timeout(60)
+    assert page.evaluate('window.__skips')==1,'The same ad control was spammed'
+    page.locator('video').evaluate("e=>e.dispatchEvent(new Event('loadedmetadata'))")
+    page.wait_for_function('window.__skips===2')
+    expect(page.locator('.ytp-ad-overlay-container')).to_be_hidden()
+    page.evaluate('__setEnabled(false)')
+    page.locator('#native-ad-skip').evaluate('e=>{e.disabled=true;e.disabled=false;}')
+    page.wait_for_timeout(60)
+    assert page.evaluate('window.__skips')==2
+    page.evaluate('__setEnabled(true)')
+    page.wait_for_function('window.__skips===3')
+    page.locator('#movie_player').evaluate("e=>e.classList.remove('ad-showing')")
+    page.wait_for_timeout(40)
+    page.locator('#native-ad-skip').evaluate('e=>e.hidden=true')
+    page.locator('#movie_player').evaluate("e=>e.classList.add('ad-showing')")
+    page.wait_for_timeout(60)
+    assert page.evaluate('window.__skips')==3,'A hidden skip button was clicked'
+    page.locator('#native-ad-skip').evaluate('e=>e.hidden=false')
+    page.wait_for_function('window.__skips===4')
+    page.locator('#movie_player').evaluate("e=>e.classList.remove('ad-showing')")
+    assert page.evaluate("""()=>{
+      const original=window.__originalMedia,video=document.querySelector('video');
+      return video===original.video&&video.parentElement===original.parent&&video.muted===original.muted&&video.volume===original.volume&&video.playbackRate===original.rate&&video.currentTime>=original.time;
+    }""")
+    box=page.locator('#myt-watch .media').bounding_box()
+    pixel=rendered_pixel(page,box['x']+box['width']/2,box['y']+box['height']/2)
+    assert all(abs(a-b)<=6 for a,b in zip(pixel,[24,180,96,255])),pixel
+    assert_stable(page)
+    page.evaluate('clearInterval(window.__frames);window.__stream.getTracks().forEach(track=>track.stop())')
+    page.close()
+
+
 def check_background_work(browser):
     results={}
     probe="""async () => {
@@ -1880,6 +1979,12 @@ def main():
         ok('homepage-style masthead brand repairs native rerenders without duplicates, restores native logo on disable and keeps its home link')
         page.close()
 
+        check_fast_fullscreen(browser)
+        ok('native video fills the viewport in the same click before the fullscreen handler, without waiting or replacing media')
+        check_player_ad_data(browser)
+        ok('initial player bootstrap and real Response.json discard ad slots but preserve native content URLs, playability and disabled parsers')
+        check_player_ad_controls(browser)
+        ok('only visible enabled native ad skip controls are clicked, with consecutive-ad/off support and unchanged media volume/rate/identity')
         check_native_home_fallback(browser)
         ok('native and SPA home stay usable when local extension files are unavailable; settings and search still work without a blind redirect')
         for width in [1440,390]:

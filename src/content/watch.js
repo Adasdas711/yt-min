@@ -28,7 +28,7 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
 .owner { display:flex;align-items:center;gap:12px;min-width:0;flex-wrap:wrap; }.owner-link { display:flex;align-items:center;gap:12px;color:var(--ink);min-width:0; }.owner img { width:46px;height:46px;border-radius:50%;object-fit:cover;flex:none; }.owner-name { font-size:17px;font-weight:600; }.owner small { display:block;color:var(--muted);font-size:14px; }
 .owner .primary { min-height:36px;height:36px;padding:0 14px;border-radius:10px;font-size:14px;line-height:1.25; }
 .actions { display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0; }.primary { background:var(--ink);color:var(--bg);border-color:transparent; }.primary:hover { opacity:.9;background:var(--ink); }
-.more-actions { display:flex; }.more-popup { position:fixed;inset:auto;margin:0;padding:6px;width:min(260px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--ink);box-shadow:0 12px 36px #0002; }.more-popup::backdrop { background:transparent; }.more-popup button { display:flex;width:100%;justify-content:flex-start;white-space:normal;text-align:left;border:0;background:transparent; }.more-popup button:hover,.more-popup button:focus-visible { background:var(--soft); }.more-popup button:focus-visible { outline-offset:-2px; }
+.more-actions { display:flex; }.more-toggle { width:44px;min-width:44px;padding:10px; }.more-popup { position:fixed;inset:auto;margin:0;padding:6px;width:min(260px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--ink);box-shadow:0 12px 36px #0002; }.more-popup::backdrop { background:transparent; }.more-popup button { display:flex;width:100%;justify-content:flex-start;white-space:normal;text-align:left;border:0;background:transparent; }.more-popup button:hover,.more-popup button:focus-visible { background:var(--soft); }.more-popup button:focus-visible { outline-offset:-2px; }
 #myt-comments-toggle { display:inline-flex;align-items:center;gap:9px; }.description { border:1px solid var(--border);border-radius:20px;background:var(--surface);padding:28px; }
 .stats { font-size:14px;font-weight:500;color:var(--muted);margin-bottom:16px; }.prose { font-size:17px;line-height:1.8;overflow-wrap:anywhere;white-space:pre-wrap; }.prose p { margin:0 0 18px; }.prose ul,.prose ol { padding-left:24px; }.prose:not(.expanded) { max-height:9em;overflow:hidden; }.expand { margin-top:18px;background:transparent; }
 .section { margin-top:32px; }.section-head { display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px; }.hint { color:var(--muted);font-size:15px;line-height:1.6; }
@@ -155,16 +155,28 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
         prepareFullscreen() {
             if(this.fullscreenPending)return;
             const player=this.nativePlayer();if(!player)return;
-            this.fullscreenPending=true;this.restore(player);
+            this.fullscreenPending=true;this.fullscreenPreview=player;
+            this.closeMore();player.setAttribute('data-myt-fullscreen-pending','');
+            // Paint the native frame at full size in the same click. Preserve its
+            // positioning state until the browser enters fullscreen; the native
+            // button handler can request it as soon as its popover is hidden.
+            this.updateFullscreenLayout(player);
+            for(const node of this.islands.keys())if(node.matches(':popover-open'))node.hidePopover();
+            if(this.host.matches(':popover-open'))this.host.hidePopover();
             clearTimeout(this.fullscreenTimer);
             this.fullscreenTimer=setTimeout(()=>this.resumeFullscreen(),600);
         }
+        clearFullscreenPreview() {
+            this.fullscreenPreview?.removeAttribute('data-myt-fullscreen-pending');this.fullscreenPreview=null;
+        }
         resumeFullscreen() {
             clearTimeout(this.fullscreenTimer);this.fullscreenPending=false;
-            if(!document.fullscreenElement&&this.host.isConnected){this.restoreFullscreenLayout();this.open(this.host);this.sync(this.options);}
+            this.clearFullscreenPreview();
+            if(!document.fullscreenElement&&this.host.isConnected){this.restoreFullscreenLayout();this.open(this.host);this.sync(this.options);this.resizeNativePlayer();}
         }
         syncFullscreen() {
             clearTimeout(this.fullscreenTimer);this.fullscreenPending=false;
+            this.clearFullscreenPreview();
             if(document.fullscreenElement){
                 this.closeMore();
                 for(const[node,state]of this.islands){
@@ -182,8 +194,7 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
             }
             this.fullscreenNodes.clear();
         }
-        updateFullscreenLayout() {
-            const fullscreen=document.fullscreenElement;
+        updateFullscreenLayout(fullscreen=document.fullscreenElement) {
             if(!fullscreen)return;
             const video=fullscreen.matches('video')?fullscreen:(fullscreen.querySelector('video.html5-main-video')||fullscreen.querySelector('video'));
             if(!video)return;
@@ -235,7 +246,8 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
         }
         moreActions(share,nativeMenu) {
             const group=this.node('div','more-actions');
-            const toggle=this.button(this.copy.menu,null,'menu');
+            const toggle=this.button('',null,'menu');
+            toggle.setAttribute('aria-label',this.copy.menu);toggle.title=this.copy.menu;
             toggle.className='more-toggle';toggle.id='watch-more-toggle';
             toggle.setAttribute('popovertarget','watch-more-menu');
             toggle.setAttribute('aria-controls','watch-more-menu');
@@ -398,7 +410,7 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
             this.options=options;this.copy=words[options.language]||words.en;const c=this.copy;
             const media=this.native.querySelector('video');if(media!==this.media){this.media?.removeEventListener('timeupdate',this.videoTime);this.media=media;this.media?.addEventListener('timeupdate',this.videoTime);}
             if(document.fullscreenElement){this.updateFullscreenLayout();return;}
-            if(this.fullscreenPending)return;
+            if(this.fullscreenPending){this.updateFullscreenLayout(this.fullscreenPreview);return;}
             this.surface.toggleAttribute('dark',options.dark);this.surface.toggleAttribute('theater',this.native.hasAttribute('theater'));if(this.host.lang!==options.language)this.host.lang=options.language;
             const input=this.q('#watch-search');input.placeholder=c.search;input.setAttribute('aria-label',c.search);this.q('#watch-clear').setAttribute('aria-label',c.clear);
             const metadata=this.native.querySelector('ytd-watch-metadata,ytd-video-primary-info-renderer,ytd-video-secondary-info-renderer');
@@ -486,7 +498,7 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
             this.q('.transcript-status').textContent=data.length?(filtered.length?'':this.copy.noResults):(this.transcriptLoading?this.copy.loading:this.copy.unavailable);this.q('.transcript-retry').hidden=!!data.length||this.transcriptLoading;this.q('.transcript-search').hidden=!data.length;
         }
         closeTranscript() {this.transcriptOpen=false;clearTimeout(this.transcriptTimeout);if(this.q){this.q('#watch-transcript').hidden=true;this.q('.transcript-menu-toggle')?.setAttribute('aria-expanded','false');this.q('.transcript-content').hidden=true;this.q('.transcript-toggle').setAttribute('aria-expanded','false');}if(this.nativePanelState){for(const[name,value]of this.nativePanelState.attrs){if(value===null)this.nativePanelState.node.removeAttribute(name);else this.nativePanelState.node.setAttribute(name,value);}this.nativePanelState=null;}}
-        destroy() {this.restoreFullscreenLayout();clearTimeout(this.fullscreenTimer);for(const type of ['click','dblclick','keydown'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);this.media?.removeEventListener('timeupdate',this.videoTime);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;}
+        destroy() {this.clearFullscreenPreview();this.restoreFullscreenLayout();clearTimeout(this.fullscreenTimer);for(const type of ['click','dblclick','keydown'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);this.media?.removeEventListener('timeupdate',this.videoTime);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;}
     }
     globalThis.MinimalYouTubeWatch=WatchView;
 })();

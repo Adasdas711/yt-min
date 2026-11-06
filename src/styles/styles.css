@@ -1269,7 +1269,7 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] { disp
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="popups"] { display: block !important; pointer-events: none !important; background: transparent !important; overflow: visible !important; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="popups"] > * { pointer-events: auto; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="anchor"] { display: block !important; opacity: 0 !important; pointer-events: none !important; }
-html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island]:not(:popover-open) { display: none !important; }
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island]:not(:popover-open):not([data-myt-fullscreen-pending]) { display: none !important; }
 html.minimal-youtube[data-myt-watch-ui] :fullscreen,
 html.minimal-youtube[data-myt-watch-ui] ytd-watch-flexy[data-myt-watch-source]:fullscreen {
     visibility: visible !important; position: fixed !important; inset: 0 !important;
@@ -1295,6 +1295,14 @@ html.minimal-youtube[data-myt-watch-ui] video[data-myt-fullscreen-part="video"] 
     object-fit: contain !important;
 }
 
+/* Immediate native-player preview while its own fullscreen request starts. */
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="media"][data-myt-fullscreen-pending] {
+    display: block !important; visibility: visible !important;
+    position: fixed !important; inset: 0 !important;
+    width: 100vw !important; height: 100vh !important;
+    clip-path: none !important; border-radius: 0 !important; z-index: 2147483647 !important;
+}
+
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island]::backdrop { background: transparent !important; backdrop-filter: none !important; }
 
 /* Chat and archived chat are excluded from data/network too. This covers
@@ -1302,3 +1310,6 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island]::backdrop { back
 html.minimal-youtube ytd-watch-flexy :is(#chat, #chat-container, ytd-live-chat-frame, ytd-live-chat-renderer, ytd-live-chat-replay-renderer, ytd-engagement-panel-section-list-renderer[target-id*="live-chat"], ytd-engagement-panel-section-list-renderer[data-target-id*="live-chat"]) {
     display: none !important;
 }
+
+/* Banner overlays only. Never hide the native video or the skip control. */
+html.minimal-youtube #movie_player :is(.ytp-ad-overlay-container, .ytp-ad-overlay-slot) { display: none !important; }

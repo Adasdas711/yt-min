@@ -94,6 +94,32 @@ async function main() {
     assert.equal(next.onResponseReceivedActions[2].reloadContinuationItemsCommand.continuationItems[0].playlistPanelVideoRenderer.videoId, "keep");
     const player = { streamingData: { adaptiveFormats: [{ url: "https://media.example/video" }] }, playabilityStatus: { status: "OK" }, videoDetails: { videoId: "native" }, contents: { twoColumnSearchResultsRenderer: { contents: [{ reelShelfRenderer: {} }] } } };
     assert.deepEqual(JSON.parse(JSON.stringify(parse(player))), player, "Player data is outside the pruning scope");
+    const adPlayer = {
+        playabilityStatus: { status: 'OK' }, videoDetails: { videoId: 'native-ad-free' },
+        streamingData: { adaptiveFormats: [{ url: 'https://rr1.googlevideo.com/videoplayback?sig=private', signatureCipher: 'unchanged' }], serverAbrStreamingUrl: 'https://rr1.googlevideo.com/sabr?token=keep' },
+        responseContext: { visitorData: 'keep' }, captions: { tracks: ['keep'] },
+        playerAds: [{ id: 'drop-client-ad' }], adPlacements: [{ slot: 'drop-pre-roll' }], adSlots: [{ slot: 'drop-mid-roll' }],
+    };
+    const stream = adPlayer.streamingData;
+    context.ytInitialPlayerResponse = adPlayer;
+    assert.equal(context.ytInitialPlayerResponse, adPlayer);
+    assert.equal(adPlayer.streamingData, stream);
+    assert.equal(adPlayer.responseContext.visitorData, 'keep');
+    for (const key of ['playerAds', 'adPlacements', 'adSlots']) assert(!(key in adPlayer), key);
+    for (const response of [parse({ ...adPlayer, playerAds: [1], adPlacements: [2], adSlots: [3] }), await new Response({ ...adPlayer, playerAds: [1], adPlacements: [2] }).json()]) {
+        assert(!response.playerAds && !response.adPlacements && !response.adSlots);
+        assert.deepEqual(JSON.parse(JSON.stringify(response.streamingData)), stream);
+        assert.equal(response.playabilityStatus.status, 'OK');
+    }
+    const prefetched = parse({ playerResponse: { ...adPlayer, adSlots: [1] } });
+    assert(!prefetched.playerResponse.adSlots);
+    const adOnly = parse({ responseContext: { visitorData: 'keep' }, adSlots: [1], adPlacements: [2], tracking: 'keep' });
+    assert(!adOnly.adSlots && !adOnly.adPlacements);assert.equal(adOnly.responseContext.visitorData, 'keep');assert.equal(adOnly.tracking, 'keep');
+    const lookalike = { adPlacements: ['keep-unrelated-json'], value: 'not player data' };
+    assert.deepEqual(JSON.parse(JSON.stringify(parse(lookalike))), lookalike);
+    // A reviver is allowed to freeze a value; ad filtering must not break parsing.
+    context.frozenText = JSON.stringify({ ...adPlayer, playerAds: [1] });
+    assert.doesNotThrow(() => vm.runInContext('JSON.parse(frozenText, (key,value)=>key===""?Object.freeze(value):value)', context));
     const unrelated = { inlinePlaybackEndpoint: { value: 1 }, text: "Unrelated JSON" };
     assert.deepEqual(JSON.parse(JSON.stringify(parse(unrelated))), unrelated);
     assert.throws(() => vm.runInContext('JSON.parse("not json")', context));
@@ -114,14 +140,19 @@ async function main() {
     command(false);
     assert.equal(vm.runInContext("JSON.parse", context), originalParse);
     assert.equal(Response.prototype.json, originalResponseJSON);
+    const playerDescriptor = Object.getOwnPropertyDescriptor(context, 'ytInitialPlayerResponse');
+    assert.equal(playerDescriptor.get, undefined);assert.equal(playerDescriptor.value, adPlayer);
+    context.ytInitialPlayerResponse = { ...adPlayer, playerAds: [1] };
+    assert.deepEqual(context.ytInitialPlayerResponse.playerAds, [1]);
     const native = parse({ contents: { twoColumnSearchResultsRenderer: { contents: [{ reelShelfRenderer: {} }] } } });
     assert.equal(native.contents.twoColumnSearchResultsRenderer.contents.length, 1);
     const nativeChat = parse({ contents: { twoColumnWatchNextResults: { conversationBar: chat } } });
     assert.deepEqual(JSON.parse(JSON.stringify(nativeChat.contents.twoColumnWatchNextResults.conversationBar)), chat);
     context.ytInitialData = native;
     command(true);
+    assert(!context.ytInitialPlayerResponse.playerAds);
     assert.equal(native.contents.twoColumnSearchResultsRenderer.contents.length, 0);
     command(false);
-    console.log("PASS initial/fetch/parse feed pruning and live/replay chat removal; native player, playlist, comments, transcript, static thumbnails and disabled mode preserved");
+    console.log("PASS initial/fetch/parse feed pruning and live/replay chat removal; explicit player ad placements stripped; native streams/playability/captions, playlist, comments, transcript and disabled parsers/globals preserved");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

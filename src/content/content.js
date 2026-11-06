@@ -18,6 +18,7 @@
     const hiddenElements = new Set();
     const pendingRoots = new Set();
     const suspendedChatFrames = new Map();
+    const playerAds = globalThis.MinimalYouTubeAds ? new globalThis.MinimalYouTubeAds() : null;
     const nativeShorts = [
         "ytd-reel-shelf-renderer", "ytd-reel-item-renderer",
         "ytd-reel-video-renderer", "yt-shorts-lockup-view-model", "ytm-shorts-lockup-view-model",
@@ -858,6 +859,7 @@
         const active = enabled && (root.dataset.mytPage === "watch" || root.dataset.mytPreviousPage === "watch");
         const watch = active && [...document.querySelectorAll("ytd-watch-flexy:not([hidden])")].find(node =>
             !node.closest("[hidden], [aria-hidden='true']") && node.querySelector("video, ytd-player"));
+        playerAds?.bind(watch ? (watch.querySelector("#movie_player, .html5-video-player") || watch.querySelector("ytd-player")) : null);
         if (watchView && (!watch || watchView.native !== watch)) {
             watchView.destroy();
             watchView = null;
@@ -1429,6 +1431,7 @@
     });
 
     function setEnabled(value) {
+        playerAds?.setEnabled(Boolean(value));
         document.dispatchEvent(new CustomEvent("minimal-youtube:optimization", { detail: { enabled: Boolean(value) } }));
         if (!value && standaloneHome) { openNativeHome(); return; }
         if (enabled === value) return;
