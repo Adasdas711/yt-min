@@ -35,7 +35,12 @@
         "hideComments": "Скрыть комментарии",
         "settings": "Настройки",
         "settingsHint": "Аккаунт, приватность и оформление",
-        "showCookies": "Показать список cookies",
+        "showCookies": "Список cookies",
+        "appearance": "Оформление",
+        "languageInfo": "Для YouTube и расширения",
+        "themeInfo": "Оформление главной страницы",
+        "lightShort": "Светлая",
+        "darkShort": "Тёмная",
         "close": "Закрыть настройки",
         "account": "Аккаунт YouTube",
         "accountInfo": "Вход и управление аккаунтом на YouTube и Google.",
@@ -46,7 +51,7 @@
         "cookies": "Cookies YouTube",
         "cookieInfo": "Только cookies YouTube. После удаления может потребоваться вход.",
         "loading": "Загрузка…",
-        "deleteCookies": "Удалить cookies YouTube",
+        "deleteCookies": "Удалить cookies",
         "confirmCookies": "Удалить все cookies YouTube в этом профиле?",
         "confirm": "Удалить",
         "cancel": "Отмена",
@@ -68,7 +73,12 @@
         "hideComments": "Hide comments",
         "settings": "Settings",
         "settingsHint": "Account, privacy and appearance",
-        "showCookies": "View cookie list",
+        "showCookies": "View cookies",
+        "appearance": "Appearance",
+        "languageInfo": "YouTube and extension interface",
+        "themeInfo": "Start page appearance",
+        "lightShort": "Light",
+        "darkShort": "Dark",
         "close": "Close settings",
         "account": "YouTube account",
         "accountInfo": "Sign in and manage your YouTube account.",
@@ -79,7 +89,7 @@
         "cookies": "YouTube cookies",
         "cookieInfo": "YouTube cookies only. You may need to sign in again.",
         "loading": "Loading…",
-        "deleteCookies": "Delete YouTube cookies",
+        "deleteCookies": "Clear cookies",
         "confirmCookies": "Delete all YouTube cookies in this profile?",
         "confirm": "Delete",
         "cancel": "Cancel",
@@ -351,123 +361,130 @@
 
 [hidden] { display: none !important; }
 
+
 :host([data-myt-theme="light"]) {
-    --myt-settings-bg: #ffffff;
-    --myt-settings-card: #f7f7f9;
-    --myt-settings-control: #ffffff;
-    --myt-danger: #bc2b3c;
-    --myt-settings-shadow: 0 24px 80px rgba(24, 24, 27, .16);
+    --myt-settings-bg: #ffffff; --myt-settings-control: #f4f4f6;
+    --myt-settings-selected: #ffffff; --myt-settings-header: #fcfcfd;
+    --myt-settings-accent-bg: #fff0f2; --myt-danger: #bc2b3c;
+    --myt-settings-shadow: 0 32px 100px rgba(24, 24, 27, .18);
 }
 :host([data-myt-theme="dark"]) {
-    --myt-settings-bg: #171719;
-    --myt-settings-card: #202024;
-    --myt-settings-control: #29292e;
-    --myt-danger: #ff8b96;
-    --myt-settings-shadow: 0 24px 80px rgba(0, 0, 0, .4);
+    --myt-settings-bg: #18181b; --myt-settings-control: #232327;
+    --myt-settings-selected: #37373d; --myt-settings-header: #1c1c20;
+    --myt-settings-accent-bg: #362127; --myt-danger: #ff929e;
+    --myt-settings-shadow: 0 32px 100px rgba(0, 0, 0, .48);
 }
 .myt-settings-button {
-    position: fixed; right: 24px; top: 24px;
-    display: grid; place-items: center; width: 44px; height: 44px;
-    border: 1px solid var(--myt-border); border-radius: 14px;
+    position: fixed; right: 24px; top: 24px; display: grid; place-items: center;
+    width: 44px; height: 44px; border: 1px solid var(--myt-border); border-radius: 14px;
     background: var(--myt-surface); color: var(--myt-muted); cursor: pointer;
-    transition: color 140ms ease, background-color 140ms ease;
+    transition: color 150ms ease, background-color 150ms ease;
 }
 .myt-settings-button:hover { color: var(--myt-ink); background: var(--myt-soft); }
 .myt-settings-button svg { width: 22px; height: 22px; }
-:host([data-settings-open]) :is(.myt-home__brand, .myt-search, .myt-theme-toggle) {
-    visibility: hidden;
-    pointer-events: none;
-}
-.myt-settings-backdrop {
-    position: fixed; inset: 0; z-index: 2;
-    background: rgba(0, 0, 0, .42); backdrop-filter: blur(6px);
-}
+:host([data-settings-open]) :is(.myt-home__brand, .myt-search, .myt-theme-toggle) { visibility: hidden; pointer-events: none; }
+.myt-settings-backdrop { position: fixed; inset: 0; z-index: 2; background: rgba(0,0,0,.48); backdrop-filter: blur(10px); }
 .myt-settings-panel {
-    position: fixed; left: 50%; top: 50%; z-index: 3;
-    transform: translate(-50%, -50%);
-    width: min(500px, calc(100% - 32px)); max-height: calc(100svh - 40px);
-    overflow: auto; overscroll-behavior: contain; padding: 0;
+    position: fixed; left: 50%; top: 50%; z-index: 3; transform: translate(-50%,-50%);
+    width: min(600px,calc(100% - 32px)); max-height: calc(100svh - 40px);
+    overflow: auto; overscroll-behavior: contain; padding: 0; scrollbar-width: thin;
     border: 1px solid var(--myt-border); border-radius: 24px;
-    background: var(--myt-settings-bg, var(--myt-surface)); color: var(--myt-ink); text-align: start;
-    box-shadow: var(--myt-settings-shadow);
-    scrollbar-width: thin;
-    font: 14px/1.5 "Roboto", "Arial", sans-serif;
+    background: var(--myt-settings-bg); color: var(--myt-ink); box-shadow: var(--myt-settings-shadow);
+    text-align: start; font: 14px/1.5 "Roboto","Arial",sans-serif;
 }
 .myt-settings-panel:not([hidden]) { animation: myt-settings-enter 160ms ease-out; }
 @keyframes myt-settings-enter { from { opacity: 0; } to { opacity: 1; } }
 .myt-settings-panel > header {
-    position: sticky; top: 0; z-index: 2;
-    display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
-    padding: 22px 24px 20px; border-bottom: 1px solid var(--myt-border);
-    background: var(--myt-settings-bg, var(--myt-surface));
+    position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between;
+    gap: 20px; padding: 28px 32px; border-bottom: 1px solid var(--myt-border); background: var(--myt-settings-header);
 }
-.myt-settings-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.myt-settings-heading > span, .myt-section-icon {
-    display: grid; place-items: center; flex: none;
-    background: var(--myt-settings-control); color: var(--myt-muted);
-    width: 38px; height: 38px; border: 1px solid var(--myt-border); border-radius: 12px;
+.myt-settings-heading { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.myt-settings-heading > span {
+    display: grid; place-items: center; flex: none; width: 46px; height: 46px;
+    border-radius: 15px; background: var(--myt-settings-accent-bg); color: var(--myt-accent);
 }
 .myt-settings-panel svg { width: 18px; height: 18px; flex: none; }
-.myt-settings-panel h2 { margin: 0; font-size: 21px; font-weight: 600; letter-spacing: -.4px; line-height: 1.2; }
-.myt-settings-panel p { color: var(--myt-muted); font-size: 12px; line-height: 1.6; margin: 9px 0 14px; }
-.myt-settings-heading p { margin: 4px 0 0; font-size: 12px; }
-.myt-settings-body { display: grid; gap: 14px; padding: 20px 24px 24px; }
-.myt-settings-panel section {
-    min-width: 0; padding: 16px;
-    border: 1px solid var(--myt-border); border-radius: 16px;
-    background: var(--myt-settings-card, var(--myt-bg));
-}
-.myt-section-heading { display: flex; align-items: center; gap: 10px; }
-.myt-section-icon { width: 30px; height: 30px; border-radius: 9px; background: transparent; }
-.myt-section-heading h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.myt-settings-heading > span svg { width: 23px; height: 23px; }
+.myt-settings-panel h2 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -.7px; line-height: 1.2; }
+.myt-settings-panel p { margin: 8px 0 0; color: var(--myt-muted); font-size: 13px; line-height: 1.6; }
+.myt-settings-heading p { margin-top: 5px; font-size: 13px; }
+.myt-settings-body { padding: 0 32px 28px; }
+.myt-settings-panel section { min-width: 0; padding: 26px 0; border-bottom: 1px solid var(--myt-border); }
+.myt-settings-panel section:last-of-type { border-bottom: 0; padding-bottom: 0; }
+.myt-section-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.myt-section-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; color: var(--myt-muted); }
+.myt-section-heading h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.myt-account-overview { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.myt-account-overview .myt-section-heading { flex: 1 1 auto; }
+.myt-account-overview .myt-section-icon { width: 46px; height: 46px; border-radius: 50%; background: var(--myt-settings-control); }
+.myt-account-overview p { max-width: 250px; margin-top: 5px; }
 .myt-settings-panel a, .myt-settings-panel button, .myt-settings-panel select {
-    box-sizing: border-box; font: inherit;
-    border: 1px solid var(--myt-border); border-radius: 10px;
-    color: var(--myt-ink); background: var(--myt-settings-control, var(--myt-soft)); padding: 9px 12px;
-    transition: background-color 140ms ease, border-color 140ms ease;
+    box-sizing: border-box; font: inherit; border: 1px solid transparent; border-radius: 12px;
+    padding: 10px 13px; color: var(--myt-ink); background: var(--myt-settings-control);
+    transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
 }
-.myt-settings-panel a, .myt-settings-panel button { cursor: pointer; text-decoration: none; }
-.myt-settings-panel :is(a,button):hover:not(:disabled) { border-color: var(--myt-muted); }
+.myt-settings-panel :is(a,button) { cursor: pointer; text-decoration: none; }
+.myt-settings-panel :is(a,button):hover:not(:disabled) { background: var(--myt-soft); }
 .myt-settings-panel button:disabled { opacity: .45; cursor: default; }
-.myt-settings-panel :is(a, button, select, summary):focus-visible, .myt-settings-button:focus-visible { outline: 2px solid var(--myt-muted); outline-offset: 3px; }
-.myt-settings-panel #myt-settings-close { display: grid; place-items: center; padding: 8px; width: 34px; height: 34px; border-color: transparent; background: transparent; color: var(--myt-muted); }
-.myt-settings-panel #myt-settings-close:hover { background: var(--myt-settings-card); color: var(--myt-ink); }
-.myt-settings-panel #myt-account-manage {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    width: 100%; min-height: 42px; font-weight: 600; font-size: 13px;
-    background: var(--myt-ink); color: var(--myt-bg); border-color: transparent;
-}
-.myt-settings-actions { display: flex; flex-wrap: wrap; gap: 7px; }
-.myt-account-actions { margin-top: 8px; }
-.myt-account-actions a { flex: 1 1 auto; text-align: center; white-space: nowrap; padding: 7px 9px; font-size: 12px; background: transparent; }
-.myt-settings-panel #myt-cookie-status { margin: 0 0 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
-.myt-cookie-details { margin-bottom: 12px; border: 1px solid var(--myt-border); border-radius: 10px; background: var(--myt-settings-bg); }
-.myt-cookie-details summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; list-style: none; cursor: pointer; padding: 9px 11px; font-size: 12px; color: var(--myt-muted); border-radius: 9px; }
-.myt-cookie-details summary::-webkit-details-marker { display: none; }
-.myt-cookie-details[open] summary svg { transform: rotate(180deg); }
-.myt-settings-panel ul { margin: 0; padding: 0 11px 8px; list-style: none; max-height: 120px; overflow: auto; scrollbar-width: thin; font-size: 11px; overflow-wrap: anywhere; }
-.myt-settings-panel li { padding-block: 6px; border-top: 1px solid var(--myt-border); }
-.myt-cookie-name { font-family: ui-monospace, monospace; }
+.myt-settings-panel :is(a,button,select):focus-visible, .myt-settings-button:focus-visible { outline: 2px solid var(--myt-accent); outline-offset: 3px; }
+.myt-settings-panel #myt-settings-close { display: grid; place-items: center; width: 36px; height: 36px; padding: 9px; border-radius: 50%; color: var(--myt-muted); background: transparent; }
+.myt-settings-panel #myt-settings-close:hover { color: var(--myt-ink); background: var(--myt-settings-control); }
+.myt-settings-panel #myt-account-manage { display: inline-flex; align-items: center; justify-content: center; gap: 12px; flex: none; min-height: 44px; font-size: 13px; font-weight: 600; border: 1px solid var(--myt-border); background: var(--myt-settings-bg); }
+.myt-settings-panel #myt-account-manage:hover { border-color: var(--myt-muted); }
+.myt-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.myt-account-actions { margin-top: 22px; gap: 4px; padding: 4px; border-radius: 14px; background: var(--myt-settings-control); }
+.myt-account-actions a { flex: 1 1 auto; text-align: center; white-space: nowrap; font-size: 13px; background: transparent; padding: 9px 12px; }
+.myt-account-actions a:hover { background: var(--myt-settings-selected) !important; }
+.myt-cookie-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.myt-settings-panel #myt-cookie-status { margin: 0; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-variant-numeric: tabular-nums; background: var(--myt-settings-control); }
+.myt-settings-panel #myt-cookie-status:is(.is-error,.is-notice) { flex-basis: 100%; padding: 0; background: transparent; }
+.myt-settings-panel #myt-cookie-status.is-error { color: var(--myt-danger); }
+.myt-cookie-tools { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.myt-settings-panel #myt-cookie-toggle { display: inline-flex; align-items: center; gap: 8px; padding: 9px 0; background: transparent; font-size: 13px; }
+.myt-settings-panel #myt-cookie-toggle:hover:not(:disabled) { color: var(--myt-muted); }
+.myt-settings-panel #myt-cookie-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+.myt-settings-panel #myt-cookie-clear { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: auto; padding: 9px 12px; color: var(--myt-danger); background: transparent; font-size: 13px; }
+.myt-settings-panel #myt-cookie-clear:hover:not(:disabled) { background: var(--myt-settings-accent-bg); }
+.myt-cookie-details { margin-top: 12px; padding: 6px 14px; border-radius: 14px; background: var(--myt-settings-control); }
+.myt-settings-panel ul { margin: 0; padding: 0; list-style: none; max-height: 150px; overflow: auto; scrollbar-width: thin; font-size: 12px; overflow-wrap: anywhere; }
+.myt-settings-panel li { padding: 9px 0; border-bottom: 1px solid var(--myt-border); }
+.myt-settings-panel li:last-child { border: 0; }
+.myt-cookie-name { font-family: ui-monospace,monospace; }
 .myt-cookie-domain { color: var(--myt-muted); }
-.myt-settings-panel #myt-cookie-clear { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; color: var(--myt-danger); background: transparent; font-size: 12px; }
-.myt-settings-panel #myt-cookie-clear:hover:not(:disabled) { border-color: var(--myt-danger); }
-.myt-settings-panel #myt-cookie-confirmation { padding: 12px; border: 1px solid var(--myt-danger); border-radius: 12px; margin-top: 12px; }
-.myt-settings-panel #myt-cookie-confirmation p { margin: 0 0 10px; color: var(--myt-ink); }
-.myt-settings-panel #myt-cookie-confirm { background: var(--myt-danger); color: var(--myt-settings-bg); border-color: transparent; }
-.myt-preferences { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.myt-settings-panel label { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; margin-bottom: 10px; }
-.myt-settings-panel label svg { color: var(--myt-muted); width: 16px; height: 16px; }
-.myt-settings-panel select { width: 100%; min-height: 40px; font-size: 12px; padding: 9px 10px; }
-.myt-settings-panel #myt-settings-error { color: var(--myt-danger); margin: 0; font-size: 12px; }
+.myt-settings-panel #myt-cookie-confirmation { margin-top: 16px; padding: 16px; border: 1px solid var(--myt-danger); border-radius: 14px; }
+.myt-settings-panel #myt-cookie-confirmation p { margin: 0 0 14px; color: var(--myt-ink); }
+.myt-settings-panel #myt-cookie-confirm { background: var(--myt-danger); color: var(--myt-settings-bg); }
+.myt-preferences { margin-top: 20px; }
+.myt-preference-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 0; }
+.myt-preference-row + .myt-preference-row { border-top: 1px solid var(--myt-border); }
+.myt-preference-row:last-child { padding-bottom: 0; }
+.myt-settings-panel label, .myt-preference-label { display: block; margin: 0; font-size: 14px; font-weight: 500; }
+.myt-preference-row p { margin-top: 4px; font-size: 12px; }
+.myt-settings-panel select { width: 230px; max-width: 100%; min-height: 44px; font-size: 13px; padding: 10px 12px; }
+.myt-theme-switch { display: flex; gap: 4px; padding: 4px; width: 230px; flex: none; border-radius: 14px; background: var(--myt-settings-control); }
+.myt-settings-panel .myt-theme-choice { display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex: 1 1 0; padding: 8px 9px; background: transparent; color: var(--myt-muted); font-size: 13px; }
+.myt-settings-panel .myt-theme-choice[aria-pressed="true"] { background: var(--myt-settings-selected); color: var(--myt-ink); box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+.myt-settings-panel .myt-theme-choice svg { width: 16px; height: 16px; }
+.myt-settings-panel #myt-settings-error { margin: 18px 0 0; color: var(--myt-danger); font-size: 13px; }
 .myt-settings-panel #myt-settings-error:empty { display: none; }
 @media (max-width: 600px) {
     .myt-settings-button { right: 16px; top: 16px; }
-}
-@media (max-width: 480px) {
     .myt-settings-panel { border-radius: 20px; max-height: calc(100svh - 24px); }
-    .myt-settings-panel > header { padding: 18px 18px 16px; }
-    .myt-settings-body { padding: 16px 18px 18px; gap: 12px; }
-    .myt-preferences { grid-template-columns: 1fr; gap: 12px; }
+    .myt-settings-panel > header { padding: 24px; gap: 12px; }
+    .myt-settings-body { padding: 0 24px 24px; }
+    .myt-settings-heading { gap: 12px; }
+    .myt-settings-panel h2 { font-size: 24px; }
+    .myt-account-overview { align-items: stretch; flex-direction: column; gap: 18px; }
+    .myt-account-overview p { max-width: none; }
+}
+@media (max-width: 440px) {
+    .myt-settings-heading > span { width: 40px; height: 40px; border-radius: 13px; }
+    .myt-settings-heading p { font-size: 12px; }
+    .myt-settings-panel > header { padding: 22px; }
+    .myt-settings-body { padding-inline: 22px; }
+    .myt-account-actions a { padding-inline: 9px; font-size: 12px; }
+    .myt-preference-row { flex-direction: column; align-items: stretch; gap: 12px; }
+    .myt-settings-panel select, .myt-theme-switch { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
     .myt-settings-panel:not([hidden]) { animation: none; }
@@ -534,8 +551,10 @@
             home.dataset.mytTheme = root.dataset.mytTheme || "";
             home.firstElementChild.dataset.mytTheme = root.dataset.mytTheme || "";
         }
-        const themeSelect = home?.firstElementChild.shadowRoot.querySelector("#myt-settings-theme");
-        if (themeSelect) themeSelect.value = root.dataset.mytTheme || "light";
+        for (const choice of home?.firstElementChild.shadowRoot.querySelectorAll("[data-myt-theme-choice]") || []) {
+            const pressed = String(choice.dataset.mytThemeChoice === root.dataset.mytTheme);
+            if (choice.getAttribute("aria-pressed") !== pressed) choice.setAttribute("aria-pressed", pressed);
+        }
         const button = home?.firstElementChild.shadowRoot.querySelector("#myt-theme-toggle");
         if (!button) return;
         const dark = theme ? theme === "dark" : root.hasAttribute("dark");
@@ -946,6 +965,8 @@
             trash: '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',
             language: '<path d="M3 5h12M9 3v2M5 5c0 5 4 9 8 11M13 5c-1 5-4 9-10 12M14 21l4-10 4 10M15.5 17h5"/>',
             theme: '<circle cx="12" cy="12" r="8"/><path d="M12 4v16a8 8 0 0 0 0-16Z" fill="currentColor"/>',
+            sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
+            moon: '<path d="M20.8 13A9 9 0 0 1 11 3.2 9 9 0 1 0 20.8 13Z"/>',
         };
         return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`;
     }
@@ -980,23 +1001,29 @@
             <aside class="myt-settings-panel" id="myt-settings-panel" role="dialog" aria-modal="true" aria-labelledby="myt-settings-title" ${settingsOpen ? "" : "hidden"}>
                 <header><div class="myt-settings-heading"><span>${settingsIcon("settings")}</span><div><h2 id="myt-settings-title">${copy.settings}</h2><p>${copy.settingsHint}</p></div></div><button type="button" id="myt-settings-close" aria-label="${copy.close}">${settingsIcon("close")}</button></header>
                 <div class="myt-settings-body">
-                    <section><div class="myt-section-heading"><span class="myt-section-icon">${settingsIcon("account")}</span><h3>${copy.account}</h3></div><p>${copy.accountInfo}</p>
-                        <a id="myt-account-manage" href="https://www.youtube.com/account">${copy.manage}${settingsIcon("arrow")}</a>
+                    <section>
+                        <div class="myt-account-overview"><div class="myt-section-heading"><span class="myt-section-icon">${settingsIcon("account")}</span><div><h3>${copy.account}</h3><p>${copy.accountInfo}</p></div></div>
+                            <a id="myt-account-manage" href="https://www.youtube.com/account">${copy.manage}${settingsIcon("arrow")}</a>
+                        </div>
                         <div class="myt-settings-actions myt-account-actions">
                             <a id="myt-account-signin" href="https://www.youtube.com/signin?next=%2F">${copy.signin}</a>
                             <a id="myt-account-switch" href="https://accounts.google.com/AccountChooser?service=youtube&amp;continue=https%3A%2F%2Fwww.youtube.com%2F">${copy.switchAccount}</a>
                             <a id="myt-account-signout" href="https://www.youtube.com/logout?next=%2F">${copy.signout}</a>
                         </div>
                     </section>
-                    <section><div class="myt-section-heading"><span class="myt-section-icon">${settingsIcon("cookies")}</span><h3>${copy.cookies}</h3></div><p>${copy.cookieInfo}</p><p id="myt-cookie-status" role="status"></p>
-                        <details class="myt-cookie-details" hidden><summary>${copy.showCookies}${settingsIcon("chevron")}</summary><ul id="myt-cookie-list"></ul></details>
-                        <button type="button" id="myt-cookie-clear" disabled>${settingsIcon("trash")}${copy.deleteCookies}</button>
+                    <section>
+                        <div class="myt-cookie-heading"><div class="myt-section-heading"><span class="myt-section-icon">${settingsIcon("cookies")}</span><h3>${copy.cookies}</h3></div><p id="myt-cookie-status" role="status"></p></div><p>${copy.cookieInfo}</p>
+                        <div class="myt-cookie-tools"><button type="button" id="myt-cookie-toggle" aria-expanded="false" aria-controls="myt-cookie-details" disabled>${copy.showCookies}${settingsIcon("chevron")}</button><button type="button" id="myt-cookie-clear" disabled>${settingsIcon("trash")}${copy.deleteCookies}</button></div>
+                        <div id="myt-cookie-details" class="myt-cookie-details" hidden><ul id="myt-cookie-list"></ul></div>
                         <div id="myt-cookie-confirmation" hidden><p>${copy.confirmCookies}</p><div class="myt-settings-actions"><button type="button" id="myt-cookie-confirm">${copy.confirm}</button><button type="button" id="myt-cookie-cancel">${copy.cancel}</button></div></div>
                     </section>
-                    <div class="myt-preferences">
-                        <section><label for="myt-settings-language">${settingsIcon("language")}${copy.language}</label><select id="myt-settings-language"><option value="">${copy.system}</option><option value="ru">Русский</option><option value="en">English</option></select></section>
-                        <section><label for="myt-settings-theme">${settingsIcon("theme")}${copy.theme}</label><select id="myt-settings-theme"><option value="light">${copy.light}</option><option value="dark">${copy.dark}</option></select></section>
-                    </div>
+                    <section>
+                        <div class="myt-section-heading"><span class="myt-section-icon">${settingsIcon("theme")}</span><h3>${copy.appearance}</h3></div>
+                        <div class="myt-preferences">
+                            <div class="myt-preference-row"><div><label for="myt-settings-language">${copy.language}</label><p>${copy.languageInfo}</p></div><select id="myt-settings-language"><option value="">${copy.system}</option><option value="ru">Русский</option><option value="en">English</option></select></div>
+                            <div class="myt-preference-row"><div><span class="myt-preference-label">${copy.theme}</span><p>${copy.themeInfo}</p></div><div class="myt-theme-switch" id="myt-settings-theme" role="group" aria-label="${copy.theme}"><button type="button" class="myt-theme-choice" id="myt-theme-light" data-myt-theme-choice="light" aria-label="${copy.light}" aria-pressed="false">${settingsIcon("sun")}${copy.lightShort}</button><button type="button" class="myt-theme-choice" id="myt-theme-dark" data-myt-theme-choice="dark" aria-label="${copy.dark}" aria-pressed="false">${settingsIcon("moon")}${copy.darkShort}</button></div></div>
+                        </div>
+                    </section>
                     <p id="myt-settings-error" role="alert"></p>
                 </div>
             </aside>`;
@@ -1009,6 +1036,8 @@
         const cookieStatus = view.querySelector("#myt-cookie-status");
         const cookieList = view.querySelector("#myt-cookie-list");
         const clearCookies = view.querySelector("#myt-cookie-clear");
+        const cookieToggle = view.querySelector("#myt-cookie-toggle");
+        const cookieDetails = view.querySelector("#myt-cookie-details");
         const confirmation = view.querySelector("#myt-cookie-confirmation");
         const settingsError = view.querySelector("#myt-settings-error");
         const setPanel = open => {
@@ -1026,13 +1055,17 @@
         };
         const requestCookies = action => {
             cookieStatus.textContent = copy.loading;
-            view.querySelector(".myt-cookie-details").hidden = true;
+            cookieDetails.hidden = true;
+            cookieToggle.disabled = true;
+            cookieToggle.setAttribute("aria-expanded", "false");
+            cookieStatus.classList.remove("is-error", "is-notice");
             clearCookies.disabled = true;
             view.querySelector("#myt-cookie-confirm").disabled = true;
             const done = response => {
                 if (!container.isConnected) return;
                 view.querySelector("#myt-cookie-confirm").disabled = false;
                 if (chrome.runtime?.lastError || !response?.ok || !Array.isArray(response.cookies)) {
+                    cookieStatus.classList.add("is-error");
                     cookieStatus.textContent = copy.cookieError;
                     return;
                 }
@@ -1049,7 +1082,8 @@
                     item.append(name, domain);
                     cookieList.append(item);
                 }
-                view.querySelector(".myt-cookie-details").hidden = response.cookies.length === 0;
+                cookieToggle.disabled = response.cookies.length === 0;
+                cookieStatus.classList.toggle("is-notice", typeof response.removed === "number");
                 clearCookies.disabled = response.cookies.length === 0;
                 cookieStatus.textContent = `${typeof response.removed === "number" ? copy.cookieDeleted + " " + response.removed + ". " : ""}${copy.cookieCount} ${response.cookies.length}`;
             };
@@ -1075,6 +1109,11 @@
                 setPanel(false);
             }
         });
+        cookieToggle.addEventListener("click", () => {
+            const open = cookieDetails.hidden;
+            cookieDetails.hidden = !open;
+            cookieToggle.setAttribute("aria-expanded", String(open));
+        });
         clearCookies.addEventListener("click", () => {
             confirmation.hidden = false;
             view.querySelector("#myt-cookie-confirm").focus();
@@ -1084,7 +1123,9 @@
             clearCookies.focus();
         });
         view.querySelector("#myt-cookie-confirm").addEventListener("click", () => requestCookies("minimal-youtube:clear-cookies"));
-        view.querySelector("#myt-settings-theme").addEventListener("change", event => saveTheme(event.target.value));
+        for (const choice of view.querySelectorAll("[data-myt-theme-choice]")) {
+            choice.addEventListener("click", () => saveTheme(choice.dataset.mytThemeChoice));
+        }
         const languageSelect = view.querySelector("#myt-settings-language");
         languageSelect.value = language || "";
         languageSelect.addEventListener("change", () => {
