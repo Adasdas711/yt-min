@@ -819,6 +819,141 @@ def watch_details_fixture(legacy=False):
       </ytd-watch-flexy></ytd-page-manager></ytd-app>'''
     return body
 
+def native_watch_fixture(theater=False):
+    avatar = 'data:image/svg+xml;base64,' + base64.b64encode(b'<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" rx="24" fill="#ee4433"/><text x="11" y="30" fill="white" font-size="19">R</text></svg>').decode()
+    player = '''<div id="player-container-outer"><div id="player-container-inner"><div id="player"><ytd-player id="ytd-player"><div id="container"><div id="movie_player" class="html5-video-player"><video class="html5-main-video" muted playsinline></video><span id="clock" class="ytp-time-current">0:00</span><button id="native-play" onclick="let v=document.querySelector('video');v.paused?v.play():v.pause()">YouTube play/pause</button></div></div></ytd-player></div></div></div>'''
+    return '<ytd-app>'+MASTHEAD+f'''
+      <style>
+      ytd-player,#movie_player {{ display:block;position:relative;width:100%;height:100%; }}
+      #player-container-outer,#player-container-inner,#player {{ height:360px; }}
+      #ytd-player > #container {{ width:100%;height:100%; }}
+      video.html5-main-video {{ position:absolute;inset:0;width:100%;height:100%;object-fit:contain; }}
+      #native-play {{ position:absolute;bottom:8px;left:8px;z-index:5; }}
+      </style><ytd-page-manager class="ytd-app"><ytd-watch-flexy {'theater' if theater else ''}>
+      <div id="full-bleed-container"><div id="cinematics-container">{player if theater else '<div id=ambient-layer></div>'}</div></div>
+      <div id="columns"><div id="primary">{'' if theater else player}<div id="below"><ytd-watch-metadata>
+      <h1>Native YouTube player regression</h1>
+      <div id="owner"><img class="badge" src="https://www.youtube.com/invalid-badge"><a id="avatar" href="/@revolt"><yt-img-shadow><img src="{avatar}"></yt-img-shadow></a><ytd-channel-name><yt-formatted-string id="text"><a href="/@revolt">REVOLT</a><tp-yt-paper-tooltip>REVOLT</tp-yt-paper-tooltip></yt-formatted-string></ytd-channel-name><span id="owner-sub-count">3.33M subscribers</span><div id="subscribe-button"><button>Subscribe</button></div></div>
+      <div id="actions"><div id="top-level-buttons-computed"><button id="share">Share</button></div></div>
+      <div id="description" role="button"><span id="info-container">906,359 views</span><ytd-text-inline-expander id="description-inline-expander"><yt-attributed-string id="attributed-snippet-text">The real video description is available here.</yt-attributed-string><yt-attributed-string id="attributed-description-text"></yt-attributed-string><button id="expand" onclick="document.querySelector('#attributed-description-text').innerHTML='Full video description with native markup, links and paragraphs. &lt;a href=&quot;https://example.com/description&quot;&gt;Official website&lt;/a&gt;';window.__descriptionLoaded=true">Show more</button></ytd-text-inline-expander></div>
+      </ytd-watch-metadata></div></div><div id="secondary"><div id="secondary-inner"></div></div></div>
+      </ytd-watch-flexy></ytd-page-manager></ytd-app>'''
+
+
+VIDEO_STREAM = """async () => {
+  const canvas=document.createElement('canvas');canvas.width=640;canvas.height=360;
+  const context=canvas.getContext('2d');context.fillStyle='rgb(24,180,96)';context.fillRect(0,0,640,360);
+  window.__stream=canvas.captureStream(15);
+  window.__frames=setInterval(()=>context.fillRect(0,0,640,360),50);
+  const video=document.querySelector('video');window.__nativeVideo=video;window.__nativeVideoParent=video.parentElement;
+  video.srcObject=window.__stream;video.muted=true;await video.play();
+  await Promise.race([new Promise(resolve=>video.requestVideoFrameCallback(resolve)),new Promise((_,reject)=>setTimeout(()=>reject(new Error('No decoded video frame')),3000))]);
+  return {width:video.videoWidth,height:video.videoHeight};
+}"""
+
+
+def rendered_pixel(page, x, y):
+    png = page.screenshot(animations='disabled')
+    return page.evaluate("""async ({encoded,x,y}) => {
+      const image=await createImageBitmap(await(await fetch('data:image/png;base64,'+encoded)).blob());
+      const context=new OffscreenCanvas(image.width,image.height).getContext('2d');context.drawImage(image,0,0);
+      return [...context.getImageData(Math.floor(x),Math.floor(y),1,1).data];
+    }""", {'encoded':base64.b64encode(png).decode(),'x':x,'y':y})
+
+
+def check_native_watch(browser, theater=False, width=1440):
+    page=setup(browser,'/watch?v=native',native_watch_fixture(theater),native_dark=True,width=width)
+    expect(page.locator('#ytd-player')).to_be_visible()
+    assert page.locator('#ytd-player').evaluate("e=>e.matches(':popover-open')&&e.parentElement.id==='player'")
+    assert page.locator('ytd-watch-flexy').get_attribute('popover') is None
+    decoded=page.evaluate(VIDEO_STREAM)
+    assert decoded=={'width':640,'height':360}
+    box=page.locator('#myt-watch .media').bounding_box()
+    video=page.locator('video').bounding_box()
+    assert all(abs(video[key]-box[key])<2 for key in ['x','y','width','height']), (video,box)
+    pixel=rendered_pixel(page,box['x']+box['width']/2,box['y']+box['height']/2)
+    assert all(abs(a-b)<=6 for a,b in zip(pixel,[24,180,96,255])), f'Video is decoded but its visible surface is covered: {pixel}'
+    page.locator('#native-play').click()
+    assert page.locator('video').evaluate('v=>v.paused') is True
+    page.locator('#native-play').click()
+    page.wait_for_function('document.querySelector("video").currentTime>.2')
+    expect(page.locator('.owner-name')).to_have_text('REVOLT3.33M subscribers')
+    expect(page.locator('.owner img')).to_be_visible()
+    page.wait_for_function("document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.owner img').naturalWidth===48")
+    assert 'invalid-badge' not in page.locator('.owner img').get_attribute('src')
+    expect(page.locator('#watch-description')).to_have_text('The real video description is available here.')
+    page.locator('#myt-watch .expand').click()
+    expect(page.locator('#watch-description')).to_contain_text('Full video description with native markup')
+    expect(page.locator('#watch-description a')).to_have_attribute('href','https://example.com/description')
+    assert page.evaluate('window.__descriptionLoaded') is True
+    # Enough chapters to overflow on desktop and mobile: exactly one scroll row.
+    page.locator('#below').evaluate("e=>{for(let i=0;i<12;i++)e.insertAdjacentHTML('beforeend',`<ytd-macro-markers-list-item-renderer><button><span id=time>${i}:00</span><span id=title>Episode ${i}: a longer chapter title</span></button></ytd-macro-markers-list-item-renderer>`);}")
+    expect(page.locator('.chapter')).to_have_count(12)
+    page.locator('.chapter-list').scroll_into_view_if_needed()
+    geometry=page.locator('.chapter-list').evaluate('e=>({width:e.clientWidth,scrollWidth:e.scrollWidth,ys:[...e.children].map(c=>c.offsetTop)})')
+    assert geometry['scrollWidth']>geometry['width'] and len(set(geometry['ys']))==1, geometry
+    page.locator('.chapter-list').hover()
+    page.mouse.wheel(0,400)
+    page.wait_for_function("document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.chapter-list').scrollLeft>0")
+    assert page.locator('#myt-watch .viewport').evaluate('e=>e.scrollWidth<=e.clientWidth')
+    page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
+    page.locator('#movie_player').evaluate('e=>e.requestFullscreen()')
+    assert page.evaluate('document.fullscreenElement.id')=='movie_player'
+    pixel=rendered_pixel(page,width/2,480)
+    assert all(abs(a-b)<=6 for a,b in zip(pixel,[24,180,96,255])), pixel
+    page.evaluate('document.exitFullscreen()')
+    expect(page.locator('#myt-watch')).to_be_visible()
+    assert page.locator('#ytd-player').evaluate("e=>e.matches(':popover-open')")
+    assert page.evaluate('window.__nativeVideo===document.querySelector("video")&&window.__nativeVideoParent===document.querySelector("video").parentElement')
+    page.evaluate('__setEnabled(false)')
+    assert page.locator('#ytd-player').get_attribute('popover') is None
+    assert page.locator('video').get_attribute('style') is None
+    assert page.evaluate('window.__nativeVideo===document.querySelector("video")&&!document.querySelector("video").paused')
+    page.evaluate('clearInterval(window.__frames);window.__stream.getTracks().forEach(track=>track.stop())')
+    page.close()
+
+
+def check_background_work(browser):
+    results={}
+    probe="""async () => {
+      const clock=document.querySelector('#clock');let queries=0,syncs=0;const methods=[];
+      for(const proto of [Document.prototype,Element.prototype])for(const name of ['querySelector','querySelectorAll']){
+        const original=proto[name];methods.push([proto,name,original]);proto[name]=function(...args){queries++;return original.apply(this,args);};
+      }
+      const original=MinimalYouTubeWatch.prototype.sync;
+      MinimalYouTubeWatch.prototype.sync=function(...args){syncs++;return original.apply(this,args);};
+      try {
+        for(let i=0;i<40;i++){clock.textContent=String(i);clock.setAttribute('aria-label','Playback '+i);await new Promise(requestAnimationFrame);}
+        await new Promise(requestAnimationFrame);return{queries,syncs};
+      } finally {for(const[proto,name,method]of methods)proto[name]=method;MinimalYouTubeWatch.prototype.sync=original;}
+    }"""
+    for path,body in [('/', '<ytd-app><div id="clock">0</div></ytd-app>'),('/watch?v=native',native_watch_fixture())]:
+        page=setup(browser,path,body,native_dark=True)
+        page.wait_for_timeout(100)
+        result=page.evaluate(probe)
+        assert result['syncs']==0 and result['queries']<10, (path,result)
+        results[path]=result
+        if path=='/':
+            page.evaluate("document.documentElement.removeAttribute('dark')")
+            expect(page.locator('#myt-home')).to_have_attribute('data-myt-theme','light')
+            page.evaluate("document.documentElement.setAttribute('dark','')")
+            expect(page.locator('#myt-home')).to_have_attribute('data-myt-theme','dark')
+        else:
+            page.locator('ytd-watch-metadata h1').evaluate("e=>e.textContent='Actual metadata change'")
+            expect(page.locator('#watch-title')).to_have_text('Actual metadata change')
+        page.close()
+    print('Background mutation profile:',results)
+    page=setup(browser,'/', '<ytd-app><ytd-browse page-subtype="home"><video muted></video></ytd-browse></ytd-app>')
+    paused=page.evaluate("""async()=>{
+      const canvas=document.createElement('canvas');canvas.width=2;canvas.height=2;
+      const video=document.querySelector('video');const stream=canvas.captureStream(10);video.srcObject=stream;video.muted=true;
+      video.play().catch(()=>{});canvas.getContext('2d').fillRect(0,0,2,2);
+      await new Promise(resolve=>setTimeout(resolve,100));const paused=video.paused;stream.getTracks().forEach(track=>track.stop());return paused;
+    }""")
+    assert paused is True, 'Hidden homepage preview keeps decoding in the background'
+    page.close()
+
+
 def check_watch_details(browser, dark, width=1440, legacy=False):
     fixture = watch_details_fixture(legacy)
     actions = '''<div id="top-row"><div id="owner"><a href="/@revolt"><img alt="" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="><span id="channel-name">REVOLT</span></a><div id="subscribe-button"><button onclick="window.__subscribe=true">Subscribe</button></div></div><div id="actions"><div id="top-level-buttons-computed"><segmented-like-dislike-button-view-model id="video-votes"><button>Like</button><button>Dislike</button></segmented-like-dislike-button-view-model><button id="share" onclick="window.__share=true;document.querySelector('#share-dialog').hidden=false">Share</button><button id="save" onclick="window.__save=true">Save</button></div></div></div>'''
@@ -829,7 +964,8 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
     expect(page.locator('#myt-watch')).to_be_visible()
     expect(page.locator('#watch-title')).to_have_text('Music, life and the stories behind it')
     assert page.locator('#myt-watch').evaluate("e => e.matches(':popover-open')")
-    assert page.locator('ytd-watch-flexy').evaluate("e => e.matches(':popover-open') && e.parentElement.matches('ytd-page-manager')")
+    assert page.locator('ytd-watch-flexy').evaluate("e => !e.matches(':popover-open') && e.parentElement.matches('ytd-page-manager')")
+    assert page.locator('#player').evaluate("e=>e.matches(':popover-open')")
     page.evaluate("window.__originalWatch=document.querySelector('ytd-watch-flexy');window.__originalVideo=document.querySelector('video');window.__playerParent=document.querySelector('video').parentElement")
     assert page.locator('#myt-watch').bounding_box() == {'x':0,'y':0,'width':width,'height':960}
     assert page.locator('#watch-description').evaluate('e => !e.querySelector("[style],script,yt-formatted-string,ytd-structured-description-content-renderer")')
@@ -842,7 +978,7 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
     expect(page.locator('#watch-chapters img')).to_have_count(0)
     cards = page.locator('.chapter').all()
     first, second = [card.bounding_box() for card in cards]
-    assert second['y'] >= first['y']+first['height']+9 and abs(second['x']-first['x']) < 1
+    assert second['x'] >= first['x']+first['width']+11 and abs(second['y']-first['y']) < 1
     assert cards[0].evaluate('e=>getComputedStyle(e).backgroundColor') != page.locator('#myt-watch .viewport').evaluate('e=>getComputedStyle(e).backgroundColor')
     cards[1].click()
     assert page.evaluate('window.__chapter') == 165
@@ -894,12 +1030,12 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
     expect(page.locator('#watch-title')).to_have_text('Updated video title')
     assert page.evaluate('window.__originalVideo===document.querySelector("video") && window.__playerParent===document.querySelector("video").parentElement')
     if dark and width == 1440 and not legacy:
-        page.locator('#player').evaluate('e=>e.requestFullscreen()')
-        assert page.evaluate('document.fullscreenElement.id') == 'player'
-        assert page.locator('#player').bounding_box() == {'x':0,'y':0,'width':width,'height':960}
+        page.locator('video').evaluate('e=>e.requestFullscreen()')
+        assert page.evaluate('document.fullscreenElement.localName') == 'video'
+        assert page.locator('video').bounding_box() == {'x':0,'y':0,'width':width,'height':960}
         page.evaluate('document.exitFullscreen()')
         expect(page.locator('#myt-watch')).to_be_visible()
-        assert page.locator('ytd-watch-flexy').evaluate("e=>e.matches(':popover-open')")
+        assert page.locator('#player').evaluate("e=>e.matches(':popover-open')")
         page.locator('ytd-watch-flexy').evaluate("e=>e.setAttribute('theater','')")
         expect(page.locator('#myt-watch > div')).to_have_attribute('theater','')
         page.locator('ytd-watch-flexy').evaluate("e=>e.removeAttribute('theater')")
@@ -1469,6 +1605,12 @@ def main():
         page.wait_for_url('https://www.youtube.com/')
         ok('homepage-style masthead brand repairs native rerenders without duplicates, restores native logo on disable and keeps its home link')
         page.close()
+
+        for theater,width in [(False,1440),(True,1440),(False,390)]:
+            check_native_watch(browser,theater,width)
+            ok(f'native YouTube player at {width}px (theater={theater}) paints decoded frames, keeps controls/fullscreen and restores its nodes; channel and modern description render correctly; chapters scroll in one row')
+        check_background_work(browser)
+        ok('player clock and hidden home mutations do not rescan/rebuild UI; metadata still updates and hidden homepage previews pause')
 
         for dark in [False, True]:
             for width in [1440, 390]:

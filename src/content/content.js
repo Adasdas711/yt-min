@@ -546,11 +546,12 @@
     }
 
     function renderTheme() {
-        if (enabled) root.dataset.mytTheme = theme || (root.hasAttribute("dark") ? "dark" : "light");
-        else delete root.dataset.mytTheme;
+        const value = theme || (root.hasAttribute("dark") ? "dark" : "light");
+        if (enabled && root.dataset.mytTheme !== value) root.dataset.mytTheme = value;
+        else if (!enabled) delete root.dataset.mytTheme;
         if (home) {
-            home.dataset.mytTheme = root.dataset.mytTheme || "";
-            home.firstElementChild.dataset.mytTheme = root.dataset.mytTheme || "";
+            if (home.dataset.mytTheme !== value) home.dataset.mytTheme = value;
+            if (home.firstElementChild.dataset.mytTheme !== value) home.firstElementChild.dataset.mytTheme = value;
         }
         for (const choice of home?.firstElementChild.shadowRoot.querySelectorAll("[data-myt-theme-choice]") || []) {
             const pressed = String(choice.dataset.mytThemeChoice === root.dataset.mytTheme);
@@ -559,7 +560,8 @@
         const button = home?.firstElementChild.shadowRoot.querySelector("#myt-theme-toggle");
         if (!button) return;
         const dark = theme ? theme === "dark" : root.hasAttribute("dark");
-        button.dataset.theme = dark ? "dark" : "light";
+        const buttonTheme = dark ? "dark" : "light";
+        if (button.dataset.theme !== buttonTheme) button.dataset.theme = buttonTheme;
         const text = dark ? copy.light : copy.dark;
         if (button.querySelector("span").textContent !== text) button.querySelector("span").textContent = text;
         if (button.getAttribute("aria-label") !== text) button.setAttribute("aria-label", text);
@@ -990,6 +992,14 @@
         return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`;
     }
 
+    function pauseHiddenPreview(video) {
+        if (!enabled || root.dataset.mytPage !== "home" || !home?.isConnected ||
+            !(video instanceof HTMLVideoElement) || video.paused || document.pictureInPictureElement === video ||
+            video.closest("ytd-miniplayer") || !video.closest("ytd-video-preview, #video-preview, ytd-rich-grid-renderer, ytd-browse[page-subtype='home']")) return;
+        video.pause();
+    }
+    document.addEventListener("play", event => pauseHiddenPreview(event.target), true);
+
     function createHome() {
         if (!document.body) return null;
         const container = document.createElement("dialog");
@@ -1254,7 +1264,10 @@
         renderTheme();
         if (!settingsReady) return;
         if (path === "/") {
-            if (!home?.isConnected) home = createHome();
+            if (!home?.isConnected) {
+                home = createHome();
+                document.querySelectorAll("video").forEach(pauseHiddenPreview);
+            }
         } else if (home && !keepHome) {
             home.remove();
             home = null;
@@ -1263,7 +1276,7 @@
         syncWatch();
         syncWatchDetails();
         syncSections();
-        if (urlChanged || force) {
+        if ((urlChanged || force) && nextPage !== "home") {
             refreshHidden([document]);
             scanShorts(document);
             syncSearch();
@@ -1283,8 +1296,15 @@
             if (!enabled) return;
             updateRoute();
             renderTheme();
-            syncBrand();
-            syncSearchDecorations();
+            if (root.dataset.mytPage === "home" && home?.isConnected && !pendingNavigation && !transitionActive) {
+                pendingRoots.clear();
+                cleanTitle();
+                return;
+            }
+            if (!watchView) {
+                syncBrand();
+                syncSearchDecorations();
+            }
             if (!settingsReady) return;
             syncWatch();
             syncWatchDetails();
@@ -1311,7 +1331,24 @@
             (root.dataset.mytPage === "home" && document.body && !home?.isConnected))) {
             updateRoute();
         }
-        for (const record of records) {
+        const stableHome = root.dataset.mytPage === "home" && home?.isConnected && !pendingNavigation && !transitionActive;
+        const relevant = records.filter(record => {
+            const target = record.target instanceof Element ? record.target : record.target.parentElement;
+            if (!target) return false;
+            if (target.closest("title")) { cleanTitle(); return false; }
+            if (stableHome) return record.target === root && record.attributeName === "dark";
+            if (target.closest("#myt-watch, #myt-home")) return false;
+            // Player clocks, captions, progress aria labels and popup animations
+            // do not change our metadata UI. React only to media-node replacement.
+            if (watchView && target.closest("ytd-player, #movie_player, .html5-video-player")) {
+                return record.type === "childList" && [...record.addedNodes, ...record.removedNodes].some(node =>
+                    node instanceof Element && (node.matches("video, ytd-player") || node.querySelector("video, ytd-player")));
+            }
+            if (watchView && target.closest("ytd-popup-container, ytd-comments")) return false;
+            return true;
+        });
+        if (!relevant.length) return;
+        for (const record of relevant) {
             if (record.type === "attributes") {
                 if (commentsOpen && commentPanelStates.has(record.target) &&
                     (record.target.hasAttribute("hidden") || record.target.getAttribute("aria-hidden") === "true" ||
@@ -1330,7 +1367,6 @@
                 }
             }
         }
-        syncBrand();
         schedule();
     });
 
@@ -1348,7 +1384,7 @@
             classObserver.observe(root, { attributes: true, attributeFilter: ["class"] });
             observer.observe(document.documentElement, {
                 subtree: true, childList: true, characterData: true,
-                attributes: true, attributeFilter: ["href", "aria-label", "aria-hidden", "visibility", "is-shorts", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "aria-pressed"],
+                attributes: true, attributeFilter: ["href", "aria-label", "aria-hidden", "visibility", "is-shorts", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "expanded", "is-expanded", "aria-pressed"],
             });
             updateRoute(true);
             syncBrand();
