@@ -3,6 +3,17 @@
 
     function initialize() {
     const root = document.documentElement;
+    const standaloneHome = root.hasAttribute("data-myt-standalone-home");
+    const pageLocation = () => standaloneHome ? "https://www.youtube.com/" + location.search : location.href;
+    let homeRedirecting = false;
+    function openNativeHome() {
+        if (homeRedirecting) return;
+        homeRedirecting = true;
+        chrome.runtime.sendMessage({ action: "minimal-youtube:open-native-home" }, result => {
+            if (result?.ok && result.url === "https://www.youtube.com/") location.replace(result.url);
+            else { homeRedirecting = false; console.warn("Minimal YouTube: could not open the native homepage."); }
+        });
+    }
     const hiddenAttribute = "data-myt-hidden";
     const hiddenElements = new Set();
     const pendingRoots = new Set();
@@ -731,7 +742,7 @@
         const shelves = "ytd-shelf-renderer, grid-shelf-view-model, ytd-rich-section-renderer, yt-horizontal-list-renderer";
         const listContainers = "ytd-item-section-renderer > #contents, ytd-shelf-renderer > #content, ytd-horizontal-card-list-renderer > #items, grid-shelf-view-model #items, yt-horizontal-list-renderer #items, ytd-rich-grid-renderer > #contents";
         const urlOf = anchor => {
-            try { return anchor && new URL(anchor.href, location.href); }
+            try { return anchor && new URL(anchor.href, pageLocation()); }
             catch { return null; }
         };
         const isVideoURL = url => url && url.protocol === "https:" &&
@@ -831,7 +842,7 @@
         if (!watchView) watchView = new globalThis.MinimalYouTubeWatch({ native: watch });
         watchView.sync({
             native: watch, language: language || defaultLanguage,
-            dark: root.hasAttribute("dark"), video: new URL(location.href).searchParams.get("v") || "",
+            dark: root.hasAttribute("dark"), video: new URL(pageLocation()).searchParams.get("v") || "",
             commentsButton, commentsOpen,
         });
     }
@@ -841,7 +852,7 @@
             if (commentsButton || watchVideo !== null) resetWatch();
             return;
         }
-        const video = new URL(location.href).searchParams.get("v") || "";
+        const video = new URL(pageLocation()).searchParams.get("v") || "";
         if (watchVideo !== video) {
             watchVideo = video;
             setCommentsOpen(false);
@@ -901,7 +912,7 @@
 
     function shortsDestination(value) {
         let url;
-        try { url = new URL(value, location.href); } catch { return null; }
+        try { url = new URL(value, pageLocation()); } catch { return null; }
         if (url.protocol !== "https:" || !(url.hostname === "youtube.com" || url.hostname.endsWith(".youtube.com"))) return null;
         if (/^\/shorts(?:\/|$)/.test(url.pathname)) return "/";
         const channel = url.pathname.match(channelShorts);
@@ -930,7 +941,7 @@
         // only when all video links are Shorts, so ordinary results survive.
         const hasRegularVideo = shelf && [...shelf.querySelectorAll("a[href]")].some(anchor => {
             if (anchor.closest(nativeShorts) || shortsDestination(anchor.href) !== null) return false;
-            try { return /^\/(watch|playlist)$/.test(new URL(anchor.href, location.href).pathname); }
+            try { return /^\/(watch|playlist)$/.test(new URL(anchor.href, pageLocation()).pathname); }
             catch { return false; }
         });
         if (shelf && !hasRegularVideo) hide(shelf);
@@ -1056,6 +1067,10 @@
                     <p id="myt-settings-error" role="alert"></p>
                 </div>
             </aside>`;
+        if (standaloneHome) {
+            view.querySelector("form").action = "https://www.youtube.com/results";
+            view.querySelector(".myt-home__brand").href = chrome.runtime.getURL("src/home/index.html") + location.search;
+        }
         view.querySelector("#myt-theme-toggle").addEventListener("click", () => {
             const dark = theme ? theme === "dark" : root.hasAttribute("dark");
             saveTheme(dark ? "light" : "dark");
@@ -1116,8 +1131,11 @@
                 clearCookies.disabled = response.cookies.length === 0;
                 cookieStatus.textContent = `${typeof response.removed === "number" ? copy.cookieDeleted + " " + response.removed + ". " : ""}${copy.cookieCount} ${response.cookies.length}`;
             };
-            try { chrome.runtime.sendMessage({ action }, done); }
-            catch { done(null); }
+            try {
+                if (standaloneHome && chrome.tabs?.getCurrent) {
+                    chrome.tabs.getCurrent(tab => chrome.runtime.sendMessage({ action, tabId: tab?.id }, done));
+                } else chrome.runtime.sendMessage({ action }, done);
+            } catch { done(null); }
         };
         settingsButton.addEventListener("click", () => setPanel(panel.hidden));
         view.querySelector("#myt-settings-close").addEventListener("click", () => setPanel(false));
@@ -1166,10 +1184,10 @@
                     return;
                 }
                 if (language !== (selected || null)) applyLanguage(selected);
-                const url = new URL(location.href);
+                const url = new URL(pageLocation());
                 url.searchParams.set("hl", selected || defaultLanguage);
                 url.searchParams.set("persist_hl", "1");
-                location.assign(url.href);
+                location.assign(standaloneHome ? chrome.runtime.getURL("src/home/index.html") + url.search : url.href);
             });
         });
         const input = view.querySelector("input");
@@ -1198,6 +1216,13 @@
             if (!query) {
                 event.preventDefault();
                 input.focus();
+            }
+            if (standaloneHome && language) {
+                for (const [name, value] of [["hl", language], ["persist_hl", "1"]]) {
+                    let setting = view.querySelector(`input[name="${name}"]`);
+                    if (!setting) { setting = document.createElement("input"); setting.type = "hidden"; setting.name = name; view.querySelector("form").append(setting); }
+                    setting.value = value;
+                }
             }
             // A native GET form encodes &, #, + and Unicode correctly and retains
             // keyboard submission; do not interpolate the raw query into a URL.
@@ -1231,8 +1256,8 @@
         if (!enabled) return;
         // Keep the incoming route's styles through the interval between YouTube's
         // navigation-start event, its history update and the replacement DOM.
-        if (pendingNavigation && location.href !== navigationSource) pendingNavigation = null;
-        const url = new URL(pendingNavigation || location.href);
+        if (pendingNavigation && pageLocation() !== navigationSource) pendingNavigation = null;
+        const url = new URL(pendingNavigation || pageLocation());
         const urlChanged = currentURL !== url.href;
         const nextPage = url.pathname === "/" ? "home" : url.pathname === "/watch" ? "watch" :
             url.pathname === "/results" ? "search" : channelRoute.test(url.pathname) ? "channel" : "other";
@@ -1263,6 +1288,13 @@
         root.dataset.mytPage = nextPage;
         renderTheme();
         if (!settingsReady) return;
+        if (path === "/" && !standaloneHome && chrome.runtime.getURL) {
+            if (!homeRedirecting) {
+                homeRedirecting = true;
+                location.replace(chrome.runtime.getURL("src/home/index.html") + url.search);
+            }
+            return;
+        }
         if (path === "/") {
             if (!home?.isConnected) {
                 home = createHome();
@@ -1326,7 +1358,7 @@
     const observer = new MutationObserver(records => {
         // Mutation callbacks run before painting. Apply route classes now rather
         // than waiting for a frame or YouTube's late navigation-finish event.
-        if (enabled && (location.href !== (pendingNavigation ? navigationSource : currentURL) ||
+        if (enabled && (pageLocation() !== (pendingNavigation ? navigationSource : currentURL) ||
             (home?.isConnected && root.dataset.mytPage !== "home") ||
             (root.dataset.mytPage === "home" && document.body && !home?.isConnected))) {
             updateRoute();
@@ -1377,6 +1409,8 @@
     });
 
     function setEnabled(value) {
+        document.dispatchEvent(new CustomEvent("minimal-youtube:optimization", { detail: { enabled: Boolean(value) } }));
+        if (!value && standaloneHome) { openNativeHome(); return; }
         if (enabled === value) return;
         enabled = value;
         root.classList.toggle("minimal-youtube", enabled);
@@ -1384,7 +1418,7 @@
             classObserver.observe(root, { attributes: true, attributeFilter: ["class"] });
             observer.observe(document.documentElement, {
                 subtree: true, childList: true, characterData: true,
-                attributes: true, attributeFilter: ["href", "aria-label", "aria-hidden", "visibility", "is-shorts", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "expanded", "is-expanded", "aria-pressed"],
+                attributes: true, attributeFilter: ["href", "aria-label", "aria-hidden", "visibility", "is-shorts", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "expanded", "is-expanded", "aria-pressed", "aria-valuetext", "data-value", "value", "content"],
             });
             updateRoute(true);
             syncBrand();
@@ -1419,12 +1453,12 @@
         const value = event.detail?.url || event.detail?.endpoint?.commandMetadata?.webCommandMetadata?.url;
         if (typeof value === "string") {
             try {
-                const incoming = new URL(value, location.href);
+                const incoming = new URL(value, pageLocation());
                 if (incoming.origin === location.origin) {
                     pendingNavigation = incoming.href;
-                    navigationSource = location.href;
+                    navigationSource = pageLocation();
                     transitionActive = true;
-                    if (incoming.pathname !== "/watch" || incoming.searchParams.get("v") !== new URL(location.href).searchParams.get("v")) {
+                    if (incoming.pathname !== "/watch" || incoming.searchParams.get("v") !== new URL(pageLocation()).searchParams.get("v")) {
                         resetWatch();
                     }
                 }
@@ -1445,7 +1479,7 @@
     }
     function navigationCommitted() {
         pendingNavigation = null;
-        transitionActive = Boolean(home?.isConnected && location.pathname !== "/");
+        transitionActive = Boolean(home?.isConnected && new URL(pageLocation()).pathname !== "/");
         if (enabled) { updateRoute(true); schedule(); }
     }
     document.addEventListener("yt-navigate-start", navigationStarted);

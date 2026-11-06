@@ -81,6 +81,15 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
                 if(control.hasAttribute('data-seconds')) this.seek(Number(control.dataset.seconds),source);
                 else { this.anchorAction(source,control); source.click(); }
             });
+            this.nativeWheel=event=>{
+                if(document.fullscreenElement||event.ctrlKey||!event.deltaY||Math.abs(event.deltaX)>Math.abs(event.deltaY))return;
+                const target=event.target instanceof Element?event.target:event.target.parentElement;
+                if(!target?.closest('[data-myt-watch-island="media"]')||target.closest('.ytp-settings-menu,.ytp-popup,.ytp-panel,.ytp-volume-area,.ytp-volume-panel,[role="menu"],[role="dialog"],[role="listbox"],[role="slider"]'))return;
+                const unit=event.deltaMode===WheelEvent.DOM_DELTA_PAGE?this.viewport.clientHeight:event.deltaMode===WheelEvent.DOM_DELTA_LINE?20:1;
+                const before=this.viewport.scrollTop;this.viewport.scrollBy({top:event.deltaY*unit,behavior:'instant'});
+                if(this.viewport.scrollTop!==before){event.preventDefault();event.stopPropagation();}
+            };
+            window.addEventListener('wheel',this.nativeWheel,{capture:true,passive:false});
             this.geometry=()=>this.position();this.viewport.addEventListener('scroll',this.geometry,{passive:true});window.addEventListener('resize',this.geometry);
             this.observer=new ResizeObserver(this.geometry);this.observer.observe(this.q('main'));this.observer.observe(this.q('.media'));
             this.fullscreen=()=>{if(!document.fullscreenElement){this.open(this.host);for(const node of this.islands.keys())this.open(node);this.position();}};document.addEventListener('fullscreenchange',this.fullscreen);
@@ -137,9 +146,53 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
             if (data.body) this.copyProse(data.body, prose, true);
             this.q('.description').hidden = !data.root && !prose.textContent.trim();
             this.q('.description h2').textContent = this.copy.description;
-            this.q('.stats').textContent = text(data.root?.querySelector('#info-container, #info'));
+            this.q('.stats').textContent = this.statsText(data.root);
             this.q('.expand').hidden = prose.textContent.trim().length < 220 && !data.expand;
             this.updateExpanded();
+        }
+        statsText(root) {
+            const info = root?.querySelector('#info-container, #info') || this.native.querySelector('ytd-watch-info-text #info, ytd-video-primary-info-renderer #info, #info-strings');
+            const semantic = node => {
+                if (node.nodeType === Node.TEXT_NODE) return node.data.trim();
+                if (!(node instanceof Element) || node.matches('tp-yt-paper-tooltip, yt-tooltip, [role="tooltip"], [aria-hidden="true"]') || (node !== info && node.matches('button, [role="button"]'))) return '';
+                const label = node.getAttribute('aria-label') || node.getAttribute('aria-valuetext');
+                if (label) return label;
+                // A rolling digit contains 0..9 for animation, not the count.
+                if (/rolling.?number|animated.?rolling/i.test(node.localName + ' ' + node.getAttribute('class'))) {
+                    return node.getAttribute('data-value') || node.getAttribute('value') || node.getAttribute('title') || '';
+                }
+                return [...node.childNodes].map(semantic).filter(Boolean).join(' ');
+            };
+            const readable = info ? semantic(info).replace(/\s+/g, ' ').trim() : '';
+            const viewMatch = readable.match(/\d[\d\s.,]*\s*(?:(?:тыс\.?|млн|млрд|[kmb])\s*)?(?:просмотр[а-яё]*|views?)/iu);
+            let views = viewMatch?.[0].trim() || readable.match(/no views|нет просмотров|без просмотров/iu)?.[0] || '';
+            if (views.replace(/\D/g, '').length > 18) views = '';
+            const expected = this.options.video;
+            const localMeta = selector => this.native.querySelector(selector);
+            const canonical = document.querySelector('link[rel="canonical"]');
+            let sameVideo = false;
+            try { sameVideo = Boolean(expected && canonical && new URL(canonical.href).searchParams.get('v') === expected); } catch {}
+            const meta = selector => localMeta(selector) || (sameVideo ? document.querySelector(selector) : null);
+            if (!views) {
+                const value = meta('meta[itemprop="interactionCount"], meta[itemprop="viewCount"]')?.content || '';
+                const number = value.match(/^(?:UserPlays:)?(\d{1,16})$/)?.[1];
+                if (number && Number.isSafeInteger(Number(number))) {
+                    const count = Number(number), ru = this.options.language === 'ru';
+                    const suffix = ru ? ({one:'просмотр',few:'просмотра',many:'просмотров',other:'просмотров'}[new Intl.PluralRules('ru').select(count)]) : (count === 1 ? 'view' : 'views');
+                    views = new Intl.NumberFormat(ru ? 'ru-RU' : 'en-US').format(count) + ' ' + suffix;
+                }
+            }
+            const relative = readable.match(/\d+\s*(?:секунд[а-я]*|минут[а-я]*|час[а-я]*|день|дня|дней|недел[а-я]*|месяц[а-я]*|мес\.?|лет|год[а-я]*|г\.)\s+назад|\d+\s*(?:seconds?|minutes?|hours?|days?|weeks?|months?|years?)\s+ago/iu);
+            const absolute = readable.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z.]*\s+\d{1,2}\s*,?\s*\d{4}|\d{1,2}\s+(?:янв|фев|мар|апр|ма[йя]|июн|июл|авг|сен|сент|окт|ноя|дек)[а-яё.]*\s+\d{4}(?:\s*г\.)?/iu);
+            let date = relative?.[0] || absolute?.[0] || '';
+            if (!date) {
+                const published = meta('meta[itemprop="datePublished"], meta[itemprop="uploadDate"]')?.content;
+                if (published && /^\d{4}-\d{2}-\d{2}/.test(published)) {
+                    const value = new Date(published);
+                    if (Number.isFinite(value.getTime())) date = new Intl.DateTimeFormat(this.options.language === 'ru' ? 'ru-RU' : 'en-US', {day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(value);
+                }
+            }
+            return [views, date].filter(Boolean).join(' · ');
         }
         nativePlayer() {
             const video = this.native.querySelector('#movie_player video, ytd-player video, video.html5-main-video, video');
@@ -212,6 +265,7 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
                 for(const source of channel?.querySelectorAll('a[href],button')||[]){const label=(text(source)||source.getAttribute('aria-label')||'').replace(/\s*↗\s*$/u,'');if(!label)continue;const a=source.tagName==='A'?this.link(source,'social',label):this.button(label,source);a.className='social';a.insertAdjacentHTML('beforeend',icon('arrow'));socials.append(a);}
                 this.q('#watch-socials').hidden=!socials.children.length;this.q('#watch-socials h2').textContent=c.socials;
             }
+            const stats=this.statsText(description);if(this.q('.stats').textContent!==stats)this.q('.stats').textContent=stats;this.q('.stats').hidden=!stats;
             const transcriptSource=this.native.querySelector('ytd-video-description-transcript-section-renderer');this.q('#watch-transcript').hidden=!transcriptSource&&!this.native.querySelector('ytd-transcript-renderer');this.q('#watch-transcript h2').textContent=c.transcript;this.q('#watch-transcript .hint').textContent=c.transcriptHint;this.q('.transcript-toggle').textContent=this.transcriptOpen?c.hideTranscript:c.showTranscript;this.q('.transcript-search').placeholder=c.find;this.q('.transcript-search').setAttribute('aria-label',c.find);this.q('.transcript-retry').textContent=c.retry;
             if(options.commentsButton){if(options.commentsButton.parentNode!==this.q('.actions'))this.q('.actions').prepend(options.commentsButton);options.commentsButton.setAttribute('aria-controls','watch-comments');}
             this.q('.comments-section').hidden=!options.commentsOpen;this.q('.comments-section h2').textContent=c.comments;
@@ -256,7 +310,7 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
             this.q('.transcript-status').textContent=data.length?(filtered.length?'':this.copy.noResults):(this.transcriptLoading?this.copy.loading:this.copy.unavailable);this.q('.transcript-retry').hidden=!!data.length||this.transcriptLoading;this.q('.transcript-search').hidden=!data.length;
         }
         closeTranscript() {this.transcriptOpen=false;clearTimeout(this.transcriptTimeout);if(this.q){this.q('.transcript-content').hidden=true;this.q('.transcript-toggle').setAttribute('aria-expanded','false');}if(this.nativePanelState){for(const[name,value]of this.nativePanelState.attrs){if(value===null)this.nativePanelState.node.removeAttribute(name);else this.nativePanelState.node.setAttribute(name,value);}this.nativePanelState=null;}}
-        destroy() {this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);this.media?.removeEventListener('timeupdate',this.videoTime);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;}
+        destroy() {this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);this.media?.removeEventListener('timeupdate',this.videoTime);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;}
     }
     globalThis.MinimalYouTubeWatch=WatchView;
 })();

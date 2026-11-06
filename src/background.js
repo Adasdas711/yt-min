@@ -1,5 +1,7 @@
 "use strict";
 
+if (typeof importScripts === "function") importScripts("optimization.js");
+
 const youtubeDomain = domain => domain === "youtube.com" || domain.endsWith(".youtube.com");
 
 async function cookieStore(sender) {
@@ -35,6 +37,15 @@ function cookieMetadata(cookies) {
 }
 
 async function handleCookieRequest(message, sender) {
+    // Extension pages can lack sender.tab. Their own tabs.getCurrent() supplies
+    // the tab ID; ordinary website senders cannot select another cookie store.
+    if (!sender.tab && chrome.runtime.getURL && Number.isInteger(message.tabId)) {
+        const home = new URL(chrome.runtime.getURL("src/home/index.html"));
+        const source = new URL(sender.url);
+        if (source.protocol === home.protocol && source.host === home.host && source.pathname === home.pathname) {
+            sender = { ...sender, tab: { id: message.tabId } };
+        }
+    }
     const cookies = await youtubeCookies(sender);
     if (message.action === "minimal-youtube:get-cookies") {
         return { ok: true, cookies: cookieMetadata(cookies) };
@@ -53,12 +64,27 @@ async function handleCookieRequest(message, sender) {
     return { ok: true, removed, cookies: cookieMetadata(remaining) };
 }
 
-chrome.runtime.onMessage.addListener((message, sender, respond) => {
-    if (sender.id !== chrome.runtime.id || !["minimal-youtube:get-cookies", "minimal-youtube:clear-cookies"].includes(message?.action)) return false;
+function trustedSender(sender) {
+    if (sender.id !== chrome.runtime.id || (typeof sender.frameId === "number" && sender.frameId !== 0)) return false;
     try {
         const url = new URL(sender.url || "");
-        if (url.protocol !== "https:" || !youtubeDomain(url.hostname)) return false;
-    } catch { return false; }
+        if (url.protocol === "https:" && youtubeDomain(url.hostname)) return true;
+        if (chrome.runtime.getURL) {
+            const home = new URL(chrome.runtime.getURL("src/home/index.html"));
+            return url.protocol === home.protocol && url.host === home.host && url.pathname === home.pathname;
+        }
+    } catch { /* Only exact extension/YouTube origins can access these actions. */ }
+    return false;
+}
+
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+    if (!trustedSender(sender)) return false;
+    if (message?.action === "minimal-youtube:open-native-home") {
+        if (!globalThis.MinimalYouTubeOptimization) { respond({ ok: false }); return false; }
+        globalThis.MinimalYouTubeOptimization.nativeHome().then(respond, () => respond({ ok: false }));
+        return true;
+    }
+    if (!["minimal-youtube:get-cookies", "minimal-youtube:clear-cookies"].includes(message?.action)) return false;
     handleCookieRequest(message, sender).then(respond, () => respond({ ok: false, error: "cookies-unavailable" }));
     return true;
 });

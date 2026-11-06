@@ -8,7 +8,8 @@
         on: "Включён",
         off: "Выключен",
         details: "Чистая главная, каналы по центру и видео без Shorts и рекомендаций.",
-        footer: "Изменения применяются к открытым вкладкам YouTube.",
+        footer: "Обновите вкладки YouTube, чтобы применить экономию памяти.",
+        disabledFooter: "Обновите YouTube, чтобы вернуть все его блоки.",
         readError: "Не удалось загрузить настройки. Откройте расширение заново.",
         saveError: "Не удалось сохранить. Попробуйте ещё раз.",
     }, en: {
@@ -17,7 +18,8 @@
         on: "Enabled",
         off: "Disabled",
         details: "A clean home, centered channels, and videos without Shorts or recommendations.",
-        footer: "Changes apply to open YouTube tabs.",
+        footer: "Reload YouTube tabs to apply memory savings.",
+        disabledFooter: "Reload YouTube to restore all of its sections.",
         readError: "Could not load settings. Please reopen the extension.",
         saveError: "Could not save. Please try again.",
     }};
@@ -40,6 +42,7 @@
     function render() {
         toggle.checked = enabled;
         status.textContent = enabled ? copy.on : copy.off;
+        document.getElementById("footer").textContent = enabled ? copy.footer : copy.disabledFooter;
     }
     function showError(message) {
         error.textContent = message;

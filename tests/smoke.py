@@ -87,8 +87,10 @@ MOCK = """(initial) => {
 }"""
 
 
-def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, native_dark=False, language="en", watch_ui=True):
+def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, native_dark=False, language="en", watch_ui=True, prune_data=False):
     page = browser.new_page(viewport={"width": width, "height": 960}, reduced_motion="reduce")
+    if prune_data:
+        page.add_init_script(path=str(ROOT / "src/content/data-pruning.js"))
     page.route("https://www.youtube.com/**", lambda route: route.fulfill(
         status=200, content_type="text/html", body=document(body)))
     page.goto("https://www.youtube.com" + path)
@@ -862,7 +864,8 @@ def rendered_pixel(page, x, y):
 
 
 def check_native_watch(browser, theater=False, width=1440):
-    page=setup(browser,'/watch?v=native',native_watch_fixture(theater),native_dark=True,width=width)
+    page=setup(browser,'/watch?v=native',native_watch_fixture(theater),native_dark=True,width=width,prune_data=True)
+    if width < 600: page.set_viewport_size({'width':width,'height':600})
     expect(page.locator('#ytd-player')).to_be_visible()
     assert page.locator('#ytd-player').evaluate("e=>e.matches(':popover-open')&&e.parentElement.id==='player'")
     assert page.locator('ytd-watch-flexy').get_attribute('popover') is None
@@ -873,6 +876,18 @@ def check_native_watch(browser, theater=False, width=1440):
     assert all(abs(video[key]-box[key])<2 for key in ['x','y','width','height']), (video,box)
     pixel=rendered_pixel(page,box['x']+box['width']/2,box['y']+box['height']/2)
     assert all(abs(a-b)<=6 for a,b in zip(pixel,[24,180,96,255])), f'Video is decoded but its visible surface is covered: {pixel}'
+    # Native media is a separate top-layer element; wheel events must be
+    # forwarded to the own page while native popup scrolling stays independent.
+    page.mouse.move(box['x']+box['width']/2,box['y']+min(box['height']/2,300))
+    page.mouse.wheel(0,280)
+    page.wait_for_function("document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.viewport').scrollTop>0")
+    page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
+    page.locator('#movie_player').evaluate("e=>{const menu=document.createElement('div');menu.id='test-player-menu';menu.className='ytp-settings-menu';menu.style.cssText='position:absolute;right:20px;top:20px;width:120px;height:100px;overflow:auto;background:white';const content=document.createElement('div');content.style.height='400px';content.textContent='Native menu';menu.append(content);e.append(menu);}")
+    page.locator('#test-player-menu').hover()
+    page.mouse.wheel(0,80)
+    page.wait_for_function("document.querySelector('#test-player-menu').scrollTop>0")
+    assert page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop')==0
+    page.locator('#test-player-menu').evaluate('e=>e.remove()')
     page.locator('#native-play').click()
     assert page.locator('video').evaluate('v=>v.paused') is True
     page.locator('#native-play').click()
@@ -886,6 +901,14 @@ def check_native_watch(browser, theater=False, width=1440):
     expect(page.locator('#watch-description')).to_contain_text('Full video description with native markup')
     expect(page.locator('#watch-description a')).to_have_attribute('href','https://example.com/description')
     assert page.evaluate('window.__descriptionLoaded') is True
+    page.locator('#info-container').evaluate("e=>{const counter=document.createElement('yt-animated-rolling-number');counter.setAttribute('aria-label','326,412,890 views');counter.textContent='123456789012345678901234567890';const date=document.createElement('span');date.textContent='1 month ago';const products=document.createElement('button');products.textContent='3 products';e.replaceChildren(counter,date,products);}")
+    expect(page.locator('#myt-watch .stats')).to_have_text('326,412,890 views · 1 month ago')
+    page.locator('yt-animated-rolling-number').evaluate("e=>e.setAttribute('aria-label','326,412,891 views')")
+    expect(page.locator('#myt-watch .stats')).to_have_text('326,412,891 views · 1 month ago')
+    page.locator('#below').evaluate("e=>e.insertAdjacentHTML('beforeend','<meta itemprop=interactionCount content=987654321>')")
+    page.locator('yt-animated-rolling-number').evaluate("e=>e.removeAttribute('aria-label')")
+    expect(page.locator('#myt-watch .stats')).to_have_text('987,654,321 views · 1 month ago')
+
     # Enough chapters to overflow on desktop and mobile: exactly one scroll row.
     page.locator('#below').evaluate("e=>{for(let i=0;i<12;i++)e.insertAdjacentHTML('beforeend',`<ytd-macro-markers-list-item-renderer><button><span id=time>${i}:00</span><span id=title>Episode ${i}: a longer chapter title</span></button></ytd-macro-markers-list-item-renderer>`);}")
     expect(page.locator('.chapter')).to_have_count(12)
@@ -896,10 +919,21 @@ def check_native_watch(browser, theater=False, width=1440):
     page.mouse.wheel(0,400)
     page.wait_for_function("document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.chapter-list').scrollLeft>0")
     assert page.locator('#myt-watch .viewport').evaluate('e=>e.scrollWidth<=e.clientWidth')
+    first_chapter=page.locator('.chapter').first.element_handle()
+    chapter_scroll=page.locator('.chapter-list').evaluate('e=>e.scrollLeft')
+    page.locator('yt-animated-rolling-number').evaluate("e=>e.setAttribute('aria-label','987,654,322 views')")
+    expect(page.locator('#myt-watch .stats')).to_have_text('987,654,322 views · 1 month ago')
+    assert first_chapter.evaluate('e=>e.isConnected'), 'View updates rebuild chapter cards'
+    assert abs(page.locator('.chapter-list').evaluate('e=>e.scrollLeft')-chapter_scroll)<2
     page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
     page.locator('#movie_player').evaluate('e=>e.requestFullscreen()')
     assert page.evaluate('document.fullscreenElement.id')=='movie_player'
-    pixel=rendered_pixel(page,width/2,480)
+    before_scroll=page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop')
+    page.mouse.move(width/2,300)
+    page.mouse.wheel(0,150)
+    assert page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop')==before_scroll
+
+    pixel=rendered_pixel(page,width/2,page.viewport_size['height']/2)
     assert all(abs(a-b)<=6 for a,b in zip(pixel,[24,180,96,255])), pixel
     page.evaluate('document.exitFullscreen()')
     expect(page.locator('#myt-watch')).to_be_visible()
