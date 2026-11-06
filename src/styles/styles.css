@@ -1240,6 +1240,7 @@ html.minimal-youtube #myt-watch {
 html.minimal-youtube #myt-watch::before,
 html.minimal-youtube #myt-watch::after { content: none !important; display: none !important; }
 html.minimal-youtube #myt-watch::backdrop { background: transparent !important; backdrop-filter: none !important; }
+html.minimal-youtube #myt-watch:not(:popover-open) { display: none !important; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island] {
     visibility: visible !important;
     position: fixed !important; inset: auto !important;
@@ -1252,6 +1253,7 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island] {
 }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="media"] {
     display: block !important; overflow: clip !important;
+    transition: none !important;
     clip-path: inset(var(--myt-island-clip, 0px) 0 0) !important;
     border-radius: 18px !important; background: #000 !important;
 }
@@ -1267,7 +1269,16 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] { disp
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="popups"] { display: block !important; pointer-events: none !important; background: transparent !important; overflow: visible !important; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="popups"] > * { pointer-events: auto; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="anchor"] { display: block !important; opacity: 0 !important; pointer-events: none !important; }
-html.minimal-youtube[data-myt-watch-ui] :fullscreen { clip-path: none !important; border-radius: 0 !important; }
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island]:not(:popover-open) { display: none !important; }
+html.minimal-youtube[data-myt-watch-ui] :fullscreen,
+html.minimal-youtube[data-myt-watch-ui] ytd-watch-flexy[data-myt-watch-source]:fullscreen {
+    visibility: visible !important; position: fixed !important; inset: 0 !important;
+    width: 100vw !important; height: 100vh !important;
+    max-width: none !important; max-height: none !important;
+    margin: 0 !important; padding: 0 !important; border: 0 !important;
+    transform: none !important; clip-path: none !important; border-radius: 0 !important;
+    transition: none !important;
+}
 
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island]::backdrop { background: transparent !important; backdrop-filter: none !important; }
 

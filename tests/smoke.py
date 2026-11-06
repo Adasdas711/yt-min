@@ -823,7 +823,7 @@ def watch_details_fixture(legacy=False):
 
 def native_watch_fixture(theater=False):
     avatar = 'data:image/svg+xml;base64,' + base64.b64encode(b'<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" rx="24" fill="#ee4433"/><text x="11" y="30" fill="white" font-size="19">R</text></svg>').decode()
-    player = '''<div id="player-container-outer"><div id="player-container-inner"><div id="player"><ytd-player id="ytd-player"><div id="container"><div id="movie_player" class="html5-video-player"><video class="html5-main-video" muted playsinline></video><span id="clock" class="ytp-time-current">0:00</span><button id="native-play" onclick="let v=document.querySelector('video');v.paused?v.play():v.pause()">YouTube play/pause</button></div></div></ytd-player></div></div></div>'''
+    player = '''<div id="player-container-outer"><div id="player-container-inner"><div id="player"><ytd-player id="ytd-player"><div id="container"><div id="movie_player" class="html5-video-player"><video class="html5-main-video" muted playsinline></video><span id="clock" class="ytp-time-current">0:00</span><button id="native-play" onclick="let v=document.querySelector('video');v.paused?v.play():v.pause()">YouTube play/pause</button><button id="native-fullscreen" class="ytp-fullscreen-button" onclick="document.fullscreenElement?document.exitFullscreen():this.closest('ytd-player').requestFullscreen().catch(error=>window.__fullscreenError=error.message)">Full screen</button></div></div></ytd-player></div></div></div>'''
     return '<ytd-app>'+MASTHEAD+f'''
       <style>
       ytd-player,#movie_player {{ display:block;position:relative;width:100%;height:100%; }}
@@ -831,6 +831,7 @@ def native_watch_fixture(theater=False):
       #ytd-player > #container {{ width:100%;height:100%; }}
       video.html5-main-video {{ position:absolute;inset:0;width:100%;height:100%;object-fit:contain; }}
       #native-play {{ position:absolute;bottom:8px;left:8px;z-index:5; }}
+      #native-fullscreen {{ position:absolute;bottom:8px;right:8px;z-index:5; }}
       </style><ytd-page-manager class="ytd-app"><ytd-watch-flexy {'theater' if theater else ''}>
       <div id="full-bleed-container"><div id="cinematics-container">{player if theater else '<div id=ambient-layer></div>'}</div></div>
       <div id="columns"><div id="primary">{'' if theater else player}<div id="below"><ytd-watch-metadata>
@@ -882,6 +883,20 @@ def check_native_watch(browser, theater=False, width=1440):
     page.mouse.wheel(0,280)
     page.wait_for_function("document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.viewport').scrollTop>0")
     page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
+    page.add_style_tag(content='ytd-player { transition:top .7s ease,left .7s ease; }')
+    for selector in ['video','#watch-title']:
+        page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
+        direct=page.locator(selector).evaluate('''e=>{
+          const ui=document.querySelector('#myt-watch').firstElementChild.shadowRoot,viewport=ui.querySelector('.viewport');
+          const event=new WheelEvent('wheel',{deltaY:120,bubbles:true,cancelable:true,composed:true});
+          e.dispatchEvent(event);
+          return {cancelled:event.defaultPrevented,scroll:viewport.scrollTop,playerY:document.querySelector('#ytd-player').getBoundingClientRect().y,slotY:ui.querySelector('.media').getBoundingClientRect().y,transition:getComputedStyle(document.querySelector('#ytd-player')).transitionDuration};
+        }''')
+        assert direct['cancelled'] and direct['scroll']==120,direct
+        assert abs(direct['playerY']-direct['slotY'])<1 and direct['transition']=='0s',direct
+        page.wait_for_timeout(100)
+        assert page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop')==120
+    page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
     page.locator('#movie_player').evaluate("e=>{const menu=document.createElement('div');menu.id='test-player-menu';menu.className='ytp-settings-menu';menu.style.cssText='position:absolute;right:20px;top:20px;width:120px;height:100px;overflow:auto;background:white';const content=document.createElement('div');content.style.height='400px';content.textContent='Native menu';menu.append(content);e.append(menu);}")
     page.locator('#test-player-menu').hover()
     page.mouse.wheel(0,80)
@@ -926,6 +941,39 @@ def check_native_watch(browser, theater=False, width=1440):
     assert first_chapter.evaluate('e=>e.isConnected'), 'View updates rebuild chapter cards'
     assert abs(page.locator('.chapter-list').evaluate('e=>e.scrollLeft')-chapter_scroll)<2
     page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
+    page.locator('#native-fullscreen').click()
+    page.wait_for_function("document.fullscreenElement?.id==='ytd-player'")
+    expect(page.locator('#myt-watch')).to_be_hidden()
+    assert page.locator('#ytd-player').bounding_box()=={'x':0,'y':0,'width':width,'height':page.viewport_size['height']}
+    assert page.evaluate('window.__fullscreenError||null') is None
+    pixel=rendered_pixel(page,width/2,page.viewport_size['height']/2)
+    assert all(abs(a-b)<=6 for a,b in zip(pixel,[24,180,96,255])),pixel
+    page.locator('#native-fullscreen').click()
+    page.wait_for_function('!document.fullscreenElement')
+    expect(page.locator('#myt-watch')).to_be_visible()
+    assert page.locator('#ytd-player').evaluate("e=>e.matches(':popover-open')")
+    # Native F shortcut must also release the shown wrapper before requesting fullscreen.
+    page.evaluate("document.addEventListener('keydown',event=>{if(event.key==='f'){if(document.fullscreenElement)document.exitFullscreen();else document.querySelector('ytd-player').requestFullscreen().catch(error=>window.__fullscreenError=error.message);}});document.querySelector('video').tabIndex=0")
+    page.locator('video').focus()
+    page.keyboard.press('f')
+    page.wait_for_function("document.fullscreenElement?.id==='ytd-player'")
+    page.keyboard.press('f')
+    page.wait_for_function('!document.fullscreenElement')
+    expect(page.locator('#myt-watch')).to_be_visible()
+    if not theater and width==1440:
+        page.locator('#movie_player').evaluate("e=>e.ondblclick=()=>e.closest('ytd-player').requestFullscreen().catch(error=>window.__fullscreenError=error.message)")
+        page.locator('video').dblclick(position={'x':30,'y':30})
+        page.wait_for_function("document.fullscreenElement?.id==='ytd-player'")
+        expect(page.locator('#myt-watch')).to_be_hidden()
+        page.locator('#native-fullscreen').click()
+        page.wait_for_function('!document.fullscreenElement')
+        # A denied/ignored native fullscreen request must restore the player.
+        page.locator('#native-fullscreen').evaluate("e=>{window.__fullscreenHandler=e.onclick;e.onclick=()=>{};}")
+        page.locator('#native-fullscreen').click()
+        page.wait_for_function("document.querySelector('#ytd-player').matches(':popover-open')")
+        assert page.evaluate('!document.fullscreenElement')
+        expect(page.locator('video')).to_be_visible()
+        page.locator('#native-fullscreen').evaluate('e=>e.onclick=window.__fullscreenHandler')
     page.locator('#movie_player').evaluate('e=>e.requestFullscreen()')
     assert page.evaluate('document.fullscreenElement.id')=='movie_player'
     before_scroll=page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop')
@@ -988,6 +1036,12 @@ def check_background_work(browser):
     page.close()
 
 
+def open_watch_item(page,name):
+    page.locator('.more-toggle').click()
+    if name=='Comments':page.locator('.more-popup #myt-comments-toggle').click()
+    else:page.locator('.more-popup').get_by_role('menuitem',name=name,exact=True).click()
+
+
 def check_watch_details(browser, dark, width=1440, legacy=False):
     fixture = watch_details_fixture(legacy)
     actions = '''<div id="top-row"><div id="owner"><a href="/@revolt"><img alt="" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="><span id="channel-name">REVOLT</span></a><div id="subscribe-button"><button onclick="window.__subscribe=true">Subscribe</button></div></div><div id="actions"><div id="top-level-buttons-computed"><segmented-like-dislike-button-view-model id="video-votes"><button>Like</button><button>Dislike</button></segmented-like-dislike-button-view-model><button id="share" onclick="window.__share=true;document.querySelector('#share-dialog').hidden=false">Share</button><button id="save" onclick="window.__save=true">Save</button><button id="more" onclick="window.__other=true;document.querySelector('#native-more-dialog').hidden=false">More</button></div></div></div>'''
@@ -1021,8 +1075,11 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
     page.locator('.socials a').click()
     assert page.evaluate('window.__social') is True
     expect(page.locator('#watch-description a').first).to_have_attribute('href','https://example.com/show')
-    page.locator('.transcript-toggle').click()
+    expect(page.locator('#watch-transcript')).to_be_hidden()
+    expect(page.locator('.actions > #myt-comments-toggle')).to_have_count(0)
+    open_watch_item(page,'Video transcript')
     expect(page.locator('.transcript-toggle')).to_have_attribute('aria-expanded','true')
+    expect(page.locator('.more-popup')).to_be_hidden()
     expect(page.locator('.segment')).to_have_count(1)
     expect(page.locator('.segment')).to_contain_text('Introduction')
     page.locator('.transcript-search').fill('missing phrase')
@@ -1037,20 +1094,20 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
         # Real YouTube can create the panel only after the first request.
         page.locator('#transcript-panel').evaluate('e=>e.remove()')
         page.locator('#open-transcript').evaluate("e=>e.onclick=()=>document.querySelector('#secondary-inner').insertAdjacentHTML('beforeend','<ytd-engagement-panel-section-list-renderer id=transcript-panel target-id=engagement-panel-searchable-transcript visibility=ENGAGEMENT_PANEL_VISIBILITY_EXPANDED><ytd-transcript-renderer><ytd-transcript-segment-renderer>2:45 Introduction after late loading</ytd-transcript-segment-renderer></ytd-transcript-renderer></ytd-engagement-panel-section-list-renderer>')")
-        page.locator('.transcript-toggle').click()
+        open_watch_item(page,'Video transcript')
         expect(page.locator('.segment')).to_contain_text('Introduction after late loading')
         page.locator('.transcript-toggle').click()
         expect(page.locator('#transcript-panel')).to_have_attribute('visibility','ENGAGEMENT_PANEL_VISIBILITY_HIDDEN')
     toggle = page.locator('#myt-comments-toggle')
     if not legacy:
-        toggle.click()
+        open_watch_item(page,'Comments')
         expect(page.locator('#comments')).to_be_visible()
         page.locator('#reply-draft').fill('Keep this native reply')
-        toggle.click()
+        open_watch_item(page,'Comments')
         expect(page.locator('#comments')).to_be_hidden()
-        toggle.click()
+        open_watch_item(page,'Comments')
         expect(page.locator('#reply-draft')).to_have_value('Keep this native reply')
-        toggle.click()
+        open_watch_item(page,'Comments')
         page.locator('.owner button').click()
         assert page.evaluate('window.__subscribe') is True
         expect(page.locator('.actions > button').filter(has_text='Share')).to_have_count(0)
@@ -1152,8 +1209,8 @@ def check_removed_chat(browser, replay):
     expect(page.locator('.actions > button').filter(has_text='Share')).to_have_count(0)
     page.locator('#share').evaluate('e=>e.onclick=()=>window.__shareOnly=true')
     page.locator('.more-toggle').click()
-    expect(page.locator('.more-popup button')).to_have_count(1)
-    page.locator('.more-popup button').click()
+    expect(page.locator('.more-popup button')).to_have_count(2)
+    page.locator('.more-popup').get_by_role('menuitem',name='Share',exact=True).click()
     assert page.evaluate('window.__shareOnly') is True
     source='/live_chat_replay?v=chat' if replay else '/live_chat?v=chat'
     page.evaluate("""source => {
