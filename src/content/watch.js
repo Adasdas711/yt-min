@@ -26,9 +26,10 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
 .details { max-width:960px;margin:28px auto 0;min-width:0; } h1 { font-size:28px;line-height:1.35;font-weight:650;letter-spacing:-.6px;overflow-wrap:anywhere; }
 .meta-row { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:20px;margin:22px 0 28px; }
 .owner { display:flex;align-items:center;gap:12px;min-width:0;flex-wrap:wrap; }.owner-link { display:flex;align-items:center;gap:12px;color:var(--ink);min-width:0; }.owner img { width:46px;height:46px;border-radius:50%;object-fit:cover;flex:none; }.owner-name { font-size:17px;font-weight:600; }.owner small { display:block;color:var(--muted);font-size:14px; }
+.owner .primary { min-height:36px;height:36px;padding:0 14px;border-radius:10px;font-size:14px;line-height:1.25; }
 .actions { display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0; }.primary { background:var(--ink);color:var(--bg);border-color:transparent; }.primary:hover { opacity:.9;background:var(--ink); }
 .more-actions { display:flex; }.more-popup { position:fixed;inset:auto;margin:0;padding:6px;width:min(260px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--ink);box-shadow:0 12px 36px #0002; }.more-popup::backdrop { background:transparent; }.more-popup button { display:flex;width:100%;justify-content:flex-start;white-space:normal;text-align:left;border:0;background:transparent; }.more-popup button:hover,.more-popup button:focus-visible { background:var(--soft); }.more-popup button:focus-visible { outline-offset:-2px; }
-#myt-comments-toggle { display:inline-flex;align-items:center;gap:9px; }.description h2 { margin-bottom:16px; }.description { border:1px solid var(--border);border-radius:20px;background:var(--surface);padding:28px; }
+#myt-comments-toggle { display:inline-flex;align-items:center;gap:9px; }.description { border:1px solid var(--border);border-radius:20px;background:var(--surface);padding:28px; }
 .stats { font-size:14px;font-weight:500;color:var(--muted);margin-bottom:16px; }.prose { font-size:17px;line-height:1.8;overflow-wrap:anywhere;white-space:pre-wrap; }.prose p { margin:0 0 18px; }.prose ul,.prose ol { padding-left:24px; }.prose:not(.expanded) { max-height:9em;overflow:hidden; }.expand { margin-top:18px;background:transparent; }
 .section { margin-top:32px; }.section-head { display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px; }.hint { color:var(--muted);font-size:15px;line-height:1.6; }
 .chapter-list { display:flex;flex-flow:row nowrap;gap:12px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-color:var(--border) transparent;padding-bottom:12px; }.chapter { flex:0 0 300px;scroll-snap-align:start;display:grid;grid-template-columns:64px minmax(0,1fr) 18px;gap:16px;text-align:left;white-space:normal;justify-content:initial;min-height:76px;padding:18px 20px;border-color:transparent;background:var(--surface);border-radius:14px; }
@@ -61,10 +62,10 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
     };
     class WatchView {
         constructor(options) {
-            this.options=options; this.native=options.native; this.islands=new Map(); this.expanded=false; this.transcriptOpen=false; this.signature=""; this.sources=new Map(); this.sequence=0; this.nativePanelState=null;
+            this.options=options; this.native=options.native; this.islands=new Map(); this.fullscreenNodes=new Map(); this.expanded=false; this.transcriptOpen=false; this.signature=""; this.sources=new Map(); this.sequence=0; this.nativePanelState=null;
             this.host=document.createElement("div"); this.host.id="myt-watch"; this.host.setAttribute("popover","manual");
             this.surface=document.createElement("div"); this.shadow=this.surface.attachShadow({mode:"open"});this.host.append(this.surface);
-            this.shadow.innerHTML=`<style>${css}</style><div class="viewport"><header class="header"><a class="brand" href="/" aria-label="YouTube"><svg viewBox="0 0 28 20" fill="currentColor" aria-hidden="true"><rect width="28" height="20" rx="6"/><path d="m11 5 8 5-8 5Z" fill="#fff"/></svg><span>YouTube</span></a><form class="search" action="/results" method="get" role="search"><input name="search_query" id="watch-search" autocomplete="off"><button type="button" id="watch-clear" hidden aria-label="Clear">×</button></form></header><main><div class="layout"><div class="media" aria-label="YouTube player"></div><aside class="sidecar" hidden></aside></div><article class="details"><h1 id="watch-title"></h1><div class="meta-row"><div class="owner"></div><div class="actions"></div></div><section class="description" aria-label="Description"><h2></h2><div class="stats"></div><div class="prose" id="watch-description"></div><button class="expand" aria-expanded="false" aria-controls="watch-description"></button></section><section class="section" id="watch-chapters" hidden><div class="section-head"><h2></h2></div><div class="chapter-list"></div></section><section class="section" id="watch-people" hidden><div class="section-head"><h2></h2></div><div class="people"></div></section><section class="section transcript-card" id="watch-transcript" hidden><div class="transcript-head"><div class="transcript-intro"><span class="transcript-icon">${icon('transcript')}</span><div class="transcript-copy"><h2></h2><p class="hint"></p></div></div><button class="transcript-toggle" aria-expanded="false" aria-controls="watch-transcript-content"></button></div><div class="transcript-content" id="watch-transcript-content" hidden><input class="transcript-search" type="search"><div class="segments"></div><p class="transcript-status" role="status"></p><button class="transcript-retry" hidden></button></div></section><section class="section" id="watch-socials" hidden><div class="section-head"><h2></h2></div><div class="socials"></div></section><section class="comments-section" id="watch-comments" hidden><h2></h2><div class="comments"></div></section></article></main></div>`;
+            this.shadow.innerHTML=`<style>${css}</style><div class="viewport"><header class="header"><a class="brand" href="/" aria-label="YouTube"><svg viewBox="0 0 28 20" fill="currentColor" aria-hidden="true"><rect width="28" height="20" rx="6"/><path d="m11 5 8 5-8 5Z" fill="#fff"/></svg><span>YouTube</span></a><form class="search" action="/results" method="get" role="search"><input name="search_query" id="watch-search" autocomplete="off"><button type="button" id="watch-clear" hidden aria-label="Clear">×</button></form></header><main><div class="layout"><div class="media" aria-label="YouTube player"></div><aside class="sidecar" hidden></aside></div><article class="details"><h1 id="watch-title"></h1><div class="meta-row"><div class="owner"></div><div class="actions"></div></div><section class="description" aria-label="Description"><div class="stats"></div><div class="prose" id="watch-description"></div><button class="expand" aria-expanded="false" aria-controls="watch-description"></button></section><section class="section" id="watch-chapters" hidden><div class="section-head"><h2></h2></div><div class="chapter-list"></div></section><section class="section" id="watch-people" hidden><div class="section-head"><h2></h2></div><div class="people"></div></section><section class="section transcript-card" id="watch-transcript" hidden><div class="transcript-head"><div class="transcript-intro"><span class="transcript-icon">${icon('transcript')}</span><div class="transcript-copy"><h2></h2><p class="hint"></p></div></div><button class="transcript-toggle" aria-expanded="false" aria-controls="watch-transcript-content"></button></div><div class="transcript-content" id="watch-transcript-content" hidden><input class="transcript-search" type="search"><div class="segments"></div><p class="transcript-status" role="status"></p><button class="transcript-retry" hidden></button></div></section><section class="section" id="watch-socials" hidden><div class="section-head"><h2></h2></div><div class="socials"></div></section><section class="comments-section" id="watch-comments" hidden><h2></h2><div class="comments"></div></section></article></main></div>`;
             this.q=selector=>this.shadow.querySelector(selector);this.viewport=this.q('.viewport');
             this.q('.expand').onclick=()=>{this.expanded=!this.expanded;const description=this.descriptionData(this.native.querySelector('ytd-watch-metadata,ytd-video-primary-info-renderer,ytd-video-secondary-info-renderer'));(this.expanded?description.expand:description.root?.querySelector('#collapse'))?.click();this.updateExpanded();};
             this.q('.transcript-toggle').onclick=()=>this.toggleTranscript();
@@ -139,7 +140,8 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
             this.fullscreenError=()=>this.resumeFullscreen();document.addEventListener('fullscreenerror',this.fullscreenError);
             this.sourceLoad=()=>{if(this.host.isConnected&&this.options.video!==undefined)this.sync(this.options);};this.native.addEventListener('load',this.sourceLoad,true);
             this.videoTime=()=>this.updateCurrentChapter();this.media=this.native.querySelector('video');this.media?.addEventListener('timeupdate',this.videoTime);
-            document.documentElement.append(this.host);document.documentElement.dataset.mytWatchUi="";this.native.dataset.mytWatchSource="";this.open(this.host);
+            document.documentElement.append(this.host);document.documentElement.dataset.mytWatchUi="";this.native.dataset.mytWatchSource="";
+            if(document.fullscreenElement)this.syncFullscreen();else this.open(this.host);
         }
         open(node) { if(node.isConnected&&!node.matches(':popover-open')) { try{node.showPopover();}catch{} } }
         key(node) { const id=String(++this.sequence);this.sources.set(id,node);return id; }
@@ -159,7 +161,7 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
         }
         resumeFullscreen() {
             clearTimeout(this.fullscreenTimer);this.fullscreenPending=false;
-            if(!document.fullscreenElement&&this.host.isConnected){this.open(this.host);this.sync(this.options);}
+            if(!document.fullscreenElement&&this.host.isConnected){this.restoreFullscreenLayout();this.open(this.host);this.sync(this.options);}
         }
         syncFullscreen() {
             clearTimeout(this.fullscreenTimer);this.fullscreenPending=false;
@@ -170,7 +172,46 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
                     else if(node.matches(':popover-open'))node.hidePopover();
                 }
                 if(this.host.matches(':popover-open'))this.host.hidePopover();
+                this.updateFullscreenLayout();
             }else this.resumeFullscreen();
+        }
+        restoreFullscreenLayout() {
+            for(const[node,original]of this.fullscreenNodes){
+                if(original===null)node.removeAttribute('data-myt-fullscreen-part');
+                else node.setAttribute('data-myt-fullscreen-part',original);
+            }
+            this.fullscreenNodes.clear();
+        }
+        updateFullscreenLayout() {
+            const fullscreen=document.fullscreenElement;
+            if(!fullscreen)return;
+            const video=fullscreen.matches('video')?fullscreen:(fullscreen.querySelector('video.html5-main-video')||fullscreen.querySelector('video'));
+            if(!video)return;
+            const wanted=new Map([[video,'video']]);
+            // Repair only the chain that sizes the active video. Cached native
+            // inline sizes can otherwise leave a fullscreen player painting black.
+            if(video!==fullscreen)for(let node=video.parentElement;node;node=node.parentElement){
+                wanted.set(node,'container');if(node===fullscreen)break;
+            }
+            let changed=false;
+            for(const[node,original]of this.fullscreenNodes)if(!wanted.has(node)){
+                if(original===null)node.removeAttribute('data-myt-fullscreen-part');
+                else node.setAttribute('data-myt-fullscreen-part',original);
+                this.fullscreenNodes.delete(node);changed=true;
+            }
+            for(const[node,kind]of wanted){
+                if(!this.fullscreenNodes.has(node))this.fullscreenNodes.set(node,node.getAttribute('data-myt-fullscreen-part'));
+                if(node.getAttribute('data-myt-fullscreen-part')!==kind){node.setAttribute('data-myt-fullscreen-part',kind);changed=true;}
+            }
+            if(changed)this.resizeNativePlayer();
+        }
+        resizeNativePlayer() {
+            cancelAnimationFrame(this.resizeFrame);
+            this.resizeFrame=requestAnimationFrame(()=>{
+                if(!this.host.isConnected)return;
+                window.dispatchEvent(new Event('resize'));
+                this.native.dispatchEvent(new CustomEvent('yt-resize',{bubbles:true,composed:true}));
+            });
         }
         closeMore(focus=false) {
             const popup=this.q('.more-popup');
@@ -267,7 +308,7 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
             prose.replaceChildren();
             if (data.body) this.copyProse(data.body, prose, true);
             this.q('.description').hidden = !data.root && !prose.textContent.trim();
-            this.q('.description h2').textContent = this.copy.description;
+            this.q('.description').setAttribute('aria-label',this.copy.description);
             this.q('.stats').textContent = this.statsText(data.root);
             this.q('.expand').hidden = prose.textContent.trim().length < 220 && !data.expand;
             this.updateExpanded();
@@ -355,8 +396,9 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
         updateExpanded() {this.q('.prose').classList.toggle('expanded',this.expanded);this.q('.expand').textContent=this.expanded?this.copy.less:this.copy.more;this.q('.expand').setAttribute('aria-expanded',String(this.expanded));this.position();}
         sync(options) {
             this.options=options;this.copy=words[options.language]||words.en;const c=this.copy;
-            if(document.fullscreenElement||this.fullscreenPending)return;
             const media=this.native.querySelector('video');if(media!==this.media){this.media?.removeEventListener('timeupdate',this.videoTime);this.media=media;this.media?.addEventListener('timeupdate',this.videoTime);}
+            if(document.fullscreenElement){this.updateFullscreenLayout();return;}
+            if(this.fullscreenPending)return;
             this.surface.toggleAttribute('dark',options.dark);this.surface.toggleAttribute('theater',this.native.hasAttribute('theater'));if(this.host.lang!==options.language)this.host.lang=options.language;
             const input=this.q('#watch-search');input.placeholder=c.search;input.setAttribute('aria-label',c.search);this.q('#watch-clear').setAttribute('aria-label',c.clear);
             const metadata=this.native.querySelector('ytd-watch-metadata,ytd-video-primary-info-renderer,ytd-video-secondary-info-renderer');
@@ -419,7 +461,7 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
         position() {
             if(!this.host.isConnected||document.fullscreenElement||this.fullscreenPending)return;
             const headerBottom=this.q('.header').getBoundingClientRect().bottom;
-            for(const[node,state]of this.islands){if(!node.isConnected){this.restore(node);continue;}if(!state.box)continue;const b=state.box();if(state.kind==='media'&&(state.width!==b.width||state.height!==b.height)){state.width=b.width;state.height=b.height;cancelAnimationFrame(this.resizeFrame);this.resizeFrame=requestAnimationFrame(()=>{if(this.host.isConnected){window.dispatchEvent(new Event('resize'));this.native.dispatchEvent(new CustomEvent('yt-resize',{bubbles:true,composed:true}));}});}const props={'--myt-island-x':`${b.x}px`,'--myt-island-y':`${b.y}px`,'--myt-island-w':`${b.width}px`,'--myt-island-h':`${b.height}px`,'--myt-island-clip':['media','comments','sidecar'].includes(state.kind)?`${Math.max(0,headerBottom-b.y)}px`:'0px'};for(const[k,v]of Object.entries(props))if(node.style.getPropertyValue(k)!==v)node.style.setProperty(k,v);}
+            for(const[node,state]of this.islands){if(!node.isConnected){this.restore(node);continue;}if(!state.box)continue;const b=state.box();if(state.kind==='media'&&(state.width!==b.width||state.height!==b.height)){state.width=b.width;state.height=b.height;this.resizeNativePlayer();}const props={'--myt-island-x':`${b.x}px`,'--myt-island-y':`${b.y}px`,'--myt-island-w':`${b.width}px`,'--myt-island-h':`${b.height}px`,'--myt-island-clip':['media','comments','sidecar'].includes(state.kind)?`${Math.max(0,headerBottom-b.y)}px`:'0px'};for(const[k,v]of Object.entries(props))if(node.style.getPropertyValue(k)!==v)node.style.setProperty(k,v);}
         }
         updateCurrentChapter() {const time=this.native.querySelector('video')?.currentTime||0;const chapters=[...this.shadow.querySelectorAll('.chapter')];const current=chapters.findLast?chapters.findLast(b=>Number(b.dataset.seconds)<=time):chapters.filter(b=>Number(b.dataset.seconds)<=time).pop();for(const b of chapters){const value=String(b===current);if(b.getAttribute('aria-current')!==value)b.setAttribute('aria-current',value);}}
         toggleTranscript() {if(this.transcriptOpen){this.closeTranscript();}else{this.transcriptOpen=true;this.q('#watch-transcript').hidden=false;this.q('.transcript-content').hidden=false;this.q('.transcript-toggle').setAttribute('aria-expanded','true');this.loadTranscript();}this.q('.transcript-toggle').textContent=this.copy.hideTranscript;this.q('.transcript-menu-toggle')?.setAttribute('aria-expanded',String(this.transcriptOpen));this.position();}
@@ -444,7 +486,7 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
             this.q('.transcript-status').textContent=data.length?(filtered.length?'':this.copy.noResults):(this.transcriptLoading?this.copy.loading:this.copy.unavailable);this.q('.transcript-retry').hidden=!!data.length||this.transcriptLoading;this.q('.transcript-search').hidden=!data.length;
         }
         closeTranscript() {this.transcriptOpen=false;clearTimeout(this.transcriptTimeout);if(this.q){this.q('#watch-transcript').hidden=true;this.q('.transcript-menu-toggle')?.setAttribute('aria-expanded','false');this.q('.transcript-content').hidden=true;this.q('.transcript-toggle').setAttribute('aria-expanded','false');}if(this.nativePanelState){for(const[name,value]of this.nativePanelState.attrs){if(value===null)this.nativePanelState.node.removeAttribute(name);else this.nativePanelState.node.setAttribute(name,value);}this.nativePanelState=null;}}
-        destroy() {clearTimeout(this.fullscreenTimer);for(const type of ['click','dblclick','keydown'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);this.media?.removeEventListener('timeupdate',this.videoTime);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;}
+        destroy() {this.restoreFullscreenLayout();clearTimeout(this.fullscreenTimer);for(const type of ['click','dblclick','keydown'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);this.media?.removeEventListener('timeupdate',this.videoTime);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;}
     }
     globalThis.MinimalYouTubeWatch=WatchView;
 })();

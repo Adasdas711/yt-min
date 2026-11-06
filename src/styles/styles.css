@@ -1279,6 +1279,21 @@ html.minimal-youtube[data-myt-watch-ui] ytd-watch-flexy[data-myt-watch-source]:f
     transform: none !important; clip-path: none !important; border-radius: 0 !important;
     transition: none !important;
 }
+/* Fullscreen must size the native video's whole containing chain. YouTube can
+   retain inline dimensions from its covered page; no player/media nodes move. */
+html.minimal-youtube[data-myt-watch-ui] [data-myt-fullscreen-part="container"]:not(:fullscreen),
+html.minimal-youtube[data-myt-watch-ui] video[data-myt-fullscreen-part="video"]:not(:fullscreen) {
+    display: block !important; visibility: visible !important;
+    position: absolute !important; inset: 0 !important;
+    width: 100% !important; height: 100% !important;
+    min-width: 0 !important; min-height: 0 !important;
+    max-width: none !important; max-height: none !important;
+    margin: 0 !important; padding: 0 !important; border: 0 !important;
+    transform: none !important; clip-path: none !important; transition: none !important;
+}
+html.minimal-youtube[data-myt-watch-ui] video[data-myt-fullscreen-part="video"] {
+    object-fit: contain !important;
+}
 
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island]::backdrop { background: transparent !important; backdrop-filter: none !important; }
 

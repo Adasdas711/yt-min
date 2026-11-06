@@ -890,12 +890,13 @@ def check_native_watch(browser, theater=False, width=1440):
           const ui=document.querySelector('#myt-watch').firstElementChild.shadowRoot,viewport=ui.querySelector('.viewport');
           const event=new WheelEvent('wheel',{deltaY:120,bubbles:true,cancelable:true,composed:true});
           e.dispatchEvent(event);
-          return {cancelled:event.defaultPrevented,scroll:viewport.scrollTop,playerY:document.querySelector('#ytd-player').getBoundingClientRect().y,slotY:ui.querySelector('.media').getBoundingClientRect().y,transition:getComputedStyle(document.querySelector('#ytd-player')).transitionDuration};
+          return {cancelled:event.defaultPrevented,scroll:viewport.scrollTop,maxScroll:viewport.scrollHeight-viewport.clientHeight,playerY:document.querySelector('#ytd-player').getBoundingClientRect().y,slotY:ui.querySelector('.media').getBoundingClientRect().y,transition:getComputedStyle(document.querySelector('#ytd-player')).transitionDuration};
         }''')
-        assert direct['cancelled'] and direct['scroll']==120,direct
+        expected_scroll=min(120,direct['maxScroll'])
+        assert direct['cancelled'] and direct['scroll']==expected_scroll,direct
         assert abs(direct['playerY']-direct['slotY'])<1 and direct['transition']=='0s',direct
         page.wait_for_timeout(100)
-        assert page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop')==120
+        assert page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop')==expected_scroll
     page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
     page.locator('#movie_player').evaluate("e=>{const menu=document.createElement('div');menu.id='test-player-menu';menu.className='ytp-settings-menu';menu.style.cssText='position:absolute;right:20px;top:20px;width:120px;height:100px;overflow:auto;background:white';const content=document.createElement('div');content.style.height='400px';content.textContent='Native menu';menu.append(content);e.append(menu);}")
     page.locator('#test-player-menu').hover()
@@ -991,6 +992,69 @@ def check_native_watch(browser, theater=False, width=1440):
     assert page.locator('#ytd-player').get_attribute('popover') is None
     assert page.locator('video').get_attribute('style') is None
     assert page.evaluate('window.__nativeVideo===document.querySelector("video")&&!document.querySelector("video").paused')
+    page.evaluate('clearInterval(window.__frames);window.__stream.getTracks().forEach(track=>track.stop())')
+    page.close()
+
+
+def check_fullscreen_cached_layout(browser,target,theater=False,width=1440):
+    page=setup(browser,'/watch?v=fullscreen-layout',native_watch_fixture(theater),native_dark=True,width=width)
+    if width<600:page.set_viewport_size({'width':width,'height':600})
+    page.evaluate(VIDEO_STREAM)
+    errors=[]
+    page.on('pageerror',lambda error:errors.append(str(error)))
+    page.evaluate("""target=>{
+        window.__fullscreenVideo=document.querySelector('video');
+        window.__fullscreenParent=window.__fullscreenVideo.parentElement;
+        const wrappers=[document.querySelector('#ytd-player > #container'),document.querySelector('#movie_player'),window.__fullscreenVideo];
+        const saved=wrappers.map(node=>[node,node.getAttribute('style')]);
+        document.querySelector('#native-fullscreen').onclick=()=>document.fullscreenElement?document.exitFullscreen():document.querySelector(target).requestFullscreen().catch(error=>window.__fullscreenError=error.message);
+        document.addEventListener('fullscreenchange',()=>{
+            for(const[node,original]of saved){
+                if(document.fullscreenElement)node.style.cssText='position:absolute;left:0;top:0;width:0px;height:0px;overflow:hidden';
+                else if(original===null)node.removeAttribute('style');else node.setAttribute('style',original);
+            }
+        });
+    }""",target)
+    page.locator('#native-fullscreen').click()
+    page.wait_for_function('!!document.fullscreenElement')
+    expect(page.locator('#myt-watch')).to_be_hidden()
+    dimensions=page.locator('video').bounding_box()
+    assert dimensions=={'x':0,'y':0,'width':width,'height':page.viewport_size['height']},dimensions
+    assert page.locator('video').evaluate("e=>e.style.width==='0px'&&e.videoWidth===640&&e.videoHeight===360&&!e.paused")
+    # Sample the decoded picture across its contained aspect ratio, not just one
+    # center pixel that could pass with a small video inside a black fullscreen.
+    height=page.viewport_size['height'];picture_w=min(width,height*16/9);picture_h=picture_w*9/16
+    for px,py in [(x,y) for x in [.15,.5,.85] for y in [.15,.5,.85]]:
+        pixel=rendered_pixel(page,(width-picture_w)/2+px*picture_w,(height-picture_h)/2+py*picture_h)
+        assert all(abs(a-b)<=6 for a,b in zip(pixel,[24,180,96,255])),(target,px,py,pixel)
+    assert page.evaluate('window.__fullscreenVideo===document.querySelector("video")&&window.__fullscreenParent===document.querySelector("video").parentElement')
+    # Native controls must remain clickable after the dimensions are repaired.
+    page.locator('#native-play').click()
+    assert page.locator('video').evaluate('v=>v.paused')
+    page.locator('#native-play').click()
+    assert not page.locator('video').evaluate('v=>v.paused')
+    if target=='#ytd-player':
+        # Re-enabling while already fullscreen must keep the own canvas hidden.
+        page.evaluate('__setEnabled(false);__setEnabled(true)')
+        expect(page.locator('#myt-watch')).to_be_hidden()
+        page.evaluate("""async()=>{
+          const old=document.querySelector('video'),fresh=old.cloneNode(false);
+          fresh.removeAttribute('data-myt-fullscreen-part');fresh.removeAttribute('style');fresh.srcObject=old.srcObject;
+          old.replaceWith(fresh);await fresh.play();
+          await new Promise(resolve=>fresh.requestVideoFrameCallback(resolve));
+        }""")
+        expect(page.locator('video')).to_have_attribute('data-myt-fullscreen-part','video')
+        pixel=rendered_pixel(page,width/2,height/2)
+        assert all(abs(a-b)<=6 for a,b in zip(pixel,[24,180,96,255])),pixel
+    page.locator('#native-fullscreen').click()
+    page.wait_for_function('!document.fullscreenElement')
+    expect(page.locator('#myt-watch')).to_be_visible()
+    expect(page.locator('[data-myt-fullscreen-part]')).to_have_count(0)
+    assert page.locator('#ytd-player').evaluate("e=>e.matches(':popover-open')")
+    assert page.locator('video').bounding_box()==page.locator('#myt-watch .media').bounding_box()
+    assert not errors,errors
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('[data-myt-fullscreen-part]')).to_have_count(0)
     page.evaluate('clearInterval(window.__frames);window.__stream.getTracks().forEach(track=>track.stop())')
     page.close()
 
@@ -1177,7 +1241,7 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
         }""",base64.b64encode(png).decode())
         assert pixels == [expected], (width,offset,pixels)
     assert page.locator('#myt-watch .viewport').evaluate('e=>e.scrollWidth<=e.clientWidth'), 'Own buttons or cards cause horizontal overflow'
-    assert page.locator('#myt-watch button').evaluate_all("nodes=>nodes.filter(e=>e.getClientRects().length).every(e=>e.getBoundingClientRect().height>=43.5 && e.clientWidth>=e.scrollWidth-1)"), 'Own button text clips or the touch target is too short'
+    assert page.locator('#myt-watch button').evaluate_all("nodes=>nodes.filter(e=>e.getClientRects().length).every(e=>e.getBoundingClientRect().height>=(e.matches('.owner .primary')?35.5:43.5) && e.clientWidth>=e.scrollWidth-1)"), 'Own button text clips or the touch target is too short'
 
     if width==1440 and not legacy:
         page.locator('#watch-chapters').scroll_into_view_if_needed()
@@ -1766,6 +1830,9 @@ def main():
         for theater,width in [(False,1440),(True,1440),(False,390)]:
             check_native_watch(browser,theater,width)
             ok(f'native YouTube player at {width}px (theater={theater}) paints decoded frames, keeps controls/fullscreen and restores its nodes; channel and modern description render correctly; chapters scroll in one row')
+        for target,theater,width in [('#ytd-player',False,1440),('#player',True,1440),('#movie_player',False,390)]:
+            check_fullscreen_cached_layout(browser,target,theater,width)
+            ok(f'fullscreen {target} at {width}px repairs cached zero-sized native wrappers, paints the full decoded picture and keeps controls/player cleanup')
         for replay in [False,True]:
             check_removed_chat(browser,replay)
             ok(f'live chat (replay={replay}) is hidden and its iframe unloaded; late mounts, disabled mode, native player and unrelated embeds remain safe')
