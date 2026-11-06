@@ -744,7 +744,7 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     display: grid !important;
     grid-template-columns: repeat(calc(var(--myt-search-columns) * 2), minmax(0, 1fr));
     align-items: start;
-    gap: 32px 24px;
+    gap: 24px 24px;
     width: 100% !important;
     min-width: 0 !important;
     max-width: none !important;
@@ -1163,7 +1163,7 @@ html.minimal-youtube ytd-masthead :is(#search-input, .ytSearchboxComponentInputB
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-section-list-renderer > #contents {
     display: flex !important;
     flex-direction: column;
-    gap: 32px;
+    gap: 24px;
 }
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-item-section-renderer {
     margin-block: 0 !important;

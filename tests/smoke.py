@@ -553,16 +553,16 @@ def check_search_channels_and_row_gaps(browser, width):
     a,b,c = [page.locator('#channel-'+str(i)).bounding_box() for i in range(3)]
     if width > 600:
         assert abs(a['y']-b['y'])<1 and b['x']>a['x']+a['width'], (a,b)
-        assert c['y']>=a['y']+a['height']+31, (a,c)
+        assert abs(c['y']-a['y']-a['height']-24)<1, (a,c)
     else:
         assert b['y']>=a['y']+a['height']+23, (a,b)
     video_columns = 3 if width > 1000 else 2 if width > 600 else 1
     first = page.locator('#video-0').bounding_box()
     next_row = page.locator('#video-'+str(video_columns)).bounding_box()
-    assert next_row['y']>=first['y']+first['height']+23, (first,next_row)
+    assert abs(next_row['y']-first['y']-first['height']-24)<1, (first,next_row)
     end = page.locator('#video-5').bounding_box()
     start = page.locator('#video-6').bounding_box()
-    assert start['y']>=end['y']+end['height']+31, (end,start)
+    assert abs(start['y']-end['y']-end['height']-24)<1, (end,start)
     for i in range(4):
         expect(page.locator('#subscribe-'+str(i))).to_be_visible()
         expect(page.locator('#channel-'+str(i)+' #main-link')).to_have_attribute('href','/@creator'+str(i))
@@ -633,14 +633,14 @@ def check_channel_first_within_sections(browser):
     last=page.locator('#channel-order-3').bounding_box()
     assert first['y']<c1['y'], (first,c1)
     assert abs(c1['y']-c2['y'])<1, (c1,c2)
-    assert v1['y']>=max(c1['y']+c1['height'],c2['y']+c2['height'])+31, (c1,c2,v1)
+    assert v1['y']>=max(c1['y']+c1['height'],c2['y']+c2['height'])+23, (c1,c2,v1)
     assert abs(v1['y']-v2['y'])<1, (v1,v2)
     assert last['y']>v1['y']+v1['height'], (last,v1)
     assert page.locator('#video-order-1').evaluate("element => Boolean(element.compareDocumentPosition(document.querySelector('#channel-order-1')) & Node.DOCUMENT_POSITION_FOLLOWING)")
     page.locator('#channel-order-2').evaluate('element=>element.parentElement.remove()')
     expect(page.locator('#channel-order-2')).to_have_count(0)
     v1=page.locator('#video-order-1').bounding_box();c1=page.locator('#channel-order-1').bounding_box()
-    assert v1['y']>=c1['y']+c1['height']+31, (c1,v1)
+    assert v1['y']>=c1['y']+c1['height']+23, (c1,v1)
     page.evaluate('__setEnabled(false)')
     assert page.locator('[data-myt-search-video-start]').count()==0
     page.close()
