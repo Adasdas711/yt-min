@@ -1508,6 +1508,48 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
 
 
 
+def check_chapter_follow(browser, width):
+    page=setup(browser,'/watch?v=details',watch_details_fixture(),width=width)
+    page.locator('ytd-video-description-chapters-section-renderer #items').evaluate('''e=>{
+      e.replaceChildren();
+      for(let i=0;i<12;i++)e.insertAdjacentHTML('beforeend',`<ytd-macro-markers-list-item-renderer><button><span id=time>${i}:00</span><h3 id=title>Chapter ${i}: stories behind the music</h3></button></ytd-macro-markers-list-item-renderer>`);
+    }''')
+    expect(page.locator('.chapter')).to_have_count(12)
+    page.locator('.chapter-list').scroll_into_view_if_needed()
+    scroll_top=page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop')
+
+    def seek(seconds, event):
+        page.locator('video').evaluate('(e,args)=>{e.currentTime=args[0];e.dispatchEvent(new Event(args[1]));}',[seconds,event])
+
+    def current_is_visible(seconds):
+        expect(page.locator('.chapter[aria-current=true]')).to_have_attribute('data-seconds',str(seconds))
+        page.wait_for_function('''() => {
+          const ui=document.querySelector('#myt-watch').firstElementChild.shadowRoot;
+          const list=ui.querySelector('.chapter-list'),card=list.querySelector('[aria-current=true]');
+          const rail=list.getBoundingClientRect(),active=card.getBoundingClientRect();
+          return active.left>=rail.left-1&&active.right<=rail.left+list.clientWidth+1;
+        }''')
+        assert abs(page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop')-scroll_top)<1
+
+    # Playback crossing a boundary reveals the active card without moving the page.
+    seek(660,'timeupdate')
+    current_is_visible(660)
+    # Browsing the rail stays possible until the next chapter or explicit seek.
+    page.locator('.chapter-list').evaluate('e=>e.scrollLeft=0')
+    seek(661,'timeupdate')
+    assert page.locator('.chapter-list').evaluate('e=>e.scrollLeft')==0
+    # Seeking inside the same chapter follows it again, including backwards seeks.
+    seek(662,'seeked')
+    current_is_visible(660)
+    seek(0,'seeked')
+    current_is_visible(0)
+    # A chapter click uses the same follow behavior and retains native playback.
+    page.locator('.chapter').nth(5).click()
+    current_is_visible(300)
+    assert_stable(page)
+    page.close()
+
+
 def check_removed_chat(browser, replay):
     page=setup(browser, '/watch?v=chat', native_watch_fixture())
     errors=[]
@@ -2086,6 +2128,8 @@ def main():
         check_native_home_fallback(browser)
         ok('native and SPA home stay usable when local extension files are unavailable; settings and search still work without a blind redirect')
         for width in [1440,390]:
+            check_chapter_follow(browser,width)
+            ok(f'chapter rail at {width}px follows playback and forward/backward seeks without moving the page or resetting manual browsing on every clock tick')
             check_short_watch_scroll(browser,width)
             ok(f'short description at {width}px permits scrolling the whole player offscreen and back; native fixed video descendants track the page')
         for theater,width in [(False,1440),(True,1440),(False,390)]:
