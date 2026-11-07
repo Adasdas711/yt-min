@@ -1268,6 +1268,15 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"],
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] { display: block !important; border-radius: 16px !important; clip-path: inset(var(--myt-island-clip, 0px) 0 0) !important; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="popups"] { display: block !important; pointer-events: none !important; background: transparent !important; overflow: visible !important; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="popups"] > * { pointer-events: auto; }
+/* The native unsubscribe command still runs; its transient menu/confirmation
+   stays masked through its closing animation, without hiding other dialogs. */
+html.minimal-youtube[data-myt-watch-ui] [data-myt-subscription-transient] {
+    opacity: 0 !important; pointer-events: none !important;
+    transition: none !important; animation: none !important;
+}
+html.minimal-youtube[data-myt-watch-ui] [data-myt-subscription-transient]::backdrop {
+    background: transparent !important; backdrop-filter: none !important;
+}
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="anchor"] { display: block !important; opacity: 0 !important; pointer-events: none !important; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island]:not(:popover-open):not([data-myt-fullscreen-pending]) { display: none !important; }
 html.minimal-youtube[data-myt-watch-ui] :fullscreen,

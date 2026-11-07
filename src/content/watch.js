@@ -25,9 +25,9 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
 .media { width:100%;aspect-ratio:16/9;background:#000;border-radius:18px; }.sidecar { min-height:540px;border-radius:16px;background:var(--surface); }
 .details { max-width:960px;margin:28px auto 0;min-width:0;min-height:calc(100dvh - 148px); } h1 { font-size:28px;line-height:1.35;font-weight:650;letter-spacing:-.6px;overflow-wrap:anywhere; }
 .meta-row { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin:22px 0 0; }
-.channel-card { position:relative;display:grid;grid-template-columns:46px minmax(0,1fr) 20px;align-items:center;gap:2px 14px;flex:0 1 auto;width:fit-content;max-width:min(520px,100%);min-width:0;min-height:78px;padding:14px 24px;border:1px solid #dcdce3;border-radius:999px;background:#f1f1f5;color:var(--ink);--ink:#18181b;--muted:#62626e;--border:#c8c8d1; }
+.channel-card { position:relative;display:grid;grid-template-columns:46px minmax(0,1fr) 20px;align-items:center;gap:2px 14px;flex:0 1 auto;width:fit-content;max-width:min(520px,100%);min-width:0;min-height:78px;padding:14px 24px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--ink); }
 .channel-card[data-subscribed=true] { background:#c91f37;border-color:#c91f37;--ink:#fff;--muted:#ffe7eb; }.channel-card[data-subscribed=true] .owner img { box-shadow:0 0 0 1px #ffffff66; }
-.channel-card:has(.channel-subscribe:hover:not(:disabled)) { background:#e8e8ef; }.channel-card[data-subscribed=true]:has(.channel-subscribe:hover:not(:disabled)) { background:#b51b31;border-color:#b51b31; }
+.channel-card:has(.channel-subscribe:hover:not(:disabled)) { background:var(--soft); }.channel-card[data-subscribed=true]:has(.channel-subscribe:hover:not(:disabled)) { background:#b51b31;border-color:#b51b31; }
 .channel-subscribe { position:absolute;inset:0;width:100%;height:100%;padding:0;border:0;border-radius:inherit;background:transparent;color:inherit; }.channel-subscribe:hover { background:transparent; }.channel-subscribe:disabled { opacity:1; }.channel-subscribe:focus-visible { outline:2px solid #62626e;outline-offset:3px; }
 .owner { display:contents;pointer-events:none; }.avatar-link { position:relative;grid-column:1;grid-row:1 / 3;display:block;pointer-events:auto; }.owner-text { position:relative;grid-column:2;grid-row:1;align-self:end;min-width:0; }.owner-link { color:var(--ink);pointer-events:auto; }.owner img { display:block;width:46px;height:46px;border-radius:50%;object-fit:cover; }.owner-name { overflow-wrap:anywhere;font-size:17px;font-weight:600; }
 .subscription-state { position:relative;grid-column:3;grid-row:1 / 3;display:flex;align-items:center;pointer-events:none;color:var(--ink); }.subscription-state svg { width:18px;height:18px; }.channel-card .stats { position:relative;grid-column:2;grid-row:2;align-self:start;pointer-events:none;font-size:13px;line-height:1.5; }.channel-card:not(:has(.avatar-link img)) { grid-template-columns:minmax(0,1fr) 20px; }.channel-card:not(:has(.avatar-link img)) .owner-text,.channel-card:not(:has(.avatar-link img)) .stats { grid-column:1; }.channel-card:not(:has(.avatar-link img)) .subscription-state { grid-column:2; }.sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0; }
@@ -352,37 +352,64 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
             button.hidden=!state.button;button.disabled=pending||state.disabled;
             button.setAttribute('aria-pressed',String(state.subscribed));button.setAttribute('aria-busy',String(pending));
             button.setAttribute('aria-label',`${state.subscribed?this.copy.unsubscribeChannel:this.copy.subscribeChannel} ${data.name||''}`.trim());
-                        status.hidden=!state.button;
+            status.hidden=!state.button;
             const label=pending?(state.subscribed?this.copy.unsubscribing:this.copy.subscribing):(state.subscribed?this.copy.subscribed:this.copy.subscribe);
             if(status.dataset.label!==label){
                 status.dataset.label=label;
-                status.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${state.subscribed?'<path d="m5 12 4 4L19 6"/>':'<path d="M12 5v14M5 12h14"/>'}</svg>`;
+                status.innerHTML=state.subscribed?`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>`:'';
                 status.append(this.node('span','sr-only',label));
             }
         }
-        clearSubscription() {
-            clearTimeout(this.subscriptionTimer);this.subscriptionObserver?.disconnect();this.subscriptionObserver=null;this.subscriptionPending=null;
+        clearSubscription(restore=false) {
+            clearTimeout(this.subscriptionTimer);this.subscriptionPending=null;
+            this.cleanSubscriptionPopups(restore);
+            if(this.subscriptionMasks?.size)this.subscriptionTimer=setTimeout(()=>this.clearSubscription(true),2000);
+            else{this.subscriptionObserver?.disconnect();this.subscriptionObserver=null;}
+        }
+        cleanSubscriptionPopups(restore=false) {
+            for(const [node,value] of this.subscriptionMasks||[]){
+                const closed=!node.isConnected||node.closest('[hidden],[aria-hidden="true"]')||!node.getClientRects().length||getComputedStyle(node).visibility==='hidden'||(node.matches('tp-yt-iron-overlay-backdrop')&&!node.hasAttribute('opened'));
+                const authentication=/^(?:sign in|войти)/iu.test(text(node.querySelector('#confirm-button')));
+                const reused=authentication||(node.matches('ytd-menu-popup-renderer,yt-menu-popup-renderer')&&Boolean(text(node))&&!/unsubscribe|отписаться|отменить подписку|отказаться от подписки|abo beenden|se désabonner|cancelar (?:suscripción|inscrição)|annulla iscrizione/iu.test(text(node)));
+                if(restore||closed||reused){if(value===null)node.removeAttribute('data-myt-subscription-transient');else node.setAttribute('data-myt-subscription-transient',value);this.subscriptionMasks.delete(node);}
+            }
+            if(!this.subscriptionPending&&!this.subscriptionMasks?.size){clearTimeout(this.subscriptionTimer);this.subscriptionObserver?.disconnect();this.subscriptionObserver=null;}
+        }
+        maskSubscriptionPopup(node) {
+            const target=node.closest('tp-yt-paper-dialog,dialog,ytd-menu-popup-renderer,yt-menu-popup-renderer,yt-confirm-dialog-renderer,ytd-confirm-dialog-renderer')||node;
+            this.subscriptionMasks||=new Map();
+            if(!this.subscriptionMasks.has(target)){this.subscriptionMasks.set(target,target.getAttribute('data-myt-subscription-transient'));target.setAttribute('data-myt-subscription-transient','');}
+            this.maskSubscriptionBackdrops();
+        }
+        maskSubscriptionBackdrops() {
+            if(!this.subscriptionMasks?.size)return;
+            for(const backdrop of document.querySelectorAll('tp-yt-iron-overlay-backdrop[opened]')){
+                if(!this.subscriptionMasks.has(backdrop)){this.subscriptionMasks.set(backdrop,backdrop.getAttribute('data-myt-subscription-transient'));backdrop.setAttribute('data-myt-subscription-transient','');}
+            }
         }
         toggleSubscription() {
             if(this.subscriptionPending)return;
             const data=this.subscriptionData||{},state=this.subscriptionState(data.owner);
             if(!state.button?.isConnected||state.disabled)return;
+            clearTimeout(this.subscriptionTimer);this.subscriptionObserver?.disconnect();this.subscriptionObserver=null;this.cleanSubscriptionPopups();
             this.closeMore();
             const visible=node=>Boolean(node.getClientRects().length&&getComputedStyle(node).visibility!=='hidden'&&getComputedStyle(node).display!=='none');
             const popups=document.querySelector('ytd-popup-container');
             const existing=popups?[...popups.querySelectorAll('ytd-menu-service-item-renderer,ytd-menu-navigation-item-renderer,yt-list-item-view-model,[role="menuitem"],#confirm-button')].filter(visible):[];
             this.subscriptionPending={video:this.options.video,subscribed:state.subscribed,visible,existing:new Set(existing)};
             this.subscriptionObserver=new MutationObserver(records=>{
-                if(records.some(record=>{const target=record.target instanceof Element?record.target:record.target.parentElement;return data.owner?.contains(target)||target?.closest('ytd-popup-container')||[...record.addedNodes].some(node=>node instanceof Element&&(node.matches('ytd-popup-container')||node.querySelector('ytd-popup-container')));}))this.continueSubscription();
+                if(records.some(record=>{const target=record.target instanceof Element?record.target:record.target.parentElement;return data.owner?.contains(target)||target?.closest('ytd-popup-container,tp-yt-iron-overlay-backdrop')||[...record.addedNodes].some(node=>node instanceof Element&&(node.matches('ytd-popup-container,tp-yt-iron-overlay-backdrop')||node.querySelector('ytd-popup-container')));})){if(this.subscriptionPending)this.continueSubscription();else{this.maskSubscriptionBackdrops();this.cleanSubscriptionPopups();}}
             });
-            this.subscriptionObserver.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['subscribed','is-subscribed','aria-pressed','aria-label','aria-busy','hidden','aria-hidden','disabled','aria-disabled','style','opened']});
-            this.subscriptionTimer=setTimeout(()=>{this.clearSubscription();this.syncSubscription(this.subscriptionData||{});},6000);
+            this.subscriptionObserver.observe(document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['subscribed','is-subscribed','aria-pressed','aria-label','aria-busy','hidden','aria-hidden','disabled','aria-disabled','style','class','open','opened']});
+            this.subscriptionTimer=setTimeout(()=>{this.clearSubscription(true);this.syncSubscription(this.subscriptionData||{});},6000);
             this.syncSubscription(data);
-            try{state.button.click();this.continueSubscription();}catch{this.clearSubscription();this.syncSubscription(data);}
+            try{state.button.click();this.continueSubscription();}catch{this.clearSubscription(true);this.syncSubscription(data);}
         }
         continueSubscription() {
             const pending=this.subscriptionPending;
             if(!pending)return;
+            this.cleanSubscriptionPopups();
+            this.maskSubscriptionBackdrops();
             this.syncSubscription(this.subscriptionData||{});
             if(this.subscriptionPending!==pending||!pending.subscribed)return;
             const popups=document.querySelector('ytd-popup-container');
@@ -391,11 +418,11 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
             const available=node=>!pending.existing.has(node)&&pending.visible(node)&&!node.matches(':disabled,[aria-disabled="true"]')&&unsubscribe.test((node.getAttribute('aria-label')||'')+' '+text(node));
             if(!pending.menuClicked){
                 const item=[...popups.querySelectorAll('ytd-menu-service-item-renderer,ytd-menu-navigation-item-renderer,yt-list-item-view-model,[role="menuitem"]')].find(available);
-                if(item){pending.menuClicked=true;item.click();this.continueSubscription();return;}
+                if(item){this.maskSubscriptionPopup(item);pending.menuClicked=true;item.click();this.continueSubscription();return;}
             }
             if(!pending.confirmClicked){
                 const confirm=[...popups.querySelectorAll('yt-confirm-dialog-renderer #confirm-button,ytd-confirm-dialog-renderer #confirm-button,[role="dialog"] #confirm-button')].find(available);
-                if(confirm){pending.confirmClicked=true;(confirm.querySelector('button')||confirm).click();this.continueSubscription();}
+                if(confirm){this.maskSubscriptionPopup(confirm);pending.confirmClicked=true;(confirm.querySelector('button')||confirm).click();this.continueSubscription();}
             }
         }
         descriptionData(metadata) {
@@ -434,10 +461,11 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
             return this.viewsFormat.format(count).toLowerCase().replace(/\s+/g,' ').replace(/млн$/u,'млн.').replace(/млрд$/u,'млрд.');
         }
         publicationDate(meta,info,readable) {
-            const months=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+            const locale=this.options.language==='ru'?'ru-RU':'en-GB';
+            if(this.dateLocale!==locale){this.dateLocale=locale;this.dateFormat=new Intl.DateTimeFormat(locale,{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});}
             const format=(year,month,day)=>{
                 const date=new Date(Date.UTC(year,month-1,day));
-                return year>=1000&&date.getUTCFullYear()===year&&date.getUTCMonth()===month-1&&date.getUTCDate()===day?`${day} ${months[month-1]} ${year} г.`:'';
+                return year>=1000&&date.getUTCFullYear()===year&&date.getUTCMonth()===month-1&&date.getUTCDate()===day?this.dateFormat.format(date).replace(/\s+/g,' '):'';
             };
             const parse=value=>{
                 if(!value)return '';
@@ -636,7 +664,7 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
             this.q('.transcript-status').textContent=data.length?(filtered.length?'':this.copy.noResults):(this.transcriptLoading?this.copy.loading:this.copy.unavailable);this.q('.transcript-retry').hidden=!!data.length||this.transcriptLoading;this.q('.transcript-search').hidden=!data.length;
         }
         closeTranscript() {this.transcriptOpen=false;clearTimeout(this.transcriptTimeout);if(this.q){this.q('#watch-transcript').hidden=true;this.q('.transcript-menu-toggle')?.setAttribute('aria-expanded','false');this.q('.transcript-content').hidden=true;this.q('.transcript-toggle').setAttribute('aria-expanded','false');}if(this.nativePanelState){for(const[name,value]of this.nativePanelState.attrs){if(value===null)this.nativePanelState.node.removeAttribute(name);else this.nativePanelState.node.setAttribute(name,value);}this.nativePanelState=null;}}
-        destroy() {this.clearSubscription();this.clearFullscreenPreview();this.restoreFullscreenLayout();clearTimeout(this.fullscreenTimer);for(const type of ['click','dblclick','keydown'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);for(const type of ['timeupdate','seeked'])this.media?.removeEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.removeEventListener(type,this.videoMetadata);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;window.dispatchEvent(new Event('resize'));}
+        destroy() {this.clearSubscription(true);this.clearFullscreenPreview();this.restoreFullscreenLayout();clearTimeout(this.fullscreenTimer);for(const type of ['click','dblclick','keydown'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);for(const type of ['timeupdate','seeked'])this.media?.removeEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.removeEventListener(type,this.videoMetadata);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;window.dispatchEvent(new Event('resize'));}
     }
     globalThis.MinimalYouTubeWatch=WatchView;
 })();

@@ -540,7 +540,7 @@
             home = createHome();
             renderTheme();
         }
-        if (settingsReady) syncWatch();
+        if (settingsReady) { syncWatch(); syncWatchDetails(); }
     }
 
     function saveTheme(value) {

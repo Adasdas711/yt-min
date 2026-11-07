@@ -923,12 +923,12 @@ def check_native_watch(browser, theater=False, width=1440):
     assert page.evaluate('window.__descriptionLoaded') is True
     page.locator('#below').evaluate("e=>e.insertAdjacentHTML('beforeend','<meta itemprop=datePublished content=2025-03-08>')")
     page.locator('#info-container').evaluate("e=>{const counter=document.createElement('yt-animated-rolling-number');counter.setAttribute('aria-label','326,412,890 views');counter.textContent='123456789012345678901234567890';const date=document.createElement('span');date.textContent='1 month ago';const products=document.createElement('button');products.textContent='3 products';e.replaceChildren(counter,date,products);}")
-    expect(page.locator('#myt-watch .stats')).to_have_text('326m · 8 марта 2025 г.')
+    expect(page.locator('#myt-watch .stats')).to_have_text('326m · 8 March 2025')
     page.locator('yt-animated-rolling-number').evaluate("e=>e.setAttribute('aria-label','326,412,891 views')")
-    expect(page.locator('#myt-watch .stats')).to_have_text('326m · 8 марта 2025 г.')
+    expect(page.locator('#myt-watch .stats')).to_have_text('326m · 8 March 2025')
     page.locator('#below').evaluate("e=>e.insertAdjacentHTML('beforeend','<meta itemprop=interactionCount content=987654321>')")
     page.locator('yt-animated-rolling-number').evaluate("e=>e.removeAttribute('aria-label')")
-    expect(page.locator('#myt-watch .stats')).to_have_text('988m · 8 марта 2025 г.')
+    expect(page.locator('#myt-watch .stats')).to_have_text('988m · 8 March 2025')
 
     # Enough chapters to overflow on desktop and mobile: exactly one scroll row.
     page.locator('#below').evaluate("e=>{for(let i=0;i<12;i++)e.insertAdjacentHTML('beforeend',`<ytd-macro-markers-list-item-renderer><button><span id=time>${i}:00</span><span id=title>Episode ${i}: a longer chapter title</span></button></ytd-macro-markers-list-item-renderer>`);}")
@@ -943,7 +943,7 @@ def check_native_watch(browser, theater=False, width=1440):
     first_chapter=page.locator('.chapter').first.element_handle()
     chapter_scroll=page.locator('.chapter-list').evaluate('e=>e.scrollLeft')
     page.locator('yt-animated-rolling-number').evaluate("e=>e.setAttribute('aria-label','987,654,322 views')")
-    expect(page.locator('#myt-watch .stats')).to_have_text('988m · 8 марта 2025 г.')
+    expect(page.locator('#myt-watch .stats')).to_have_text('988m · 8 March 2025')
     assert first_chapter.evaluate('e=>e.isConnected'), 'View updates rebuild chapter cards'
     assert abs(page.locator('.chapter-list').evaluate('e=>e.scrollLeft')-chapter_scroll)<2
     page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
@@ -1535,11 +1535,18 @@ def check_subscription_card(browser, dark, width, modern=False):
         if(window.__signInRequired){popups.innerHTML='<div role="dialog" id="sign-in-dialog">Sign in to subscribe<button id="confirm-button" onclick="window.__wrongConfirm=true">Sign in</button></div>';return;}
         if(subscribed&&window.__useUnsubMenu){
           setTimeout(()=>{
-            popups.innerHTML='<ytd-menu-service-item-renderer role="menuitem">Unsubscribe</ytd-menu-service-item-renderer>';
+            popups.innerHTML='<ytd-menu-service-item-renderer role="menuitem" data-test-unsubscribe-ui>Unsubscribe</ytd-menu-service-item-renderer>';
             popups.firstElementChild.onclick=()=>{
               window.__unsubscribeMenu=true;
-              popups.innerHTML='<yt-confirm-dialog-renderer role="dialog"><div id="confirm-button"><button>Unsubscribe</button></div></yt-confirm-dialog-renderer>';
-              popups.querySelector('button').onclick=()=>{window.__unsubscribeConfirm=true;window.__setSubscribed(false);popups.replaceChildren();};
+              popups.innerHTML='<yt-confirm-dialog-renderer role="dialog" style="display:block;position:fixed;inset:180px auto auto 80px;padding:30px;background:white;color:black;opacity:1;transition:opacity .25s"><div id="confirm-button"><button>Unsubscribe</button></div></yt-confirm-dialog-renderer>';
+              popups.querySelector('button').onclick=()=>{
+                window.__unsubscribeConfirm=true;
+                if(window.__slowUnsubscribe){
+                  popups.firstElementChild.dataset.testUnsubscribeUi='';
+                  const backdrop=document.createElement('tp-yt-iron-overlay-backdrop');backdrop.setAttribute('opened','');backdrop.dataset.testUnsubscribeUi='';backdrop.style.cssText='position:fixed;inset:0;background:#0009;opacity:1;transition:opacity .25s;';document.body.append(backdrop);
+                  setTimeout(()=>{window.__setSubscribed(false);setTimeout(()=>{popups.replaceChildren();backdrop.remove();},350);},120);
+                }else{window.__setSubscribed(false);popups.replaceChildren();}
+              };
             };
           },0);
         }else window.__setSubscribed(!subscribed);
@@ -1561,6 +1568,7 @@ def check_subscription_card(browser, dark, width, modern=False):
     card.scroll_into_view_if_needed()
     page.mouse.move(0,0)
     original_color=card.evaluate('e=>getComputedStyle(e).backgroundColor')
+    expect(card.locator('.subscription-state svg')).to_have_count(0)
     box=card.bounding_box()
     card.click(position={'x':box['width']-12,'y':box['height']/2})
     expect(button).to_have_attribute('aria-pressed','true')
@@ -1580,12 +1588,33 @@ def check_subscription_card(browser, dark, width, modern=False):
     button.press('Space')
     expect(button).to_have_attribute('aria-pressed','true')
     if dark and width==1440:card.screenshot(path='/tmp/yt-min-channel-card-subscribed.png')
-    page.evaluate('window.__useUnsubMenu=true')
+    page.evaluate('''() => {
+      window.__useUnsubMenu=true;window.__slowUnsubscribe=true;window.__unsubscribePainted=[];
+      const end=performance.now()+750;
+      const frame=()=>{
+        for(const node of document.querySelectorAll('[data-test-unsubscribe-ui]')){
+          let visible=Boolean(node.getClientRects().length);
+          for(let parent=node;parent&&visible;parent=parent.parentElement){const style=getComputedStyle(parent);if(style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0)visible=false;}
+          if(visible)window.__unsubscribePainted.push(node.localName);
+        }
+        if(performance.now()<end)requestAnimationFrame(frame);else window.__unsubscribeCaptureDone=true;
+      };requestAnimationFrame(frame);
+    }''')
     click_background()
     expect(button).to_have_attribute('aria-pressed','false')
     assert page.evaluate('__unsubscribeMenu&&__unsubscribeConfirm')
-    assert page.evaluate('__subscribeCalls')==4
+    rapid=modern and width==390
+    if rapid:
+        button.focus();button.press('Space')
+        expect(button).to_have_attribute('aria-pressed','true')
+    assert page.evaluate('__subscribeCalls')==(5 if rapid else 4)
+    page.wait_for_function('window.__unsubscribeCaptureDone')
+    assert page.evaluate('__unsubscribePainted')==[], 'Native unsubscribe confirmation or backdrop flashed while opening/closing'
+    expect(page.locator('[data-myt-subscription-transient]')).to_have_count(0)
     # An attribute-only native update must also change the card.
+    if rapid:
+        page.evaluate('__setSubscribed(false)')
+        expect(button).to_have_attribute('aria-pressed','false')
     if modern:page.locator('#native-subscribe').evaluate('e=>e.setAttribute("aria-pressed","true")')
     else:page.locator('#subscribe-button').evaluate('e=>e.setAttribute("subscribed","")')
     expect(button).to_have_attribute('aria-pressed','true')
@@ -1596,6 +1625,7 @@ def check_subscription_card(browser, dark, width, modern=False):
     expect(button).to_have_attribute('aria-busy','true')
     expect(card).to_have_attribute('data-subscribed','false')
     expect(page.locator('#sign-in-dialog')).to_be_visible()
+    assert page.locator('#sign-in-dialog').evaluate('e=>!e.closest("[data-myt-subscription-transient]")')
     assert page.evaluate('!window.__wrongConfirm')
     page.clock.fast_forward(6100)
     expect(button).to_have_attribute('aria-busy','false')
@@ -1608,20 +1638,40 @@ def check_subscription_card(browser, dark, width, modern=False):
     page.close()
 
 
+def check_watch_language_change(browser, legacy=False):
+    page=setup(browser,'/watch?v=details',watch_details_fixture(legacy),language='ru')
+    stats=page.locator('#myt-watch .stats')
+    page.evaluate('window.__originalVideo=document.querySelector("video")')
+    expect(stats).to_have_text('906 тыс. · 8 марта 2025 г.')
+    page.evaluate("chrome.storage.local.set({language:'en'})")
+    expect(stats).to_have_text('906k · 8 March 2025')
+    page.evaluate("chrome.storage.local.set({language:'ru'})")
+    expect(stats).to_have_text('906 тыс. · 8 марта 2025 г.')
+    page.locator('#info-container').evaluate('e=>e.textContent="3,33 млн просмотров · 8 марта 2025 г."')
+    expect(stats).to_have_text('3,33 млн. · 8 марта 2025 г.')
+    page.evaluate("chrome.storage.local.set({language:'en'})")
+    expect(stats).to_have_text('3.33m · 8 March 2025')
+    page.evaluate("chrome.storage.local.set({language:''})")
+    expect(stats).to_have_text('3,33 млн. · 8 марта 2025 г.')
+    assert page.evaluate('__originalVideo===document.querySelector("video")')
+    page.close()
+
+
 def check_watch_stats(browser, language):
     page=setup(browser,'/watch?v=details',watch_details_fixture(),language=language)
     stats=page.locator('#myt-watch .stats')
     ru=language=='ru'
-    expect(stats).to_have_text(('906 тыс.' if ru else '906k')+' · 8 марта 2025 г.')
+    date=lambda ru_value,en_value:ru_value if ru else en_value
+    expect(stats).to_have_text(('906 тыс.' if ru else '906k')+' · '+date('8 марта 2025 г.','8 March 2025'))
     for raw,compact in [('1234 views','1,23 тыс.' if ru else '1.23k'),('3,33 млн просмотров','3,33 млн.' if ru else '3.33m'),('1.2K views','1,2 тыс.' if ru else '1.2k'),('999999 views','1 млн.' if ru else '1m'),('No views','0')]:
         page.locator('#info-container').evaluate('(e,value)=>e.textContent=value+" · Jul 4, 2026"',raw)
-        expect(stats).to_have_text(compact+' · 4 июля 2026 г.')
+        expect(stats).to_have_text(compact+' · '+date('4 июля 2026 г.','4 July 2026'))
     page.locator('#info-container').evaluate('e=>e.textContent="853 views · 1 month ago"')
     expect(stats).to_have_text('853')  # A relative label cannot establish a day.
     page.locator('ytd-watch-metadata').evaluate('e=>e.insertAdjacentHTML("beforeend",\'<meta itemprop="uploadDate" content="2024-03-01"><meta itemprop="datePublished" content="2024-02-29T23:45:00-08:00">\')')
-    expect(stats).to_have_text('853 · 29 февраля 2024 г.')
+    expect(stats).to_have_text('853 · '+date('29 февраля 2024 г.','29 February 2024'))
     page.locator('meta[itemprop=datePublished]').evaluate('e=>e.content="2025-02-29"')
-    expect(stats).to_have_text('853 · 1 марта 2024 г.')  # Invalid publication day falls back to valid upload metadata.
+    expect(stats).to_have_text('853 · '+date('1 марта 2024 г.','1 March 2024'))  # Invalid publication day falls back to valid upload metadata.
     page.locator('meta[itemprop=uploadDate]').evaluate('e=>e.remove()')
     expect(stats).to_have_text('853')
     page.locator('meta[itemprop=datePublished]').evaluate('e=>e.remove()')
@@ -1630,10 +1680,10 @@ def check_watch_stats(browser, language):
     }''')
     expect(stats).to_have_text('853')
     page.locator('link[rel=canonical]').evaluate('e=>e.href="https://www.youtube.com/watch?v=details"')
-    expect(stats).to_have_text('853 · 2 января 2025 г.')
+    expect(stats).to_have_text('853 · '+date('2 января 2025 г.','2 January 2025'))
     page.locator('link[rel=canonical]').evaluate('e=>e.href="https://www.youtube.com/watch?v=previous"')
     page.locator('#info-container').evaluate('e=>e.insertAdjacentHTML("beforeend",\'<tp-yt-paper-tooltip hidden>6 августа 2020 г.</tp-yt-paper-tooltip>\')')
-    expect(stats).to_have_text('853 · 6 августа 2020 г.')
+    expect(stats).to_have_text('853 · '+date('6 августа 2020 г.','6 August 2020'))
     page.close()
 
 
@@ -2275,6 +2325,9 @@ def main():
         ok('only visible enabled native ad skip controls are clicked, with consecutive-ad/off support and unchanged media volume/rate/identity')
         check_native_home_fallback(browser)
         ok('native and SPA home stay usable when local extension files are unavailable; settings and search still work without a blind redirect')
+        for legacy in [False,True]:
+            check_watch_language_change(browser,legacy)
+            ok(f'watch language (legacy={legacy}) updates counts and full dates immediately through storage changes, without a reload or native metadata mutation')
         for language in ['ru','en']:
             check_watch_stats(browser,language)
             ok(f'watch stats ({language}) use compact counts without a views label and an exact calendar day, without relative-date guesses or stale-video metadata')
