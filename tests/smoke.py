@@ -1306,6 +1306,128 @@ def check_theater_edges(browser,width,source_height):
     page.close()
 
 
+def playlist_panel_fixture():
+    rows=''.join(f'''<ytd-playlist-panel-video-renderer><a href="/watch?v=playlist-{i}" onclick="event.preventDefault();window.__playlistVisit={i}"><span class="playlist-preview">{i+1}</span><span>Playlist video {i+1}: a conversation about life and music</span></a></ytd-playlist-panel-video-renderer>''' for i in range(50))
+    return '''<style>
+      #playlist { color:#eee;background:#19191d;font:15px/1.4 Arial; }
+      #playlist #header { height:88px;padding:16px; }
+      #playlist #header button { float:right; }
+      #playlist #items { overflow:auto; }
+      #playlist ytd-playlist-panel-video-renderer { height:86px;min-height:86px; }
+      #playlist ytd-playlist-panel-video-renderer a { display:flex;align-items:center;gap:12px;height:100%;padding:10px;color:inherit;text-decoration:none; }
+      #playlist .playlist-preview { display:grid;place-items:center;flex:none;width:96px;height:54px;background:#38495e;border-radius:8px; }
+    </style><ytd-playlist-panel-renderer id="playlist"><div id="container"><div id="header"><button onclick="document.querySelector('#playlist').hidden=true">Close playlist</button><strong>Playlist</strong><br>50 videos</div><div id="items">'''+rows+'</div></div></ytd-playlist-panel-renderer>'
+
+
+def check_playlist_layout(browser, theater=False, width=1440):
+    body=native_watch_fixture(theater)
+    body=body.replace('<div id="secondary-inner"></div>','<div id="secondary-inner">'+playlist_panel_fixture()+'</div>')
+    page=setup(browser,'/watch?v=native&list=fixture',body,native_dark=True,width=width)
+    page.evaluate(VIDEO_STREAM)
+    page.evaluate("document.querySelector('#expand').onclick=()=>{}")
+    page.wait_for_function('''() => {
+      const root=document.querySelector('#myt-watch').firstElementChild.shadowRoot,placeholder=root.querySelector('.sidecar').getBoundingClientRect(),native=document.querySelector('#playlist').getBoundingClientRect();
+      return placeholder.width>0&&Math.abs(placeholder.width-native.width)<1&&Math.abs(placeholder.height-native.height)<1&&Math.abs(placeholder.y-native.y)<1;
+    }''')
+    bounds=page.evaluate('''() => {
+      const root=document.querySelector('#myt-watch').firstElementChild.shadowRoot,box=s=>{const b=root.querySelector(s).getBoundingClientRect();return{x:b.x,y:b.y,width:b.width,height:b.height,right:b.right,bottom:b.bottom};};
+      return {media:box('.media'),details:box('.details'),playlist:box('.sidecar'),header:box('.header'),width:root.querySelector('.viewport').clientWidth};
+    }''')
+    media,details,playlist,header=[bounds[key] for key in ['media','details','playlist','header']]
+    if width>900:
+        assert abs(playlist['right']-bounds['width'])<1,bounds
+        assert abs(details['x']+details['width']/2-playlist['x']/2)<1,bounds
+        if theater:
+            assert media['x']==0 and media['width']==bounds['width'],bounds
+            assert abs(media['y']-header['bottom'])<1,bounds
+            assert playlist['y']>=media['bottom'] and abs(playlist['y']-details['y'])<1,bounds
+            assert playlist['height']>=details['height']-1,bounds
+        else:
+            assert abs(playlist['y']-header['bottom'])<1,bounds
+            assert abs(media['x']+media['width']/2-playlist['x']/2)<1,bounds
+    else:
+        assert playlist['y']>=details['bottom']-1,bounds
+        assert abs(playlist['x']*2+playlist['width']-bounds['width'])<1,bounds
+    minimum=page.locator('#playlist').evaluate('''e=>{
+      const rows=e.querySelectorAll('ytd-playlist-panel-video-renderer');return e.querySelector('#header').getBoundingClientRect().height+rows[0].getBoundingClientRect().height+rows[1].getBoundingClientRect().height;
+    }''')
+    assert playlist['height']>=minimum-1,(playlist,minimum)
+    assert page.locator('#playlist').evaluate("e=>e.matches(':popover-open')&&e.parentElement.id==='secondary-inner'")
+    if width>900:
+        for resized_width in [1024,1440,width]:
+            page.set_viewport_size({'width':resized_width,'height':960})
+            page.wait_for_function('''() => {
+              const root=document.querySelector('#myt-watch').firstElementChild.shadowRoot,panel=root.querySelector('.sidecar').getBoundingClientRect(),native=document.querySelector('#playlist').getBoundingClientRect();return Math.abs(panel.right-root.querySelector('.viewport').clientWidth)<1&&Math.abs(native.width-panel.width)<1&&Math.abs(native.x-panel.x)<1;
+            }''')
+            assert_stable(page)
+    if width==1440:
+        page.locator('#native-fullscreen').click()
+        page.wait_for_function('!!document.fullscreenElement')
+        assert page.locator('video').bounding_box()=={'x':0,'y':0,'width':1440,'height':960}
+        page.locator('#native-fullscreen').click()
+        page.wait_for_function('!document.fullscreenElement')
+        page.wait_for_function('''() => {
+          const root=document.querySelector('#myt-watch').firstElementChild.shadowRoot,a=root.querySelector('.sidecar').getBoundingClientRect(),b=document.querySelector('#playlist').getBoundingClientRect();return a.width>0&&Math.abs(a.width-b.width)<1&&Math.abs(a.y-b.y)<1;
+        }''')
+        assert_stable(page)
+    # Longer description expands the same playlist row; closing restores it.
+    page.locator('#attributed-description-text').evaluate("e=>e.innerHTML=Array.from({length:14},(_,i)=>'<p>Paragraph '+i+': '+('A longer description with useful video information. '.repeat(5))+'</p>').join('')")
+    page.locator('.expand').click()
+    if theater and width>900:
+        page.wait_for_function('''() => {
+          const root=document.querySelector('#myt-watch').firstElementChild.shadowRoot,a=root.querySelector('.sidecar').getBoundingClientRect(),b=root.querySelector('.details').getBoundingClientRect(),native=document.querySelector('#playlist').getBoundingClientRect();return a.height>=b.height-1&&a.height>1000&&Math.abs(native.height-a.height)<1;
+        }''')
+    # Native list retains independent wheel scrolling and its original handlers.
+    page.locator('.viewport').evaluate('''e=>{const panel=e.getRootNode().querySelector('.sidecar'),y=panel.getBoundingClientRect().top;window.__playlistTargetY=Math.min(100,y+e.scrollTop);e.scrollTop+=y-__playlistTargetY;}''')
+    page.wait_for_function('''() => Math.abs(document.querySelector('#playlist').getBoundingClientRect().y-document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.sidecar').getBoundingClientRect().y)<1''')
+    before=page.locator('.viewport').evaluate('e=>e.scrollTop')
+    items=page.locator('#playlist #items');box=items.bounding_box()
+    page.mouse.move(box['x']+box['width']/2,max(140,box['y']+30));page.mouse.wheel(0,260)
+    page.wait_for_function("document.querySelector('#playlist #items').scrollTop>0")
+    assert abs(page.locator('.viewport').evaluate('e=>e.scrollTop')-before)<1
+    items.evaluate('e=>e.scrollTop=0')
+    page.locator('#playlist ytd-playlist-panel-video-renderer a').first.click()
+    assert page.evaluate('__playlistVisit')==0
+    assert page.locator('#playlist').evaluate("e=>e.parentElement.id==='secondary-inner'")
+    assert_stable(page)
+    if width>900:
+        page.screenshot(path='/tmp/yt-min-playlist-'+('theater' if theater else 'normal')+'.png')
+    page.locator('#playlist #header button').click()
+    expect(page.locator('.sidecar')).to_be_hidden()
+    expect(page.locator('main')).not_to_have_class('has-sidecar')
+    expect(page.locator('#playlist')).to_be_hidden()
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('[data-myt-watch-island]')).to_have_count(0)
+    assert page.locator('#playlist').evaluate("e=>!e.hasAttribute('popover')&&e.parentElement.id==='secondary-inner'")
+    page.evaluate('clearInterval(__frames);__stream.getTracks().forEach(track=>track.stop())')
+    page.close()
+
+
+def check_description_link_styles(browser,width=1440):
+    page=setup(browser,'/watch?v=native',native_watch_fixture(),native_dark=True,width=width)
+    long_url='https://example.com/'+'long-link-'*40
+    html=f'''<p>Telegram: <a href="https://t.me/maksklg" onclick="event.preventDefault();window.__descriptionVisit=this.href">t.me/maksklg</a> и <a href="{long_url}" onclick="event.preventDefault();window.__descriptionVisit=this.href">{long_url}</a></p><p><a href="/watch?v=native&t=42" onclick="event.preventDefault()">0:42</a></p>'''
+    page.locator('#attributed-description-text').evaluate('(e,html)=>e.innerHTML=html',html)
+    page.evaluate('document.querySelector("#expand").onclick=()=>{}')
+    page.locator('.expand').click()
+    links=page.locator('.prose a')
+    expect(links).to_have_count(3)
+    expect(links.first).to_have_text('t.me/maksklg')
+    expect(links.locator('.link-symbol')).to_have_count(3)
+    for link in links.all():
+        expect(link).to_have_css('font-weight','700')
+        expect(link.locator('.link-symbol')).to_have_attribute('aria-hidden','true')
+    expect(page.locator('.prose button')).to_have_count(0)
+    links.first.locator('.link-symbol').click()
+    assert page.evaluate('__descriptionVisit')=='https://t.me/maksklg'
+    links.nth(2).click()
+    assert page.locator('video').evaluate('e=>e.currentTime')==42
+    assert page.locator('.viewport').evaluate('e=>e.scrollWidth===e.clientWidth')
+    if width==1440:page.locator('.description').screenshot(path='/tmp/yt-min-description-links.png')
+    assert_stable(page)
+    page.close()
+
+
 def check_theater_responsive_width(browser):
     page=setup(browser,'/watch?v=native',native_watch_fixture(theater=True),native_dark=True,prune_data=True)
     page.evaluate(VIDEO_STREAM)
@@ -2486,6 +2608,13 @@ def main():
         for width,height in [(1440,480),(390,360)]:
             check_theater_edges(browser,width,height)
             ok(f'theater at {width}px is edge-to-edge at native aspect ratio, with no top gap, rounded corners or playlist side gutter')
+        for width in [1440,390]:
+            check_description_link_styles(browser,width)
+            ok(f'description links at {width}px use bold text and a decorative chain symbol, keep native navigation/timestamps and have no copy buttons')
+        for theater in [False,True]:
+            for width in [2010,1440,390]:
+                check_playlist_layout(browser,theater,width)
+                ok(f'playlist layout (theater={theater}, {width}px) aligns to the window edge, centers content, sizes for two rows/details and keeps native scrolling/actions')
         check_theater_responsive_width(browser)
         ok('theater follows the current browser width on resize, despite cached 5000px native sizes and long content')
         check_fast_fullscreen(browser)

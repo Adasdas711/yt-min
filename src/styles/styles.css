@@ -1266,6 +1266,21 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="media"]::before,
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="media"]::after { content: none !important; display: none !important; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"],
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] { display: block !important; border-radius: 16px !important; clip-path: inset(var(--myt-island-clip, 0px) 0 0) !important; }
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] {
+    min-width: 0 !important; min-height: 0 !important; overflow: hidden !important;
+    border-radius: 16px 0 0 16px !important;
+}
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] > #container {
+    display: flex !important; flex-direction: column !important;
+    height: 100% !important; max-height: none !important; min-height: 0 !important;
+}
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] > #container > #header { flex: 0 0 auto !important; }
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] #items {
+    flex: 1 1 0% !important; height: auto !important; min-height: 0 !important; max-height: none !important; overflow-y: auto !important;
+}
+@media (max-width: 900px) {
+    html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] { border-radius: 16px !important; }
+}
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="popups"] { display: block !important; pointer-events: none !important; background: transparent !important; overflow: visible !important; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="popups"] > * { pointer-events: auto; }
 /* The native unsubscribe command still runs; its transient menu/confirmation
