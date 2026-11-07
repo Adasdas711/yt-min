@@ -1638,6 +1638,110 @@ def check_subscription_card(browser, dark, width, modern=False):
     page.close()
 
 
+def check_unsubscribe_staged_dialog(browser, modern=False, width=1440):
+    owner='<div id="owner"><a href="/@revolt"><span id="channel-name">REVOLT</span></a><ytd-subscribe-button-renderer id="subscribe-button" subscribed><button id="native-subscribe">Subscribed</button></ytd-subscribe-button-renderer></div>'
+    body=watch_details_fixture().replace('<div id="description" class=',owner+'<div id="description" class=',1)+'<ytd-popup-container></ytd-popup-container>'
+    page=setup(browser,'/watch?v=details',body,width=width)
+    page.evaluate('''modern => {
+      window.__stagedPainted=[];
+      document.querySelector('#native-subscribe').onclick=()=>{
+        const popups=document.querySelector('ytd-popup-container');
+        const outer=document.createElement('tp-yt-paper-dialog');outer.setAttribute('role','dialog');outer.dataset.testUnsubStage='';
+        outer.style.cssText='display:block;position:fixed;left:60px;top:140px;width:260px;min-height:120px;padding:24px;background:white;color:black;opacity:1;transition:opacity .25s';
+        const panel=document.createElement(modern?'yt-confirm-dialog-view-model':'yt-confirm-dialog-renderer');outer.append(panel);popups.append(outer);
+        const backdrop=document.createElement('tp-yt-iron-overlay-backdrop');backdrop.setAttribute('opened','');backdrop.dataset.testUnsubStage='';backdrop.style.cssText='position:fixed;inset:0;background:#0009;opacity:1;transition:opacity .25s';document.body.append(backdrop);
+        setTimeout(()=>panel.innerHTML='<h2>Вы хотите отписаться от канала?</h2>',50);
+        setTimeout(()=>{
+          panel.insertAdjacentHTML('beforeend',modern?'<button>Отписаться</button>':'<div id="confirm-button"><button>Unsubscribe</button></div>');
+          panel.querySelector('button').onclick=()=>{
+            window.__stagedConfirmed=true;
+            document.querySelector('#subscribe-button').removeAttribute('subscribed');document.querySelector('#native-subscribe').textContent='Subscribe';
+            setTimeout(()=>{outer.remove();backdrop.remove();},300);
+          };
+        },110);
+        const end=performance.now()+750;
+        const frame=()=>{
+          for(const node of document.querySelectorAll('[data-test-unsub-stage]')){
+            let visible=Boolean(node.getClientRects().length);
+            for(let parent=node;parent&&visible;parent=parent.parentElement){const style=getComputedStyle(parent);if(style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0)visible=false;}
+            if(visible)window.__stagedPainted.push(node.localName);
+          }
+          if(performance.now()<end)requestAnimationFrame(frame);else window.__stagedCaptureDone=true;
+        };requestAnimationFrame(frame);
+      };
+    }''',modern)
+    button=page.locator('.channel-subscribe')
+    expect(button).to_have_attribute('aria-pressed','true')
+    box=button.bounding_box()
+    button.click(position={'x':box['width']-12,'y':box['height']/2})
+    expect(button).to_have_attribute('aria-pressed','false',timeout=2000)
+    page.wait_for_function('window.__stagedCaptureDone')
+    assert page.evaluate('__stagedConfirmed')
+    assert page.evaluate('__stagedPainted')==[], 'Partially rendered unsubscribe panel or its outer window painted before the buttons mounted'
+    expect(page.locator('[data-myt-subscription-transient]')).to_have_count(0)
+    page.close()
+
+
+def check_local_title_fonts(browser):
+    page=setup(browser,'/watch?v=details',watch_details_fixture(),native_dark=True,watch_ui=False)
+    requests=[]
+
+    def font_resource(route):
+        name=route.request.url.rsplit('/',1)[-1]
+        assert name in ['BarlowCondensed-BlackItalic.ttf','RobotoCondensed-Italic.ttf']
+        requests.append(name)
+        route.fulfill(status=200,content_type='font/ttf',body=(ROOT/'src/assets/fonts'/name).read_bytes())
+
+    page.route('https://www.youtube.com/__minimal_fonts__/*',font_resource)
+    page.evaluate('''() => {
+      chrome.runtime.getURL=path=>'https://www.youtube.com/__minimal_fonts__/'+path.split('/').pop();
+      const policy=document.createElement('meta');policy.httpEquiv='Content-Security-Policy';policy.content="font-src 'none'";document.head.append(policy);
+    }''')
+    page.add_script_tag(path=str(ROOT/'src/content/watch.js'))
+    page.evaluate("document.dispatchEvent(new Event('yt-navigate-finish'))")
+    expect(page.locator('#myt-watch')).to_be_visible()
+    page.wait_for_function("[...document.fonts].some(f=>f.family.includes('Barlow')&&f.status==='loaded')")
+    assert requests==['BarlowCondensed-BlackItalic.ttf'], 'The Cyrillic fallback should load only when a title needs it'
+    session=page.context.new_cdp_session(page)
+    session.send('DOM.enable');session.send('CSS.enable')
+
+    def title_fonts():
+        page.evaluate('async()=>{await document.fonts.ready;await new Promise(requestAnimationFrame);}')
+        session.send('DOM.getDocument',{'depth':-1,'pierce':True})
+        obj=session.send('Runtime.evaluate',{'expression':'document.querySelector("#myt-watch").firstElementChild.shadowRoot.querySelector("#watch-title .title-outline")'})['result']['objectId']
+        node=session.send('DOM.requestNode',{'objectId':obj})['nodeId']
+        return session.send('CSS.getPlatformFontsForNode',{'nodeId':node})['fonts']
+
+    assert any('Barlow' in f['familyName'] and f['isCustomFont'] for f in title_fonts())
+    def capture_title(name):
+        page.locator('#watch-title').evaluate('e=>{const view=e.getRootNode().querySelector(".viewport");view.scrollTop+=e.getBoundingClientRect().top-140;}')
+        page.evaluate('async()=>{await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);}')
+        box=page.locator('#watch-title').bounding_box()
+        page.screenshot(path='/tmp/yt-min-title-'+name+'.png',clip={'x':box['x']-16,'y':box['y']-24,'width':box['width']+32,'height':box['height']+64})
+
+    page.locator('ytd-watch-metadata h1').evaluate('e=>e.textContent="Nelly On KRS-One Beef, Iconic Band-Aid, Super Bowl Nipplegate, Industry Drama And The Stories Behind The Music | Drink Champs"')
+    expect(page.locator('#watch-title')).to_contain_text('Nelly On KRS-One')
+    full_title=page.locator('#watch-title').text_content()
+    first_line=page.locator('#watch-title .title-outline').text_content()
+    assert first_line and len(first_line)<len(full_title)
+    page.set_viewport_size({'width':390,'height':960})
+    page.wait_for_function('''length=>document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.title-outline').textContent.length<length''',arg=len(first_line))
+    assert page.locator('#watch-title').text_content()==full_title
+    page.set_viewport_size({'width':1440,'height':960})
+    expect(page.locator('#watch-title .title-outline')).to_have_text(first_line)
+    capture_title('barlow')
+    page.locator('ytd-watch-metadata h1').evaluate('e=>e.textContent="История музыки и люди, которые её изменили: важные встречи, легендарные песни и разговор о событиях за кадром"')
+    expect(page.locator('#watch-title')).to_contain_text('История музыки')
+    page.wait_for_function("[...document.fonts].some(f=>f.family.includes('Roboto')&&f.status==='loaded')")
+    assert any('Roboto Condensed' in f['familyName'] and f['isCustomFont'] for f in title_fonts())
+    capture_title('cyrillic')
+    assert requests==['BarlowCondensed-BlackItalic.ttf','RobotoCondensed-Italic.ttf']
+    page.locator('ytd-watch-metadata h1').evaluate('e=>e.textContent="A different video title"')
+    expect(page.locator('#watch-title')).to_have_text('A different video title')
+    assert len(requests)==2, 'Metadata rerenders must reuse loaded title fonts'
+    page.close()
+
+
 def check_watch_language_change(browser, legacy=False):
     page=setup(browser,'/watch?v=details',watch_details_fixture(legacy),language='ru')
     stats=page.locator('#myt-watch .stats')
@@ -2325,6 +2429,11 @@ def main():
         ok('only visible enabled native ad skip controls are clicked, with consecutive-ad/off support and unchanged media volume/rate/identity')
         check_native_home_fallback(browser)
         ok('native and SPA home stay usable when local extension files are unavailable; settings and search still work without a blind redirect')
+        for modern,width in [(False,1440),(True,1440),(True,390)]:
+            check_unsubscribe_staged_dialog(browser,modern,width)
+            ok(f'unsubscribe dialog (modern={modern}, {width}px) never paints its outer shell, late heading/buttons or closing backdrop')
+        check_local_title_fonts(browser)
+        ok('packaged title fonts render real Latin/Cyrillic glyphs under a restrictive font policy and load each asset only once')
         for legacy in [False,True]:
             check_watch_language_change(browser,legacy)
             ok(f'watch language (legacy={legacy}) updates counts and full dates immediately through storage changes, without a reload or native metadata mutation')

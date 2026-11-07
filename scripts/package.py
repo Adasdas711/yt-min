@@ -1,5 +1,6 @@
 """Build a reproducible unpacked-extension ZIP without third-party packages."""
 import json
+from fnmatch import fnmatchcase
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
@@ -16,6 +17,13 @@ assert ROOT / manifest['action']['default_popup'] in files, 'Missing popup'
 assert ROOT / manifest['background']['service_worker'] in files, 'Missing background worker'
 for required in ['src/optimization.js', 'src/content/data-pruning.js', 'src/home/index.html', 'src/home/home.js', 'src/home/home.css']:
     assert ROOT / required in files, f'Missing memory-optimization resource: {required}'
+for font in ['BarlowCondensed-BlackItalic', 'RobotoCondensed-Italic']:
+    path = f'src/assets/fonts/{font}.ttf'
+    assert ROOT / path in files, f'Missing title font: {path}'
+    assert any(fnmatchcase(path, pattern) and 'https://*.youtube.com/*' in entry.get('matches', [])
+               for entry in manifest.get('web_accessible_resources', []) for pattern in entry.get('resources', [])), f'Title font is not accessible: {path}'
+for license_file in ['BarlowCondensed-OFL.txt', 'RobotoCondensed-OFL.txt']:
+    assert ROOT / 'src/assets/fonts' / license_file in files, f'Missing font license: {license_file}'
 assert any('src/home/index.html' in entry.get('resources', []) and '<all_urls>' in entry.get('matches', [])
            for entry in manifest.get('web_accessible_resources', [])), 'Homepage must be accessible to browser redirects'
 
