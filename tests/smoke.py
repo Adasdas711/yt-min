@@ -1777,7 +1777,7 @@ def check_subscription_card(browser, dark, width, modern=False):
         button.click(position={'x':box['width']-12,'y':box['height']/2})
 
     expect(button).to_have_attribute('aria-pressed',str(modern).lower())
-    expect(card.locator('.stats')).to_have_text('906.36k · 8 March 2025')
+    expect(card.locator('.stats')).to_have_text('906.35k · 8 March 2025')
     expect(page.locator('#watch-chapters h2')).to_have_count(0)
     expect(page.locator('#watch-chapters')).to_have_attribute('aria-label','Chapters')
     assert card.evaluate('e=>getComputedStyle(e).backgroundColor')!=page.locator('.viewport').evaluate('e=>getComputedStyle(e).backgroundColor')
@@ -1923,7 +1923,7 @@ def check_collaboration_card(browser, width, attributed=False):
     expect(page.locator('.channel-card')).not_to_contain_text('Устаревший канал')
     expect(page.locator('.owner img')).to_have_count(2)
     expect(page.locator('.channel-card')).to_have_attribute('data-collaborative','')
-    expect(page.locator('.channel-card .stats')).to_have_text('906.36k')
+    expect(page.locator('.channel-card .stats')).to_have_text('906.35k')
     for name in names.all():name.click()
     for avatar_link in page.locator('.owner .avatar-link').all():avatar_link.click()
     if attributed:assert page.evaluate('__authorsOpened')==3
@@ -2004,11 +2004,11 @@ def check_watch_language_change(browser, legacy=False):
     page=setup(browser,'/watch?v=details',watch_details_fixture(legacy),language='ru')
     stats=page.locator('#myt-watch .stats')
     page.evaluate('window.__originalVideo=document.querySelector("video")')
-    expect(stats).to_have_text('906.36k · 8 March 2025')
+    expect(stats).to_have_text('906.35k · 8 March 2025')
     page.evaluate("chrome.storage.local.set({language:'en'})")
-    expect(stats).to_have_text('906.36k · 8 March 2025')
+    expect(stats).to_have_text('906.35k · 8 March 2025')
     page.evaluate("chrome.storage.local.set({language:'ru'})")
-    expect(stats).to_have_text('906.36k · 8 March 2025')
+    expect(stats).to_have_text('906.35k · 8 March 2025')
     page.locator('#info-container').evaluate('e=>e.textContent="3,33 млн просмотров · 8 марта 2025 г."')
     expect(stats).to_have_text('3.33m · 8 March 2025')
     page.evaluate("chrome.storage.local.set({language:'en'})")
@@ -2024,8 +2024,8 @@ def check_watch_stats(browser, language):
     stats=page.locator('#myt-watch .stats')
     ru=False  # Raw source may be Russian; the extension interface is English.
     date=lambda ru_value,en_value:ru_value if ru else en_value
-    expect(stats).to_have_text(('906 тыс.' if ru else '906.36k')+' · '+date('8 марта 2025 г.','8 March 2025'))
-    for raw,compact in [('1234 views','1,23 тыс.' if ru else '1.23k'),('3,33 млн просмотров','3,33 млн.' if ru else '3.33m'),('1.2K views','1,2 тыс.' if ru else '1.20k'),('999999 views','1 млн.' if ru else '1.00m'),('1000 views','1.00k'),('1000000 views','1.00m'),('1000000000 views','1.00b'),('999 views','999'),('No views','0')]:
+    expect(stats).to_have_text(('906 тыс.' if ru else '906.35k')+' · '+date('8 марта 2025 г.','8 March 2025'))
+    for raw,compact in [('1234 views','1,23 тыс.' if ru else '1.23k'),('3,33 млн просмотров','3,33 млн.' if ru else '3.33m'),('1.2K views','1,2 тыс.' if ru else '1.20k'),('999999 views','1 млн.' if ru else '999.99k'),('1000 views','1k'),('1000000 views','1m'),('1000000000 views','1b'),('1009999 views','1m'),('1010000 views','1.01m'),('1100000 views','1.10m'),('1009999K views','1b'),('1010000K views','1.01b'),('999 views','999'),('No views','0')]:
         page.locator('#info-container').evaluate('(e,value)=>e.textContent=value+" · Jul 4, 2026"',raw)
         expect(stats).to_have_text(compact+' · '+date('4 июля 2026 г.','4 July 2026'))
     page.locator('#info-container').evaluate('e=>e.textContent="853 views · 1 month ago"')
@@ -2052,6 +2052,23 @@ def check_watch_stats(browser, language):
     page.locator('#info-container').evaluate('e=>e.textContent="No views · Mar 8, 2025"')
     expect(stats).to_have_text('0 · 8 March 2025')
     expect(stats.locator('.views-icon')).to_be_visible()
+    page.close()
+
+
+def check_description_icons(browser):
+    page=setup(browser,'/watch?v=details',watch_details_fixture())
+    button=page.locator('.expand')
+    expect(button).to_have_text('')
+    expect(button.locator('svg')).to_have_count(1)
+    expect(button).to_have_attribute('aria-label','Show more')
+    button.focus();button.press('Enter')
+    expect(button).to_have_attribute('aria-expanded','true')
+    expect(button).to_have_attribute('aria-label','Show less')
+    expect(button).to_have_text('')
+    button.press('Enter')
+    expect(button).to_have_attribute('aria-expanded','false')
+    expect(button).to_have_attribute('aria-label','Show more')
+    assert_stable(page)
     page.close()
 
 
@@ -2730,6 +2747,8 @@ def main():
         for language in ['ru','en']:
             check_watch_stats(browser,language)
             ok(f'watch stats ({language}) use compact counts without a views label and an exact calendar day, without relative-date guesses or stale-video metadata')
+        check_description_icons(browser)
+        ok('description arrows replace visible text and preserve accessible labels, keyboard expansion and collapse')
         check_chapter_sources(browser)
         ok('description and engagement-panel chapters are deduplicated by time, sorted and restricted to the current video')
         for dark in [False,True]:

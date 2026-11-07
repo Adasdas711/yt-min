@@ -53,7 +53,7 @@ def noise_check(page):
     page.locator('#description').evaluate('''e=>{
       const next=e.cloneNode(true);next.querySelector('a').onclick=()=>{window.__freshDescriptionLink=true;return false;};e.replaceWith(next);
     }''')
-    expect(page.locator('#myt-watch .stats')).to_have_text('906.36k')
+    expect(page.locator('#myt-watch .stats')).to_have_text('906.35k')
     page.locator('.prose a').first.click()
     assert page.evaluate('window.__freshDescriptionLink===true')
     page.evaluate('__view.viewport.scrollTop=0;__view.position()')
@@ -81,7 +81,7 @@ def noise_check(page):
     assert result['methods'].get('renderDescription', {}).get('calls', 0) == 0, result
     assert result['methods'].get('sync', {}).get('calls', 0) == 0, result
     assert result['methods']['syncStats']['calls'] > 10 and result['adChecks'] == 0, result
-    assert result['stats'] == '906.45k · 8 March 2025', result
+    assert result['stats'] == '906.44k · 8 March 2025', result
     page.locator('.more-toggle').click()
     print('Counter/hidden-surface profile:', json.dumps(result), flush=True)
 

@@ -68,13 +68,13 @@ main.has-sidecar .details { min-height:0; }
 :host([theater]) main,:host([theater]) .layout,:host([theater]) .media { width:100%;min-width:0;max-width:100%; }:host([theater]) .layout { overflow-x:clip; }
 @media(max-width:900px) { .layout.has-sidecar { grid-template-columns:minmax(0,1fr); } main { padding-inline:20px; }main.has-sidecar .primary { padding:20px 20px 0; }.has-sidecar .sidecar { width:calc(100% - 40px);margin:28px auto 0;border-radius:16px; }:host([theater]) .has-sidecar .details { width:calc(100% - 40px); }:host([theater]) .has-sidecar .sidecar { grid-column:1;grid-row:3;margin-top:0; } }
 @media(max-width:600px) { .header { height:66px;padding:10px 16px;gap:14px; }.brand svg { width:32px;height:24px; }.brand span { display:none; }.search { height:44px; }.search input { font-size:16px; } main { padding:12px 16px 48px; }.media { border-radius:12px; }.details { margin-top:24px;min-height:calc(100dvh - 114px); }.meta-row { gap:12px; }.channel-card { grid-template-columns:var(--owner-avatars-small,40px) minmax(0,1fr) 18px;padding:12px 18px;gap:2px 10px; }.owner img { width:40px;height:40px; }.actions { width:100%; }.actions button { flex:1 1 auto; }.description { padding:22px 20px;border-radius:16px; }.prose { font-size:16px;line-height:1.75; }.chapter { flex-basis:min(200px,calc((100% - 12px) / 2));padding:14px 12px;border-radius:20px; }.chapter-title { font-size:17px; } h2 { font-size:21px; }.avatar-group .avatar-link { width:40px;height:40px; }.transcript-card { padding:22px 20px; }.transcript-head>button { width:100%; }.transcript-intro { align-items:start; }.segment { grid-template-columns:55px minmax(0,1fr);gap:12px; }.person { width:100%; }.section { margin-top:28px; } }
-.expand { border-color:transparent;background:transparent; }.expand:hover,.expand:focus-visible { background:var(--soft); }
+.expand { border-color:transparent;background:transparent; }.expand:hover,.expand:focus-visible { background:var(--soft); }.expand[aria-expanded=true] svg { transform:rotate(180deg); }
 `;
     const words = {
         ru: { search:"Поиск на YouTube", clear:"Очистить поиск", description:"Описание", more:"Показать полностью", less:"Свернуть", chapters:"Эпизоды", people:"Упомянутые люди", transcript:"Расшифровка видео", transcriptHint:"Читайте текст и переходите к нужному моменту видео.", showTranscript:"Открыть расшифровку", hideTranscript:"Свернуть", find:"Найти в расшифровке", loading:"Загружаем расшифровку…", unavailable:"Текст пока не загрузился. Попробуйте ещё раз.", retry:"Повторить", noResults:"Совпадений нет", socials:"Ссылки канала", comments:"Комментарии", subscribe:"Подписаться", subscribed:"Вы подписаны", subscribeChannel:"Подписаться на канал", unsubscribeChannel:"Отписаться от канала", subscribing:"Подписываем…", unsubscribing:"Отписываем…", share:"Поделиться", openPlaylist:"Открыть плейлист", closePlaylist:"Закрыть плейлист", menu:"Ещё", otherActions:"Другие действия", video:"Видео" },
         en: { search:"Search YouTube", clear:"Clear search", description:"Description", more:"Show more", less:"Show less", chapters:"Chapters", people:"Mentioned people", transcript:"Video transcript", transcriptHint:"Read along and jump to any moment in the video.", showTranscript:"Open transcript", hideTranscript:"Collapse", find:"Search transcript", loading:"Loading transcript…", unavailable:"The transcript has not loaded yet. Please try again.", retry:"Try again", noResults:"No matches", socials:"Channel links", comments:"Comments", subscribe:"Subscribe", subscribed:"Subscribed", subscribeChannel:"Subscribe to", unsubscribeChannel:"Unsubscribe from", subscribing:"Subscribing…", unsubscribing:"Unsubscribing…", share:"Share", openPlaylist:"Playlist", closePlaylist:"Close playlist", menu:"More", otherActions:"Other actions", video:"Video" }
     };
-    const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${({transcript:'<path d="M5 3h14v18H5Z"/><path d="M8 8h8M8 12h8M8 16h5"/>', arrow:'<path d="m7 17 10-10M7 7h10v10"/>', share:'<path d="m15 4 6 6-6 6v-4C8 12 5 14 3 19c0-8 3-12 12-12Z"/>', close:'<path d="m6 6 12 12M18 6 6 18"/>', playlist:'<path d="M8 6h12M8 12h12M8 18h12M3 6h.01M3 12h.01M3 18h.01"/>', eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>', menu:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'})[name] || ''}</svg>`;
+    const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${({chevron:'<path d="m6 9 6 6 6-6"/>', transcript:'<path d="M5 3h14v18H5Z"/><path d="M8 8h8M8 12h8M8 16h5"/>', arrow:'<path d="m7 17 10-10M7 7h10v10"/>', share:'<path d="m15 4 6 6-6 6v-4C8 12 5 14 3 19c0-8 3-12 12-12Z"/>', close:'<path d="m6 6 12 12M18 6 6 18"/>', playlist:'<path d="M8 6h12M8 12h12M8 18h12M3 6h.01M3 12h.01M3 18h.01"/>', eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>', menu:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'})[name] || ''}</svg>`;
     const text = element => element?.textContent.replace(/\s+/g," ").trim() || "";
     const seconds = value => {
         const parts = value?.trim().split(":");
@@ -199,10 +199,11 @@ main.has-sidecar .details { min-height:0; }
             },{passive:true});window.addEventListener('resize',this.geometry);
             this.observer=new ResizeObserver(this.geometry);this.observer.observe(this.q('main'));this.observer.observe(this.q('.media'));this.observer.observe(this.q('.details'));
             this.fullscreen=()=>this.syncFullscreen();document.addEventListener('fullscreenchange',this.fullscreen);
-            // A shown popover cannot itself enter fullscreen. Release the
-            // wrapper before requesting fullscreen on the native player.
+            // Request fullscreen on the native player inside its shown wrapper.
+            // Keep that wrapper visible until the browser finishes the request.
             this.fullscreenIntent=event=>{
                 const path=event.composedPath().filter(node=>node instanceof Element),target=path[0];
+                if((document.fullscreenElement||this.fullscreenPending)&&event.type==='keydown'&&event.key?.toLowerCase()==='v'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!path.some(node=>node.matches('input,textarea,[contenteditable]'))){event.preventDefault();event.stopImmediatePropagation();return;}
                 const button=event.type==='click'&&target?.closest('.ytp-fullscreen-button');
                 const doubleClick=event.type==='dblclick'&&target?.closest('[data-myt-watch-island="media"]')&&!target.closest('button,.ytp-settings-menu,.ytp-panel');
                 const shortcut=event.type==='keydown'&&event.key?.toLowerCase()==='f'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!path.some(node=>node.matches('input,textarea,[contenteditable],button,a,[role="menu"]'));
@@ -213,7 +214,8 @@ main.has-sidecar .details { min-height:0; }
                     // site's animated fullscreen/details transition.
                     event.preventDefault();event.stopImmediatePropagation();
                     if(document.fullscreenElement){document.exitFullscreen().catch(()=>{});return;}
-                    this.prepareFullscreen();
+                    if(this.fullscreenPending)return;
+                    this.prepareFullscreen(player);
                     player.requestFullscreen({navigationUI:'hide'}).catch(()=>this.resumeFullscreen());
                 }
             };
@@ -236,18 +238,18 @@ main.has-sidecar .details { min-height:0; }
             section.scrollIntoView({behavior:'instant',block:'start'});this.position();
             const title=section.querySelector('h2');if(title){title.tabIndex=-1;title.focus({preventScroll:true});}
         }
-        prepareFullscreen() {
+        prepareFullscreen(target=this.native.querySelector('#movie_player')||this.nativePlayer()) {
             if(this.fullscreenPending)return;
             const player=this.nativePlayer();if(!player)return;
             this.fullscreenPending=true;this.fullscreenPreview=player;
             for(const[node,state]of this.islands)this.clearScrollBinding(node,state);
             this.closeMore();player.setAttribute('data-myt-fullscreen-pending','');
-            // Paint the native frame at full size in the same click. Preserve its
-            // positioning state until the browser enters fullscreen; the native
-            // request can start as soon as its popover is hidden.
+            // Keep the decoded preview in the top layer until the browser has
+            // actually entered fullscreen. Hiding it early puts the fixed frame
+            // back under YouTube's transformed/clipped native ancestors.
             this.updateFullscreenLayout(player);
-            for(const node of this.islands.keys())if(node.matches(':popover-open'))node.hidePopover();
-            if(this.host.matches(':popover-open'))this.host.hidePopover();
+            for(const node of this.islands.keys())if((node!==player||node===target)&&node.matches(':popover-open'))node.hidePopover();
+            if(target===player&&this.host.matches(':popover-open'))this.host.hidePopover();
         }
         clearFullscreenPreview() {
             this.fullscreenPreview?.removeAttribute('data-myt-fullscreen-pending');this.fullscreenPreview=null;
@@ -658,7 +660,9 @@ main.has-sidecar .details { min-height:0; }
             if(!Number.isSafeInteger(count)||count<0)return '';
             const locale=this.options.language==='ru'?'ru-RU':'en-US';
             if(this.viewsLocale!==locale){this.viewsLocale=locale;this.viewsFormat=new Intl.NumberFormat(locale,{notation:'compact',minimumFractionDigits:2,maximumFractionDigits:2});}
-            return (count<1000?String(count):this.viewsFormat.format(count)).toLowerCase().replace(/\s+/g,' ').replace(/млн$/u,'млн.').replace(/млрд$/u,'млрд.');
+            const scale=count>=1e12?1e12:count>=1e9?1e9:count>=1e6?1e6:1e3;
+            const truncated=Math.floor(count/(scale/100))*(scale/100);
+            return (count<1000?String(count):this.viewsFormat.format(truncated)).toLowerCase().replace(/[.,]00(?=\D|$)/u,'').replace(/\s+/g,' ').replace(/млн$/u,'млн.').replace(/млрд$/u,'млрд.');
         }
         publicationDate(meta,info,readable) {
             const locale=this.options.language==='ru'?'ru-RU':'en-GB';
@@ -760,7 +764,11 @@ main.has-sidecar .details { min-height:0; }
             const node=allowed.includes(tag)?document.createElement(tag):document.createDocumentFragment();
             for(const child of source.childNodes)this.copyProse(child,node);target.append(node);
         }
-        updateExpanded() {this.q('.prose').classList.toggle('expanded',this.expanded);this.q('.expand').textContent=this.expanded?this.copy.less:this.copy.more;this.q('.expand').setAttribute('aria-expanded',String(this.expanded));this.position();}
+        updateExpanded() {
+            this.q('.prose').classList.toggle('expanded',this.expanded);
+            const button=this.q('.expand');if(!button.firstElementChild)button.innerHTML=icon('chevron');
+            button.setAttribute('aria-label',this.expanded?this.copy.less:this.copy.more);button.setAttribute('aria-expanded',String(this.expanded));this.position();
+        }
         sync(options) {
             options={...options,language:"en"};this.options=options;this.copy=words.en;const c=this.copy;
             const media=this.native.querySelector('video');if(media!==this.media){for(const type of ['timeupdate','seeked'])this.media?.removeEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.removeEventListener(type,this.videoMetadata);this.media=media;for(const type of ['timeupdate','seeked'])this.media?.addEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.addEventListener(type,this.videoMetadata);}

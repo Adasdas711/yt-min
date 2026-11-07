@@ -1383,3 +1383,12 @@ html.minimal-youtube[data-myt-watch-ui] :fullscreen :is(.ytp-fullerscreen-edu-bu
 html.minimal-youtube[data-myt-watch-ui] ytd-watch-flexy:fullscreen :is(#below,#secondary,#related) {
     display: none !important;
 }
+
+/* YouTube's fullscreen other-videos toggle has several native variants. */
+html.minimal-youtube[data-myt-watch-ui] :is(:fullscreen,[data-myt-fullscreen-pending]) :is(
+    .ytp-show-tiles,.ytp-more-videos-btn,
+    [aria-label^="More videos" i],[title^="More videos" i],
+    [aria-label^="Show other videos" i],[title^="Show other videos" i],
+    [aria-label^="Show more videos" i],[title^="Show more videos" i],
+    [aria-label*="другие видео"],[title*="другие видео"]
+) { display: none !important; }
