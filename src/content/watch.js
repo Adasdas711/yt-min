@@ -25,6 +25,8 @@ main { max-width:1328px;margin:0 auto;padding:20px 24px 72px; }
 .media { width:100%;max-width:1280px;margin:0 auto;aspect-ratio:16/9;background:#000;border-radius:18px; }.sidecar { min-width:0;min-height:var(--playlist-min-height,240px);border-radius:16px 0 0 16px;background:var(--surface); }.has-sidecar .sidecar { align-self:stretch; }
 main.has-sidecar { max-width:none;padding:0 0 72px; }main.has-sidecar .primary { padding:20px 24px 0; }
 .details { max-width:960px;margin:28px auto 0;min-width:0;min-height:calc(100dvh - 148px); }
+main.has-sidecar .details { min-height:0; }
+@media(min-width:901px) { :host(:not([theater])) .has-sidecar .sidecar { align-self:start;height:var(--playlist-player-height,320px);min-height:0;margin-top:20px; } }
 #watch-title { --title-ink:var(--ink);font-family:"MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;font-size:32px;font-weight:900;font-style:italic;text-transform:uppercase;line-height:.60;letter-spacing:-.025em;color:var(--title-ink);-webkit-text-fill-color:var(--title-ink);-webkit-text-stroke:0 transparent;overflow:visible;overflow-wrap:anywhere; }
 :host([dark]) #watch-title { --title-ink:#fff; }
 #watch-title .title-outline { -webkit-text-fill-color:transparent;-webkit-text-stroke:.5px var(--title-ink); }
@@ -797,10 +799,17 @@ main.has-sidecar { max-width:none;padding:0 0 72px; }main.has-sidecar .primary {
             for(const node of this.playlistNodes||[])if(!nodes.includes(node))this.observer.unobserve(node);
             for(const node of nodes)if(!this.playlistNodes?.includes(node))this.observer.observe(node);
             this.playlistNodes=nodes;
-            if(!source)this.surface.style.removeProperty('--playlist-min-height');
+            if(source)this.syncPlaylistPlayerHeight();
+            else {this.surface.style.removeProperty('--playlist-min-height');this.surface.style.removeProperty('--playlist-player-height');}
+        }
+        syncPlaylistPlayerHeight() {
+            const height=this.q('.media').getBoundingClientRect().height;if(!height)return;
+            const value=height+'px';
+            if(this.surface.style.getPropertyValue('--playlist-player-height')!==value)this.surface.style.setProperty('--playlist-player-height',value);
         }
         syncPlaylistMinimum() {
             const source=this.playlistSource;if(!source?.isConnected)return;
+            this.syncPlaylistPlayerHeight();
             const rows=this.playlistNodes?.filter(node=>node.matches('ytd-playlist-panel-video-renderer'))||[];
             const first=rows[0]?.getBoundingClientRect(),second=rows[1]?.getBoundingClientRect();
             if(!first?.height)return;

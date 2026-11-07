@@ -1342,9 +1342,13 @@ def check_playlist_layout(browser, theater=False, width=1440):
             assert abs(media['y']-header['bottom'])<1,bounds
             assert playlist['y']>=media['bottom'] and abs(playlist['y']-details['y'])<1,bounds
             assert playlist['height']>=details['height']-1,bounds
+            description=page.locator('.description').bounding_box()
+            assert abs(playlist['bottom']-description['y']-description['height'])<1,(bounds,description)
+            assert details['height']<600,bounds
         else:
-            assert abs(playlist['y']-header['bottom'])<1,bounds
+            assert abs(playlist['y']-media['y'])<1,bounds
             assert abs(media['x']+media['width']/2-playlist['x']/2)<1,bounds
+            assert abs(playlist['height']-media['height'])<1,bounds
     else:
         assert playlist['y']>=details['bottom']-1,bounds
         assert abs(playlist['x']*2+playlist['width']-bounds['width'])<1,bounds
@@ -1370,13 +1374,19 @@ def check_playlist_layout(browser, theater=False, width=1440):
           const root=document.querySelector('#myt-watch').firstElementChild.shadowRoot,a=root.querySelector('.sidecar').getBoundingClientRect(),b=document.querySelector('#playlist').getBoundingClientRect();return a.width>0&&Math.abs(a.width-b.width)<1&&Math.abs(a.y-b.y)<1;
         }''')
         assert_stable(page)
-    # Longer description expands the same playlist row; closing restores it.
+    # Theater follows the current description height; normal mode stays tied to the video.
     page.locator('#attributed-description-text').evaluate("e=>e.innerHTML=Array.from({length:14},(_,i)=>'<p>Paragraph '+i+': '+('A longer description with useful video information. '.repeat(5))+'</p>').join('')")
     page.locator('.expand').click()
     if theater and width>900:
         page.wait_for_function('''() => {
           const root=document.querySelector('#myt-watch').firstElementChild.shadowRoot,a=root.querySelector('.sidecar').getBoundingClientRect(),b=root.querySelector('.details').getBoundingClientRect(),native=document.querySelector('#playlist').getBoundingClientRect();return a.height>=b.height-1&&a.height>1000&&Math.abs(native.height-a.height)<1;
         }''')
+    page.locator('.expand').click()
+    if width>900:
+        page.wait_for_function('''theater => {
+          const root=document.querySelector('#myt-watch').firstElementChild.shadowRoot,panel=root.querySelector('.sidecar').getBoundingClientRect(),target=root.querySelector(theater?'.description':'.media').getBoundingClientRect(),native=document.querySelector('#playlist').getBoundingClientRect();
+          return (theater?Math.abs(panel.bottom-target.bottom)<1:Math.abs(panel.height-target.height)<1)&&Math.abs(native.height-panel.height)<1;
+        }''',arg=theater)
     # Native list retains independent wheel scrolling and its original handlers.
     page.locator('.viewport').evaluate('''e=>{const panel=e.getRootNode().querySelector('.sidecar'),y=panel.getBoundingClientRect().top;window.__playlistTargetY=Math.min(100,y+e.scrollTop);e.scrollTop+=y-__playlistTargetY;}''')
     page.wait_for_function('''() => Math.abs(document.querySelector('#playlist').getBoundingClientRect().y-document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.sidecar').getBoundingClientRect().y)<1''')
@@ -2614,7 +2624,7 @@ def main():
         for theater in [False,True]:
             for width in [2010,1440,390]:
                 check_playlist_layout(browser,theater,width)
-                ok(f'playlist layout (theater={theater}, {width}px) aligns to the window edge, centers content, sizes for two rows/details and keeps native scrolling/actions')
+                ok(f'playlist layout (theater={theater}, {width}px) aligns to the window edge, centers content, matches player/current-description height and keeps native scrolling/actions')
         check_theater_responsive_width(browser)
         ok('theater follows the current browser width on resize, despite cached 5000px native sizes and long content')
         check_fast_fullscreen(browser)
