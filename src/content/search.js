@@ -76,7 +76,7 @@
     }
 
     class Search {
-        constructor(){this.cards=new Map();this.avatars=new Map();this.filters=new Map();this.layout=new Map();this.metadata=new Map();this.click=event=>this.toggleFilter(event);document.addEventListener('click',this.click,true);}
+        constructor(){this.cards=new Map();this.avatars=new Map();this.subscriptions=new Set();this.presses=new Map();this.filters=new Map();this.layout=new Map();this.metadata=new Map();this.click=event=>{this.animateSubscription(event);this.toggleFilter(event);};document.addEventListener('click',this.click,true);}
         static isPlaylist(card){
             if(card.matches('ytd-playlist-renderer,ytd-grid-playlist-renderer'))return true;
             if(!card.matches('yt-lockup-view-model'))return false;
@@ -91,6 +91,7 @@
             if(raw!==this.metadataRaw){this.metadataRaw=raw;this.metadata.clear();try{const values=JSON.parse(raw);if(Array.isArray(values))for(const value of values.slice(-200))if(typeof value.id==='string')this.metadata.set(value.id,{image:safeURL(value.image)?.href||'',count:countNumber(value.count)});}catch{}}
             this.syncLayout(searches);
             this.syncAvatars(searches);
+            this.syncSubscriptions(searches);
             for(const search of searches){
                 for(const source of search.querySelectorAll('[data-myt-search-playlist]')){
                     wanted.add(source);let card=this.cards.get(source);if(!card){card=new PlaylistCard(source);this.cards.set(source,card);}card.update(this.metadata);
@@ -117,6 +118,24 @@
         restoreAvatar(host,state){
             host.removeAttribute('data-myt-search-avatar-host');state.link.removeAttribute('data-myt-search-avatar-link');
             if(state.owned)state.link.remove();this.avatars.delete(host);
+        }
+        syncSubscriptions(searches){
+            const wanted=new Set();
+            for(const search of searches)for(const card of search.querySelectorAll('[data-myt-search-channel]')){
+                const state=globalThis.MinimalYouTubeWatch?.readSubscriptionState?.(card);if(!state?.button)continue;
+                const button=state.button,value=String(state.subscribed);wanted.add(button);
+                if(button.getAttribute('data-myt-search-subscribe')!==value)button.setAttribute('data-myt-search-subscribe',value);
+            }
+            for(const button of this.subscriptions)if(!wanted.has(button)){button.removeAttribute('data-myt-search-subscribe');this.presses.get(button)?.cancel();this.presses.delete(button);}
+            this.subscriptions=wanted;
+        }
+        animateSubscription(event){
+            const button=event.target.closest?.('[data-myt-search-subscribe]');
+            if(!button||button.matches(':disabled,[aria-disabled="true"],[aria-busy="true"]')||matchMedia('(prefers-reduced-motion: reduce)').matches||typeof button.animate!=='function')return;
+            this.presses.get(button)?.cancel();
+            const animation=button.animate([{transform:'scale(.98)'},{transform:'scale(1)'}],{duration:180,easing:'cubic-bezier(.2,.8,.2,1)'});
+            this.presses.set(button,animation);
+            const clear=()=>{if(this.presses.get(button)===animation)this.presses.delete(button);};animation.onfinish=clear;animation.oncancel=clear;
         }
         syncAvatars(searches){
             const wanted=new Set();
@@ -201,7 +220,7 @@
             for(const[name,value]of [['hidden',state.hidden],['aria-hidden',state.aria]]){if(value===null)panel.removeAttribute(name);else panel.setAttribute(name,value);}
             for(const[button,value]of state.buttons){if(value===null)button.removeAttribute('aria-expanded');else button.setAttribute('aria-expanded',value);}
         }
-        destroy(){cancelAnimationFrame(this.cardFrame);this.pendingCards?.clear();document.removeEventListener('click',this.click,true);for(const card of this.cards.values())card.destroy();this.cards.clear();for(const[host,state]of this.avatars)this.restoreAvatar(host,state);for(const[panel,state]of this.filters)this.restoreFilter(panel,state);this.filters.clear();for(const[node,attributes]of this.layout)for(const name of attributes.keys())node.removeAttribute(name);this.layout.clear();this.metadata.clear();}
+        destroy(){cancelAnimationFrame(this.cardFrame);this.pendingCards?.clear();document.removeEventListener('click',this.click,true);for(const card of this.cards.values())card.destroy();this.cards.clear();for(const[host,state]of this.avatars)this.restoreAvatar(host,state);for(const button of this.subscriptions)button.removeAttribute('data-myt-search-subscribe');this.subscriptions.clear();for(const animation of this.presses.values())animation.cancel();this.presses.clear();for(const[panel,state]of this.filters)this.restoreFilter(panel,state);this.filters.clear();for(const[node,attributes]of this.layout)for(const name of attributes.keys())node.removeAttribute(name);this.layout.clear();this.metadata.clear();}
     }
     Search.playlistSelector=playlistSelector;
     globalThis.MinimalYouTubeSearch=Search;

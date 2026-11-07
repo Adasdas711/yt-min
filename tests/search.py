@@ -179,6 +179,48 @@ def avatar_layout(browser,native):
     page.close()
 
 
+def subscription_buttons(browser,width,dark,modern):
+    renderer='yt-subscribe-button-view-model' if modern else 'ytd-subscribe-button-renderer'
+    pressed=' aria-pressed="false"' if modern else ''
+    button=f'<{renderer} id="subscribe-button"><button id="native-subscribe"{pressed} aria-label="Подписаться на канал"><svg width="20" height="20"><path d="M2 2h16v16H2Z"/></svg><span>Подписаться</span></button></{renderer}>'
+    body=f'<ytd-app>{MASTHEAD}<ytd-search><ytd-section-list-renderer><div id="contents"><ytd-channel-renderer><div id="content-section"><div id="avatar-section"><img src="{cover()}"></div><div id="info-section"><a id="main-link" href="/@creator">Creator</a>{button}</div></div></ytd-channel-renderer>{video(1)}</div></ytd-section-list-renderer></ytd-search></ytd-app>'
+    page=setup(browser,'/results?search_query=creator',body,width=width,native_dark=dark)
+    page.evaluate('''modern=>{
+      window.__subscriptionCalls=0;window.__presses=0;const button=window.__subscriptionButton=document.querySelector('#native-subscribe'),parent=button.parentElement;
+      const animate=button.animate;button.animate=function(...args){__presses++;return animate.apply(this,args)};
+      button.onclick=()=>{
+        __subscriptionCalls++;const next=modern?button.getAttribute('aria-pressed')!=='true':!parent.hasAttribute('subscribed');
+        if(modern)button.setAttribute('aria-pressed',String(next));else parent.toggleAttribute('subscribed',next);
+        button.querySelector('span').textContent=next?'Вы подписаны':'Подписаться';button.setAttribute('aria-label',next?'Вы подписаны':'Подписаться на канал');
+      };
+    }''',modern)
+    control=page.locator('#native-subscribe');card=page.locator('ytd-channel-renderer');before=card.bounding_box()
+    regular=page.locator('#video-1').bounding_box()
+    assert abs(before['width']-(regular['width']*1.5+12 if width>1000 else regular['width']))<1,(before,regular)
+    expect(control).to_have_attribute('data-myt-search-subscribe','false')
+    expect(control).to_have_css('background-color','rgb(25, 25, 29)' if dark else 'rgb(255, 255, 255)')
+    expect(control).to_have_css('border-radius','999px');expect(control.locator('svg')).to_be_hidden()
+    assert control.evaluate('e=>getComputedStyle(e,"::after").content')=='"Subscribe"'
+    control.click();page.mouse.move(1,1)
+    expect(control).to_have_attribute('data-myt-search-subscribe','true');expect(control).to_have_css('background-color','rgb(201, 31, 55)')
+    assert control.evaluate('e=>getComputedStyle(e,"::after").content')=='"Subscribed"'
+    assert page.evaluate('__subscriptionCalls===1&&__presses===0&&__subscriptionButton===document.querySelector("#native-subscribe")')
+    page.emulate_media(reduced_motion='no-preference');control.click();page.mouse.move(1,1)
+    expect(control).to_have_attribute('data-myt-search-subscribe','false')
+    assert page.evaluate('__subscriptionCalls===2&&__presses===1')
+    assert abs(card.bounding_box()['width']-before['width'])<1
+    control.evaluate('e=>e.disabled=true');box=control.bounding_box();page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
+    assert page.evaluate('__subscriptionCalls===2')
+    control.evaluate('e=>e.disabled=false')
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    page.emulate_media(reduced_motion='reduce');assert_stable(page)
+    control.click();page.mouse.move(1,1);expect(control).to_have_attribute('data-myt-search-subscribe','true');assert_stable(page)
+    page.screenshot(path=f'/tmp/yt-min-search-subscribe29-{width}-{dark}-{modern}.png')
+    page.evaluate('__setEnabled(false)');expect(page.locator('[data-myt-search-subscribe]')).to_have_count(0)
+    expect(control.locator('svg')).to_be_visible();assert page.evaluate('__subscriptionButton===document.querySelector("#native-subscribe")')
+    page.close();print(f'PASS subscription style/state, native actions, motion and 1.5-column width: {width}px, dark={dark}, modern={modern}',flush=True)
+
+
 def main():
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -189,6 +231,9 @@ def main():
         for width in [1440,390]:
             for native in [False,True]:avatar_navigation(browser,width,native)
         for native in [False,True]:avatar_layout(browser,native)
+        for width in [1440,390]:
+            for dark in [False,True]:
+                for modern in [False,True]:subscription_buttons(browser,width,dark,modern)
         browser.close()
 
 
