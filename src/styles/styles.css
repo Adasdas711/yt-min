@@ -1254,7 +1254,7 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island] {
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="media"] {
     display: block !important; overflow: clip !important;
     transition: none !important; contain: layout paint !important;
-    clip-path: inset(var(--myt-island-clip, 0px) 0 0) !important;
+    clip-path: inset(var(--myt-island-clip, 0px) 0 0);
     border-radius: 18px !important; background: #000 !important;
 }
 /* Keep YouTube's wrappers, video sizing and controls intact. Only its player
@@ -1265,10 +1265,10 @@ html.minimal-youtube[data-myt-watch-ui] ytd-watch-flexy[data-myt-watch-source] #
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="media"]::before,
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="media"]::after { content: none !important; display: none !important; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"],
-html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] { display: block !important; border-radius: 16px !important; clip-path: inset(var(--myt-island-clip, 0px) 0 0) !important; }
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] { display: block !important; border-radius: 16px !important; clip-path: inset(var(--myt-island-clip, 0px) 0 0); }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] {
     min-width: 0 !important; min-height: 0 !important; overflow: hidden !important;
-    left: 0 !important; top: 0 !important; contain: layout paint !important;
+    contain: layout paint !important;
     border-radius: 16px 0 0 16px !important;
 }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] > #container {
@@ -1278,6 +1278,7 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] > #con
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] > #container > #header { flex: 0 0 auto !important; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] #items {
     flex: 1 1 0% !important; height: auto !important; min-height: 0 !important; max-height: none !important; overflow-y: auto !important;
+    overscroll-behavior: none !important;
 }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-playlist-native-toggle],
 html.minimal-youtube[data-myt-watch-ui] [data-myt-playlist-native-toggle] * { visibility: hidden !important; pointer-events: none !important; }
@@ -1312,7 +1313,7 @@ html.minimal-youtube[data-myt-watch-ui] ytd-watch-flexy[data-myt-watch-source]:f
     width: 100vw !important; height: 100vh !important;
     max-width: none !important; max-height: none !important;
     margin: 0 !important; padding: 0 !important; border: 0 !important;
-    transform: none !important; clip-path: none !important; border-radius: 0 !important;
+    transform: none !important; translate: none !important; clip-path: none !important; border-radius: 0 !important;
     transition: none !important;
 }
 /* Fullscreen must size the native video's whole containing chain. YouTube can
@@ -1325,7 +1326,7 @@ html.minimal-youtube[data-myt-watch-ui] video[data-myt-fullscreen-part="video"]:
     min-width: 0 !important; min-height: 0 !important;
     max-width: none !important; max-height: none !important;
     margin: 0 !important; padding: 0 !important; border: 0 !important;
-    transform: none !important; clip-path: none !important; transition: none !important;
+    transform: none !important; translate: none !important; clip-path: none !important; transition: none !important;
 }
 html.minimal-youtube[data-myt-watch-ui] video[data-myt-fullscreen-part="video"] {
     object-fit: contain !important;
@@ -1356,7 +1357,7 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="media"][data-myt
     display: block !important; visibility: visible !important;
     position: fixed !important; inset: 0 !important;
     width: 100vw !important; height: 100vh !important;
-    clip-path: none !important; border-radius: 0 !important; z-index: 2147483647 !important;
+    translate: none !important; clip-path: none !important; border-radius: 0 !important; z-index: 2147483647 !important;
 }
 
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island]::backdrop { background: transparent !important; backdrop-filter: none !important; }
@@ -1369,3 +1370,16 @@ html.minimal-youtube ytd-watch-flexy :is(#chat, #chat-container, ytd-live-chat-f
 
 /* Banner overlays only. Never hide the native video or the skip control. */
 html.minimal-youtube #movie_player :is(.ytp-ad-overlay-container, .ytp-ad-overlay-slot) { display: none !important; }
+
+/* Fullscreen is a single native player, not YouTube's scrollable details view. */
+html.minimal-youtube[data-myt-watch-ui]:has(:fullscreen),
+html.minimal-youtube[data-myt-watch-ui]:has(:fullscreen) body,
+html.minimal-youtube[data-myt-watch-ui] :fullscreen,
+html.minimal-youtube[data-myt-watch-ui] [data-myt-fullscreen-part="container"] {
+    overflow: clip !important; overscroll-behavior: none !important;
+    scroll-behavior: auto !important;
+}
+html.minimal-youtube[data-myt-watch-ui] :fullscreen :is(.ytp-fullerscreen-edu-button,.ytp-fullerscreen-edu,.ytp-fullscreen-edu-button,.ytp-pause-overlay,.ytp-endscreen-content),
+html.minimal-youtube[data-myt-watch-ui] ytd-watch-flexy:fullscreen :is(#below,#secondary,#related) {
+    display: none !important;
+}

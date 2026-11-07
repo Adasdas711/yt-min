@@ -887,10 +887,10 @@ def check_native_watch(browser, theater=False, width=1440):
     page.add_style_tag(content='ytd-player { transition:top .7s ease,left .7s ease; }')
     for selector in ['video','#watch-title']:
         page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
-        direct=page.locator(selector).evaluate('''e=>{
+        direct=page.locator(selector).evaluate('''async e=>{
           const ui=document.querySelector('#myt-watch').firstElementChild.shadowRoot,viewport=ui.querySelector('.viewport');
           const event=new WheelEvent('wheel',{deltaY:120,bubbles:true,cancelable:true,composed:true});
-          e.dispatchEvent(event);
+          e.dispatchEvent(event);await new Promise(requestAnimationFrame);
           return {cancelled:event.defaultPrevented,scroll:viewport.scrollTop,maxScroll:viewport.scrollHeight-viewport.clientHeight,playerY:document.querySelector('#ytd-player').getBoundingClientRect().y,slotY:ui.querySelector('.media').getBoundingClientRect().y,transition:getComputedStyle(document.querySelector('#ytd-player')).transitionDuration};
         }''')
         expected_scroll=min(120,direct['maxScroll'])
@@ -921,12 +921,12 @@ def check_native_watch(browser, theater=False, width=1440):
     assert page.evaluate('window.__descriptionLoaded') is True
     page.locator('#below').evaluate("e=>e.insertAdjacentHTML('beforeend','<meta itemprop=datePublished content=2025-03-08>')")
     page.locator('#info-container').evaluate("e=>{const counter=document.createElement('yt-animated-rolling-number');counter.setAttribute('aria-label','326,412,890 views');counter.textContent='123456789012345678901234567890';const date=document.createElement('span');date.textContent='1 month ago';const products=document.createElement('button');products.textContent='3 products';e.replaceChildren(counter,date,products);}")
-    expect(page.locator('#myt-watch .stats')).to_have_text('326m · 8 March 2025')
+    expect(page.locator('#myt-watch .stats')).to_have_text('326.41m · 8 March 2025')
     page.locator('yt-animated-rolling-number').evaluate("e=>e.setAttribute('aria-label','326,412,891 views')")
-    expect(page.locator('#myt-watch .stats')).to_have_text('326m · 8 March 2025')
+    expect(page.locator('#myt-watch .stats')).to_have_text('326.41m · 8 March 2025')
     page.locator('#below').evaluate("e=>e.insertAdjacentHTML('beforeend','<meta itemprop=interactionCount content=987654321>')")
     page.locator('yt-animated-rolling-number').evaluate("e=>e.removeAttribute('aria-label')")
-    expect(page.locator('#myt-watch .stats')).to_have_text('988m · 8 March 2025')
+    expect(page.locator('#myt-watch .stats')).to_have_text('987.65m · 8 March 2025')
 
     # Enough chapters to overflow on desktop and mobile: exactly one scroll row.
     page.locator('#below').evaluate("e=>{for(let i=0;i<12;i++)e.insertAdjacentHTML('beforeend',`<ytd-macro-markers-list-item-renderer><button><span id=time>${i}:00</span><span id=title>Episode ${i}: a longer chapter title</span></button></ytd-macro-markers-list-item-renderer>`);}")
@@ -941,14 +941,14 @@ def check_native_watch(browser, theater=False, width=1440):
     first_chapter=page.locator('.chapter').first.element_handle()
     chapter_scroll=page.locator('.chapter-list').evaluate('e=>e.scrollLeft')
     page.locator('yt-animated-rolling-number').evaluate("e=>e.setAttribute('aria-label','987,654,322 views')")
-    expect(page.locator('#myt-watch .stats')).to_have_text('988m · 8 March 2025')
+    expect(page.locator('#myt-watch .stats')).to_have_text('987.65m · 8 March 2025')
     assert first_chapter.evaluate('e=>e.isConnected'), 'View updates rebuild chapter cards'
     assert abs(page.locator('.chapter-list').evaluate('e=>e.scrollLeft')-chapter_scroll)<2
     page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
     page.locator('#native-fullscreen').click()
-    page.wait_for_function("document.fullscreenElement?.id==='ytd-player'")
+    page.wait_for_function("document.fullscreenElement?.id==='movie_player'")
     expect(page.locator('#myt-watch')).to_be_hidden()
-    assert page.locator('#ytd-player').bounding_box()=={'x':0,'y':0,'width':width,'height':page.viewport_size['height']}
+    assert page.locator('#movie_player').bounding_box()=={'x':0,'y':0,'width':width,'height':page.viewport_size['height']}
     assert page.evaluate('window.__fullscreenError||null') is None
     pixel=rendered_pixel(page,width/2,page.viewport_size['height']/2)
     assert all(abs(a-b)<=6 for a,b in zip(pixel,[24,180,96,255])),pixel
@@ -960,24 +960,24 @@ def check_native_watch(browser, theater=False, width=1440):
     page.evaluate("document.addEventListener('keydown',event=>{if(event.key==='f'){if(document.fullscreenElement)document.exitFullscreen();else document.querySelector('ytd-player').requestFullscreen().catch(error=>window.__fullscreenError=error.message);}});document.querySelector('video').tabIndex=0")
     page.locator('video').focus()
     page.keyboard.press('f')
-    page.wait_for_function("document.fullscreenElement?.id==='ytd-player'")
+    page.wait_for_function("document.fullscreenElement?.id==='movie_player'")
     page.keyboard.press('f')
     page.wait_for_function('!document.fullscreenElement')
     expect(page.locator('#myt-watch')).to_be_visible()
     if not theater and width==1440:
         page.locator('#movie_player').evaluate("e=>e.ondblclick=()=>e.closest('ytd-player').requestFullscreen().catch(error=>window.__fullscreenError=error.message)")
         page.locator('video').dblclick(position={'x':30,'y':30})
-        page.wait_for_function("document.fullscreenElement?.id==='ytd-player'")
+        page.wait_for_function("document.fullscreenElement?.id==='movie_player'")
         expect(page.locator('#myt-watch')).to_be_hidden()
         page.locator('#native-fullscreen').click()
         page.wait_for_function('!document.fullscreenElement')
         # A denied/ignored native fullscreen request must restore the player.
-        page.locator('#native-fullscreen').evaluate("e=>{window.__fullscreenHandler=e.onclick;e.onclick=()=>{};}")
+        page.locator('#movie_player').evaluate("e=>{window.__fullscreenRequest=e.requestFullscreen;e.requestFullscreen=()=>Promise.reject(new DOMException('Denied','NotAllowedError'));}")
         page.locator('#native-fullscreen').click()
         page.wait_for_function("document.querySelector('#ytd-player').matches(':popover-open')")
         assert page.evaluate('!document.fullscreenElement')
         expect(page.locator('video')).to_be_visible()
-        page.locator('#native-fullscreen').evaluate('e=>e.onclick=window.__fullscreenHandler')
+        page.locator('#movie_player').evaluate('e=>e.requestFullscreen=window.__fullscreenRequest')
     page.locator('#movie_player').evaluate('e=>e.requestFullscreen()')
     assert page.evaluate('document.fullscreenElement.id')=='movie_player'
     before_scroll=page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop')
@@ -1018,7 +1018,7 @@ def check_fullscreen_cached_layout(browser,target,theater=False,width=1440):
             }
         });
     }""",target)
-    page.locator('#native-fullscreen').click()
+    page.evaluate('selector=>{const node=document.querySelector(selector);node.closest("[popover]")?.hidePopover();node.requestFullscreen();}',target)
     page.wait_for_function('!!document.fullscreenElement')
     expect(page.locator('#myt-watch')).to_be_hidden()
     dimensions=page.locator('video').bounding_box()
@@ -1117,18 +1117,15 @@ def check_fast_fullscreen(browser):
     page=setup(browser,'/watch?v=instant-fullscreen',native_watch_fixture(),native_dark=True)
     page.evaluate(VIDEO_STREAM)
     page.evaluate("""() => {
-      const button=document.querySelector('#native-fullscreen'),handler=button.onclick;
-      button.onclick=function(event){
-        const player=this.closest('ytd-player'),video=player.querySelector('video'),box=video.getBoundingClientRect();
-        if(!document.fullscreenElement)window.__immediateFullscreen={pending:player.hasAttribute('data-myt-fullscreen-pending'),x:box.x,y:box.y,width:box.width,height:box.height,ready:video.readyState,video:video===window.__nativeVideo};
-        return handler.call(this,event);
-      };
+      window.__delayedNativeCalls=0;
+      document.querySelector('#native-fullscreen').onclick=()=>{__delayedNativeCalls++;setTimeout(()=>document.querySelector('ytd-player').requestFullscreen(),1000);};
+      window.__fullscreenStart=performance.now();
     }""")
     page.locator('#native-fullscreen').click()
     page.wait_for_function('!!document.fullscreenElement')
-    immediate=page.evaluate('window.__immediateFullscreen')
-    assert immediate['pending'] and immediate['video'] and immediate['ready']>=2,immediate
-    assert [immediate[key] for key in ['x','y','width','height']]==[0,0,1440,960],immediate
+    assert page.evaluate('document.fullscreenElement.id')=='movie_player'
+    assert page.evaluate('__delayedNativeCalls')==0
+    assert page.locator('video').bounding_box()=={'x':0,'y':0,'width':1440,'height':960}
     pixel=rendered_pixel(page,720,480)
     assert all(abs(a-b)<=6 for a,b in zip(pixel,[24,180,96,255])),pixel
     page.locator('#native-fullscreen').click()
@@ -1780,7 +1777,7 @@ def check_subscription_card(browser, dark, width, modern=False):
         button.click(position={'x':box['width']-12,'y':box['height']/2})
 
     expect(button).to_have_attribute('aria-pressed',str(modern).lower())
-    expect(card.locator('.stats')).to_have_text('906k · 8 March 2025')
+    expect(card.locator('.stats')).to_have_text('906.36k · 8 March 2025')
     expect(page.locator('#watch-chapters h2')).to_have_count(0)
     expect(page.locator('#watch-chapters')).to_have_attribute('aria-label','Chapters')
     assert card.evaluate('e=>getComputedStyle(e).backgroundColor')!=page.locator('.viewport').evaluate('e=>getComputedStyle(e).backgroundColor')
@@ -1926,7 +1923,7 @@ def check_collaboration_card(browser, width, attributed=False):
     expect(page.locator('.channel-card')).not_to_contain_text('Устаревший канал')
     expect(page.locator('.owner img')).to_have_count(2)
     expect(page.locator('.channel-card')).to_have_attribute('data-collaborative','')
-    expect(page.locator('.channel-card .stats')).to_have_text('906k')
+    expect(page.locator('.channel-card .stats')).to_have_text('906.36k')
     for name in names.all():name.click()
     for avatar_link in page.locator('.owner .avatar-link').all():avatar_link.click()
     if attributed:assert page.evaluate('__authorsOpened')==3
@@ -2007,11 +2004,11 @@ def check_watch_language_change(browser, legacy=False):
     page=setup(browser,'/watch?v=details',watch_details_fixture(legacy),language='ru')
     stats=page.locator('#myt-watch .stats')
     page.evaluate('window.__originalVideo=document.querySelector("video")')
-    expect(stats).to_have_text('906k · 8 March 2025')
+    expect(stats).to_have_text('906.36k · 8 March 2025')
     page.evaluate("chrome.storage.local.set({language:'en'})")
-    expect(stats).to_have_text('906k · 8 March 2025')
+    expect(stats).to_have_text('906.36k · 8 March 2025')
     page.evaluate("chrome.storage.local.set({language:'ru'})")
-    expect(stats).to_have_text('906k · 8 March 2025')
+    expect(stats).to_have_text('906.36k · 8 March 2025')
     page.locator('#info-container').evaluate('e=>e.textContent="3,33 млн просмотров · 8 марта 2025 г."')
     expect(stats).to_have_text('3.33m · 8 March 2025')
     page.evaluate("chrome.storage.local.set({language:'en'})")
@@ -2027,8 +2024,8 @@ def check_watch_stats(browser, language):
     stats=page.locator('#myt-watch .stats')
     ru=False  # Raw source may be Russian; the extension interface is English.
     date=lambda ru_value,en_value:ru_value if ru else en_value
-    expect(stats).to_have_text(('906 тыс.' if ru else '906k')+' · '+date('8 марта 2025 г.','8 March 2025'))
-    for raw,compact in [('1234 views','1,23 тыс.' if ru else '1.23k'),('3,33 млн просмотров','3,33 млн.' if ru else '3.33m'),('1.2K views','1,2 тыс.' if ru else '1.2k'),('999999 views','1 млн.' if ru else '1m'),('No views','0')]:
+    expect(stats).to_have_text(('906 тыс.' if ru else '906.36k')+' · '+date('8 марта 2025 г.','8 March 2025'))
+    for raw,compact in [('1234 views','1,23 тыс.' if ru else '1.23k'),('3,33 млн просмотров','3,33 млн.' if ru else '3.33m'),('1.2K views','1,2 тыс.' if ru else '1.20k'),('999999 views','1 млн.' if ru else '1.00m'),('1000 views','1.00k'),('1000000 views','1.00m'),('1000000000 views','1.00b'),('999 views','999'),('No views','0')]:
         page.locator('#info-container').evaluate('(e,value)=>e.textContent=value+" · Jul 4, 2026"',raw)
         expect(stats).to_have_text(compact+' · '+date('4 июля 2026 г.','4 July 2026'))
     page.locator('#info-container').evaluate('e=>e.textContent="853 views · 1 month ago"')
@@ -2711,7 +2708,7 @@ def main():
         check_theater_responsive_width(browser)
         ok('theater follows the current browser width on resize, despite cached 5000px native sizes and long content')
         check_fast_fullscreen(browser)
-        ok('native video fills the viewport in the same click before the fullscreen handler, without waiting or replacing media')
+        ok('trusted fullscreen gestures request the native player directly and preserve decoded video/media identity')
         check_player_ad_data(browser)
         ok('initial player bootstrap and real Response.json discard ad slots but preserve native content URLs, playability and disabled parsers')
         check_player_ad_controls(browser)

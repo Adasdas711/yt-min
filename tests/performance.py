@@ -53,7 +53,7 @@ def noise_check(page):
     page.locator('#description').evaluate('''e=>{
       const next=e.cloneNode(true);next.querySelector('a').onclick=()=>{window.__freshDescriptionLink=true;return false;};e.replaceWith(next);
     }''')
-    expect(page.locator('#myt-watch .stats')).to_have_text('906k')
+    expect(page.locator('#myt-watch .stats')).to_have_text('906.36k')
     page.locator('.prose a').first.click()
     assert page.evaluate('window.__freshDescriptionLink===true')
     page.evaluate('__view.viewport.scrollTop=0;__view.position()')
@@ -81,7 +81,7 @@ def noise_check(page):
     assert result['methods'].get('renderDescription', {}).get('calls', 0) == 0, result
     assert result['methods'].get('sync', {}).get('calls', 0) == 0, result
     assert result['methods']['syncStats']['calls'] > 10 and result['adChecks'] == 0, result
-    assert result['stats'] == '906k · 8 March 2025', result
+    assert result['stats'] == '906.45k · 8 March 2025', result
     page.locator('.more-toggle').click()
     print('Counter/hidden-surface profile:', json.dumps(result), flush=True)
 
@@ -110,17 +110,20 @@ def resize_check(page):
 
 def response_check(page):
     page.evaluate('__view.viewport.scrollTop=0;__view.position()')
-    # Event dispatch includes our synchronous scroll handler and immediate geometry.
-    scroll = page.evaluate('''() => {
+    # Measure synchronous handler cost; compare alignment at the following paint.
+    scroll = page.evaluate('''async () => {
       const video=document.querySelector('video'),before=video.getBoundingClientRect().y,start=performance.now();
       video.dispatchEvent(new WheelEvent('wheel',{deltaY:150,bubbles:true,cancelable:true,composed:true}));
-      return {ms:performance.now()-start,moved:before-video.getBoundingClientRect().y,scroll:__view.viewport.scrollTop};
+      const elapsed=performance.now()-start;await new Promise(requestAnimationFrame);return {ms:elapsed,moved:before-video.getBoundingClientRect().y,scroll:__view.viewport.scrollTop};
     }''')
     assert scroll['moved'] >= 149 and scroll['scroll'] >= 150, scroll
     page.evaluate('__view.viewport.scrollTop=0;__view.position()')
     page.evaluate('''() => {
-      const button=document.querySelector('#native-fullscreen'),original=button.onclick;
-      if(!button.dataset.performanceMeasured){button.dataset.performanceMeasured='';button.onclick=function(event){window.__fullscreenStart=event.timeStamp;return original.call(this,event);};}
+      if(!window.__measuredFullscreen){
+        window.__measuredFullscreen=true;
+        const prepare=MinimalYouTubeWatch.prototype.prepareFullscreen;
+        MinimalYouTubeWatch.prototype.prepareFullscreen=function(...args){window.__fullscreenStart=performance.now();return prepare.apply(this,args);};
+      }
       window.__fullscreenMs=null;
       document.addEventListener('fullscreenchange',()=>{if(document.fullscreenElement)__fullscreenMs=performance.now()-__fullscreenStart;},{once:true});
     }''')

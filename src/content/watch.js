@@ -7,7 +7,7 @@
 :host([dark]) { color-scheme:only dark!important; --bg:#101012; --surface:#19191d; --soft:#24242b; --ink:#f4f4f5; --muted:#a0a0ac; --border:#303039; --link:#b6caff; }
 :host::before,:host::after { content:none!important;display:none!important; }
 *,*::before,*::after { box-sizing:border-box; } [hidden] { display:none!important; }
-.viewport { position:fixed;inset:0;overflow:auto;overscroll-behavior:contain;scroll-behavior:auto;background:var(--bg);color:var(--ink);scrollbar-color:var(--border) var(--bg); }
+.viewport { position:fixed;inset:0;overflow:auto;overscroll-behavior:none;scroll-behavior:auto;background:var(--bg);color:var(--ink);scrollbar-color:var(--border) var(--bg); }
 a { color:var(--link);text-decoration:none;overflow-wrap:anywhere; } a:hover { text-decoration:underline; }
 button,input { font:inherit; } button,a,input { -webkit-tap-highlight-color:transparent; }
 button { display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px;padding:10px 17px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--ink);font-size:16px;font-weight:500;line-height:1.3;cursor:pointer;white-space:nowrap;flex-shrink:0; }
@@ -33,7 +33,7 @@ main.has-sidecar .details { min-height:0; }
     :host(:not([theater])) .has-sidecar .details { grid-column:1 / -1;grid-row:2;justify-self:center;width:calc(100% - 48px); }
     :host(:not([theater])) .has-sidecar .sidecar { grid-column:2;grid-row:1;align-self:start;height:var(--playlist-player-height,320px);min-height:0;margin-top:20px; }
 }
-#watch-title { --title-ink:var(--ink);font-family:"MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;font-size:32px;font-weight:900;font-style:italic;text-transform:uppercase;line-height:.60;letter-spacing:-.025em;color:var(--title-ink);-webkit-text-fill-color:var(--title-ink);-webkit-text-stroke:0 transparent;overflow:visible;overflow-wrap:anywhere; }
+#watch-title { --title-ink:var(--ink);font-family:"MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;font-size:32px;font-weight:900;font-style:italic;text-transform:uppercase;line-height:.82;letter-spacing:-.025em;color:var(--title-ink);-webkit-text-fill-color:var(--title-ink);-webkit-text-stroke:0 transparent;overflow:visible;overflow-wrap:anywhere; }
 :host([dark]) #watch-title { --title-ink:#fff; }
 #watch-title .title-outline { -webkit-text-fill-color:transparent;-webkit-text-stroke:.5px var(--title-ink); }
 .meta-row { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin:22px 0 0; }
@@ -68,6 +68,7 @@ main.has-sidecar .details { min-height:0; }
 :host([theater]) main,:host([theater]) .layout,:host([theater]) .media { width:100%;min-width:0;max-width:100%; }:host([theater]) .layout { overflow-x:clip; }
 @media(max-width:900px) { .layout.has-sidecar { grid-template-columns:minmax(0,1fr); } main { padding-inline:20px; }main.has-sidecar .primary { padding:20px 20px 0; }.has-sidecar .sidecar { width:calc(100% - 40px);margin:28px auto 0;border-radius:16px; }:host([theater]) .has-sidecar .details { width:calc(100% - 40px); }:host([theater]) .has-sidecar .sidecar { grid-column:1;grid-row:3;margin-top:0; } }
 @media(max-width:600px) { .header { height:66px;padding:10px 16px;gap:14px; }.brand svg { width:32px;height:24px; }.brand span { display:none; }.search { height:44px; }.search input { font-size:16px; } main { padding:12px 16px 48px; }.media { border-radius:12px; }.details { margin-top:24px;min-height:calc(100dvh - 114px); }.meta-row { gap:12px; }.channel-card { grid-template-columns:var(--owner-avatars-small,40px) minmax(0,1fr) 18px;padding:12px 18px;gap:2px 10px; }.owner img { width:40px;height:40px; }.actions { width:100%; }.actions button { flex:1 1 auto; }.description { padding:22px 20px;border-radius:16px; }.prose { font-size:16px;line-height:1.75; }.chapter { flex-basis:min(200px,calc((100% - 12px) / 2));padding:14px 12px;border-radius:20px; }.chapter-title { font-size:17px; } h2 { font-size:21px; }.avatar-group .avatar-link { width:40px;height:40px; }.transcript-card { padding:22px 20px; }.transcript-head>button { width:100%; }.transcript-intro { align-items:start; }.segment { grid-template-columns:55px minmax(0,1fr);gap:12px; }.person { width:100%; }.section { margin-top:28px; } }
+.expand { border-color:transparent;background:transparent; }.expand:hover,.expand:focus-visible { background:var(--soft); }
 `;
     const words = {
         ru: { search:"Поиск на YouTube", clear:"Очистить поиск", description:"Описание", more:"Показать полностью", less:"Свернуть", chapters:"Эпизоды", people:"Упомянутые люди", transcript:"Расшифровка видео", transcriptHint:"Читайте текст и переходите к нужному моменту видео.", showTranscript:"Открыть расшифровку", hideTranscript:"Свернуть", find:"Найти в расшифровке", loading:"Загружаем расшифровку…", unavailable:"Текст пока не загрузился. Попробуйте ещё раз.", retry:"Повторить", noResults:"Совпадений нет", socials:"Ссылки канала", comments:"Комментарии", subscribe:"Подписаться", subscribed:"Вы подписаны", subscribeChannel:"Подписаться на канал", unsubscribeChannel:"Отписаться от канала", subscribing:"Подписываем…", unsubscribing:"Отписываем…", share:"Поделиться", openPlaylist:"Открыть плейлист", closePlaylist:"Закрыть плейлист", menu:"Ещё", otherActions:"Другие действия", video:"Видео" },
@@ -141,9 +142,18 @@ main.has-sidecar .details { min-height:0; }
                 }
             });
             this.nativeWheel=event=>{
-                if(document.fullscreenElement||event.ctrlKey||!event.deltaY||Math.abs(event.deltaX)>Math.abs(event.deltaY))return;
                 const path=event.composedPath().filter(node=>node instanceof Element),target=path[0];
+                if(document.fullscreenElement||this.fullscreenPending){
+                    if(event.ctrlKey)return;
+                    // Keep local settings/caption lists scrollable, never the
+                    // fullscreen watch page or YouTube's details shelf.
+                    const menu=target?.closest('.ytp-settings-menu,.ytp-panel,[role="menu"],[role="listbox"]');
+                    if(!menu)event.preventDefault();
+                    event.stopImmediatePropagation();return;
+                }
+                if(event.ctrlKey||!event.deltaY||Math.abs(event.deltaX)>Math.abs(event.deltaY))return;
                 const media=target?.closest('[data-myt-watch-island="media"]'),ownPage=path.includes(this.viewport);
+                if(target?.closest('[data-myt-watch-island="sidecar"]')){event.stopImmediatePropagation();return;}
                 if(!media&&!ownPage)return;
                 if(media&&target.closest('.ytp-settings-menu,.ytp-popup,.ytp-panel,.ytp-volume-area,.ytp-volume-panel,[role="menu"],[role="dialog"],[role="listbox"],[role="slider"]'))return;
                 if(ownPage){
@@ -154,10 +164,15 @@ main.has-sidecar .details { min-height:0; }
                     }
                 }
                 const unit=event.deltaMode===WheelEvent.DOM_DELTA_PAGE?this.viewport.clientHeight:event.deltaMode===WheelEvent.DOM_DELTA_LINE?20:1;
-                const before=this.viewport.scrollTop;this.viewport.scrollBy({top:event.deltaY*unit,behavior:'instant'});
-                if(this.viewport.scrollTop!==before){event.preventDefault();event.stopPropagation();this.position();}
+                // Consume the gesture even at either boundary. Passing the last
+                // wheel ticks through lets native YouTube scroll a second page.
+                event.preventDefault();event.stopImmediatePropagation();
+                this.viewport.scrollBy({top:event.deltaY*unit,behavior:'instant'});
+                this.position(true);
             };
             window.addEventListener('wheel',this.nativeWheel,{capture:true,passive:false});
+            this.fullscreenTouch=event=>{if((document.fullscreenElement||this.fullscreenPending)&&!event.target.closest?.('.ytp-settings-menu,.ytp-panel,[role="menu"],[role="listbox"]')){event.preventDefault();event.stopImmediatePropagation();}};
+            window.addEventListener('touchmove',this.fullscreenTouch,{capture:true,passive:false});
             this.geometry=()=>{
                 if(this.notifyingResize||this.geometryFrame)return;
                 this.geometryFrame=requestAnimationFrame(()=>{
@@ -180,18 +195,27 @@ main.has-sidecar .details { min-height:0; }
                     // scroll event. Dismiss only when its anchor actually moved.
                     if(this.moreAnchor&&Math.abs(rect.y-this.moreAnchor.y)>.5)this.closeMore();
                 }
-                if(this.positionedScroll!==this.viewport.scrollTop)this.position();
+                if(this.positionedScroll!==this.viewport.scrollTop)this.position(true);
             },{passive:true});window.addEventListener('resize',this.geometry);
             this.observer=new ResizeObserver(this.geometry);this.observer.observe(this.q('main'));this.observer.observe(this.q('.media'));this.observer.observe(this.q('.details'));
             this.fullscreen=()=>this.syncFullscreen();document.addEventListener('fullscreenchange',this.fullscreen);
-            // A shown popover cannot itself enter fullscreen. Release only the
-            // player wrapper before YouTube's own click/key handler requests it.
+            // A shown popover cannot itself enter fullscreen. Release the
+            // wrapper before requesting fullscreen on the native player.
             this.fullscreenIntent=event=>{
                 const path=event.composedPath().filter(node=>node instanceof Element),target=path[0];
                 const button=event.type==='click'&&target?.closest('.ytp-fullscreen-button');
                 const doubleClick=event.type==='dblclick'&&target?.closest('[data-myt-watch-island="media"]')&&!target.closest('button,.ytp-settings-menu,.ytp-panel');
                 const shortcut=event.type==='keydown'&&event.key?.toLowerCase()==='f'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!path.some(node=>node.matches('input,textarea,[contenteditable],button,a,[role="menu"]'));
-                if(!document.fullscreenElement&&(button||doubleClick||shortcut))this.prepareFullscreen();
+                if(button||doubleClick||shortcut){
+                    const player=this.native.querySelector('#movie_player')||this.nativePlayer();
+                    if(!player?.requestFullscreen)return;
+                    // Request in the trusted gesture, without waiting for the
+                    // site's animated fullscreen/details transition.
+                    event.preventDefault();event.stopImmediatePropagation();
+                    if(document.fullscreenElement){document.exitFullscreen().catch(()=>{});return;}
+                    this.prepareFullscreen();
+                    player.requestFullscreen({navigationUI:'hide'}).catch(()=>this.resumeFullscreen());
+                }
             };
             for(const type of ['click','dblclick','keydown'])window.addEventListener(type,this.fullscreenIntent,true);
             this.fullscreenError=()=>this.resumeFullscreen();document.addEventListener('fullscreenerror',this.fullscreenError);
@@ -216,26 +240,25 @@ main.has-sidecar .details { min-height:0; }
             if(this.fullscreenPending)return;
             const player=this.nativePlayer();if(!player)return;
             this.fullscreenPending=true;this.fullscreenPreview=player;
+            for(const[node,state]of this.islands)this.clearScrollBinding(node,state);
             this.closeMore();player.setAttribute('data-myt-fullscreen-pending','');
             // Paint the native frame at full size in the same click. Preserve its
             // positioning state until the browser enters fullscreen; the native
-            // button handler can request it as soon as its popover is hidden.
+            // request can start as soon as its popover is hidden.
             this.updateFullscreenLayout(player);
             for(const node of this.islands.keys())if(node.matches(':popover-open'))node.hidePopover();
             if(this.host.matches(':popover-open'))this.host.hidePopover();
-            clearTimeout(this.fullscreenTimer);
-            this.fullscreenTimer=setTimeout(()=>this.resumeFullscreen(),600);
         }
         clearFullscreenPreview() {
             this.fullscreenPreview?.removeAttribute('data-myt-fullscreen-pending');this.fullscreenPreview=null;
         }
         resumeFullscreen() {
-            clearTimeout(this.fullscreenTimer);this.fullscreenPending=false;
+            this.fullscreenPending=false;
             this.clearFullscreenPreview();
             if(!document.fullscreenElement&&this.host.isConnected){this.restoreFullscreenLayout();this.open(this.host);this.sync(this.options);this.resizeNativePlayer();}
         }
         syncFullscreen() {
-            clearTimeout(this.fullscreenTimer);this.fullscreenPending=false;
+            this.fullscreenPending=false;
             this.clearFullscreenPreview();
             if(document.fullscreenElement){
                 this.closeMore();
@@ -634,8 +657,8 @@ main.has-sidecar .details { min-height:0; }
             count=Math.round(count);
             if(!Number.isSafeInteger(count)||count<0)return '';
             const locale=this.options.language==='ru'?'ru-RU':'en-US';
-            if(this.viewsLocale!==locale){this.viewsLocale=locale;this.viewsFormat=new Intl.NumberFormat(locale,{notation:'compact',maximumSignificantDigits:3});}
-            return this.viewsFormat.format(count).toLowerCase().replace(/\s+/g,' ').replace(/млн$/u,'млн.').replace(/млрд$/u,'млрд.');
+            if(this.viewsLocale!==locale){this.viewsLocale=locale;this.viewsFormat=new Intl.NumberFormat(locale,{notation:'compact',minimumFractionDigits:2,maximumFractionDigits:2});}
+            return (count<1000?String(count):this.viewsFormat.format(count)).toLowerCase().replace(/\s+/g,' ').replace(/млн$/u,'млн.').replace(/млрд$/u,'млрд.');
         }
         publicationDate(meta,info,readable) {
             const locale=this.options.language==='ru'?'ru-RU':'en-GB';
@@ -707,12 +730,13 @@ main.has-sidecar .details { min-height:0; }
 
         island(node,kind,box) {
             if(!node)return;
-            if(!this.islands.has(node)){this.islands.set(node,{tabindex:node.getAttribute('tabindex'),popover:node.getAttribute('popover'),style:node.getAttribute('style'),properties:['--myt-island-x','--myt-island-y','--myt-island-w','--myt-island-h','--myt-island-clip',...(kind==='sidecar'?['transform','clip-path']:[])].map(name=>[name,node.style.getPropertyValue(name),node.style.getPropertyPriority(name)]),kind});node.setAttribute('popover','manual');node.dataset.mytWatchIsland=kind;if(kind==='anchor')node.tabIndex=-1;this.open(node);}
+            if(!this.islands.has(node)){this.islands.set(node,{tabindex:node.getAttribute('tabindex'),popover:node.getAttribute('popover'),style:node.getAttribute('style'),properties:['--myt-island-x','--myt-island-y','--myt-island-w','--myt-island-h','--myt-island-clip',...(['media','sidecar','comments'].includes(kind)?['translate','clip-path']:[])].map(name=>[name,node.style.getPropertyValue(name),node.style.getPropertyPriority(name)]),kind});node.setAttribute('popover','manual');node.dataset.mytWatchIsland=kind;if(kind==='anchor')node.tabIndex=-1;this.open(node);}
             this.islands.get(node).box=box;if(!document.fullscreenElement)this.open(node);
             return node;
         }
         restore(node) {
             const state=this.islands.get(node);if(!state)return;
+            this.clearScrollBinding(node,state);
             try{if(node.matches(':popover-open'))node.hidePopover();}catch{}
             if(state.popover===null)node.removeAttribute('popover');else node.setAttribute('popover',state.popover);
             for(const[name,value,priority]of state.properties){if(value)node.style.setProperty(name,value,priority);else node.style.removeProperty(name);}
@@ -946,15 +970,55 @@ main.has-sidecar .details { min-height:0; }
             const minimum=Math.ceil(controls+first.height+(second?.height||first.height)+gap+2)+'px';
             if(this.surface.style.getPropertyValue('--playlist-min-height')!==minimum)this.surface.style.setProperty('--playlist-min-height',minimum);
         }
-        position() {
+        clearScrollBinding(node,state) {
+            state.scrollAnimation?.cancel();state.scrollAnimation=null;state.scrollKey=null;
+            node.removeAttribute('data-myt-scroll-bound');
+        }
+        positionScrollIsland(node,state,box,scroll) {
+            const base=state.scrollBox,extent=this.scrollExtent||0,header=this.scrollHeader||0;
+            const key=[base.x,base.y,base.width,base.height,extent,header].join(':');
+            const set=(name,value)=>{if(node.style.getPropertyValue(name)!==value)node.style.setProperty(name,value);};
+            set('--myt-island-x',base.x+'px');set('--myt-island-y',base.y+'px');
+            set('--myt-island-w',base.width+'px');set('--myt-island-h',base.height+'px');
+            // Bind both native layers to the browser's own scroll timeline. The
+            // compositor moves them with the Shadow DOM, including scrollbar,
+            // trackpad and keyboard scrolling, without a JS-frame chase.
+            if(extent>0&&typeof globalThis.ScrollTimeline==='function'){
+                if(state.scrollKey===key)return;
+                this.clearScrollBinding(node,state);
+                try{
+                    this.scrollTimeline||=new ScrollTimeline({source:this.viewport,axis:'block'});
+                    node.style.removeProperty('translate');node.style.removeProperty('clip-path');
+                    const offsets=[0,1],crossing=(base.y-header)/extent;
+                    if(crossing>0&&crossing<1)offsets.splice(1,0,crossing);
+                    const frames=offsets.map(offset=>({offset,translate:`0px ${-extent*offset}px`,clipPath:`inset(${Math.max(0,header-base.y+extent*offset)}px 0px 0px)`}));
+                    state.scrollAnimation=node.animate(frames,{timeline:this.scrollTimeline,duration:1,fill:'both',easing:'linear'});
+                    state.scrollKey=key;node.setAttribute('data-myt-scroll-bound','');return;
+                }catch{this.clearScrollBinding(node,state);}
+            }else if(state.scrollAnimation)this.clearScrollBinding(node,state);
+            // Chrome 114 fallback: the same cached document coordinates and
+            // immediate wheel handling, with no smoothing or repeated layout.
+            const translation=`0px ${-scroll}px`,clip=`inset(${Math.max(0,header-box.y)}px 0px 0px)`;
+            if(node.style.getPropertyValue('translate')!==translation)node.style.setProperty('translate',translation,'important');
+            if(node.style.getPropertyValue('clip-path')!==clip)node.style.setProperty('clip-path',clip,'important');
+        }
+        position(scrollOnly=false) {
             if(!this.host.isConnected||document.fullscreenElement||this.fullscreenPending)return;
-            this.positionedScroll=this.viewport.scrollTop;
-            const headerBottom=this.q('.header').getBoundingClientRect().bottom;
-            // Read all rectangles before writing styles: multiple native islands
-            // otherwise alternate forced layout and style invalidation on scroll.
+            const scroll=this.viewport.scrollTop;this.positionedScroll=scroll;
+            if(!scrollOnly){this.scrollHeader=this.q('.header').getBoundingClientRect().bottom;this.scrollExtent=Math.max(0,this.viewport.scrollHeight-this.viewport.clientHeight);}
             const boxes=[];
-            for(const[node,state]of this.islands){if(!node.isConnected){this.restore(node);continue;}if(state.box)boxes.push([node,state,state.box()]);}
-            for(const[node,state,b]of boxes){if(state.kind==='media'&&(state.width!==b.width||state.height!==b.height)){state.width=b.width;state.height=b.height;this.resizeNativePlayer();}const clip=Math.max(0,headerBottom-b.y);if(state.kind==='sidecar'){const transform=`translate3d(${b.x}px,${b.y}px,0)`,mask=`inset(${clip}px 0 0)`;if(node.style.getPropertyValue('transform')!==transform)node.style.setProperty('transform',transform,'important');if(node.style.getPropertyValue('clip-path')!==mask)node.style.setProperty('clip-path',mask,'important');}const props={'--myt-island-x':`${b.x}px`,'--myt-island-y':`${b.y}px`,'--myt-island-w':`${b.width}px`,'--myt-island-h':`${b.height}px`,'--myt-island-clip':['media','comments','sidecar'].includes(state.kind)?`${Math.max(0,headerBottom-b.y)}px`:'0px'};for(const[k,v]of Object.entries(props)){if(state.kind==='sidecar'&&['--myt-island-x','--myt-island-y','--myt-island-clip'].includes(k))continue;if(node.style.getPropertyValue(k)!==v)node.style.setProperty(k,v);}}
+            for(const[node,state]of this.islands){
+                if(!node.isConnected){this.restore(node);continue;}if(!state.box)continue;
+                const moving=['media','sidecar','comments'].includes(state.kind);
+                const b=scrollOnly&&moving&&state.scrollBox?{...state.scrollBox,y:state.scrollBox.y-scroll}:state.box();
+                if(moving&&(!scrollOnly||!state.scrollBox))state.scrollBox={x:b.x,y:b.y+scroll,width:b.width,height:b.height};
+                boxes.push([node,state,b,moving]);
+            }
+            for(const[node,state,b,moving]of boxes){
+                if(state.kind==='media'&&(state.width!==b.width||state.height!==b.height)){state.width=b.width;state.height=b.height;this.resizeNativePlayer();}
+                if(moving){this.positionScrollIsland(node,state,b,scroll);continue;}
+                for(const[k,v]of Object.entries({'--myt-island-x':b.x+'px','--myt-island-y':b.y+'px','--myt-island-w':b.width+'px','--myt-island-h':b.height+'px'}))if(node.style.getPropertyValue(k)!==v)node.style.setProperty(k,v);
+            }
         }
         updateCurrentChapter(follow=false) {
             const time=this.media?.currentTime||0,starts=this.chapterStarts||[];
@@ -992,7 +1056,7 @@ main.has-sidecar .details { min-height:0; }
             this.q('.transcript-status').textContent=data.length?(filtered.length?'':this.copy.noResults):(this.transcriptLoading?this.copy.loading:this.copy.unavailable);this.q('.transcript-retry').hidden=!!data.length||this.transcriptLoading;this.q('.transcript-search').hidden=!data.length;
         }
         closeTranscript() {this.transcriptOpen=false;clearTimeout(this.transcriptTimeout);if(this.q){this.q('#watch-transcript').hidden=true;this.q('.transcript-menu-toggle')?.setAttribute('aria-expanded','false');this.q('.transcript-content').hidden=true;this.q('.transcript-toggle').setAttribute('aria-expanded','false');}if(this.nativePanelState){for(const[name,value]of this.nativePanelState.attrs){if(value===null)this.nativePanelState.node.removeAttribute(name);else this.nativePanelState.node.setAttribute(name,value);}this.nativePanelState=null;}}
-        destroy() {this.playlistStateObserver?.disconnect();this.restorePlaylistChrome();clearTimeout(this.titleTimer);cancelAnimationFrame(this.geometryFrame);cancelAnimationFrame(this.sourceFrame);this.subscriptionPress?.cancel();this.subscriptionPress=null;this.clearSubscription(true);this.clearFullscreenPreview();this.restoreFullscreenLayout();clearTimeout(this.fullscreenTimer);for(const type of ['click','dblclick','keydown'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);for(const type of ['timeupdate','seeked'])this.media?.removeEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.removeEventListener(type,this.videoMetadata);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;window.dispatchEvent(new Event('resize'));}
+        destroy() {this.playlistStateObserver?.disconnect();this.restorePlaylistChrome();clearTimeout(this.titleTimer);cancelAnimationFrame(this.geometryFrame);cancelAnimationFrame(this.sourceFrame);this.subscriptionPress?.cancel();this.subscriptionPress=null;this.clearSubscription(true);this.clearFullscreenPreview();this.restoreFullscreenLayout();for(const type of ['click','dblclick','keydown'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('touchmove',this.fullscreenTouch,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);for(const type of ['timeupdate','seeked'])this.media?.removeEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.removeEventListener(type,this.videoMetadata);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;window.dispatchEvent(new Event('resize'));}
     }
     globalThis.MinimalYouTubeWatch=WatchView;
 })();

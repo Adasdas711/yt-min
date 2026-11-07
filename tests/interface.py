@@ -58,7 +58,7 @@ def startup(browser):
     assert page.evaluate('document.querySelector("video")===__sourceVideo')
     expect(page.locator('.views-icon')).to_be_visible()
     expect(page.locator('.views-icon svg')).to_have_attribute('aria-hidden', 'true')
-    expect(page.locator('.stats')).to_have_text('906k')
+    expect(page.locator('.stats')).to_have_text('906.36k')
     page.evaluate('__resolveSettings()')
     expect(page.locator('#myt-watch')).to_be_visible()
     page.evaluate('__setEnabled(false)')
