@@ -48,6 +48,15 @@ def local_home(browser):
     page.add_init_script(script=init)
     page.goto(ORIGIN+'/src/home/index.html')
     expect(page.locator('#myt-home')).to_be_visible()
+    expect(page.locator('#myt-theme-toggle')).to_have_count(0)
+    icon=page.locator('link[rel="icon"]')
+    assert icon.get_attribute('href')=='youtube.svg'
+    pixels=page.evaluate('''async()=>{
+      const image=new Image();image.src=document.querySelector('link[rel="icon"]').href;await image.decode();
+      const canvas=new OffscreenCanvas(32,32),ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,32,32);
+      return [[4,16],[16,16],[0,0]].map(([x,y])=>[...ctx.getImageData(x,y,1,1).data]);
+    }''')
+    assert pixels==[[255,0,51,255],[255,255,255,255],[0,0,0,0]],pixels
     assert page.locator('ytd-app,ytd-player,video,iframe').count()==0
     assert not [url for url in requests if urlparse(url).netloc!='minimal-extension.test'], requests
     assert page.locator('script').evaluate_all("nodes=>nodes.every(node=>!node.src.includes('youtube.com'))")

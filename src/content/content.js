@@ -339,48 +339,6 @@
     outline-offset: 3px;
 }
 
-.myt-theme-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    min-height: 34px;
-    margin-top: 18px;
-    padding: 7px 12px;
-    border: 1px solid transparent;
-    border-radius: 999px;
-    background: transparent;
-    color: var(--myt-muted);
-    font: inherit;
-    font-size: 12px;
-    line-height: 1.5;
-    cursor: pointer;
-    transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
-}
-
-.myt-theme-toggle:hover {
-    border-color: var(--myt-border);
-    background: var(--myt-surface);
-    color: var(--myt-ink);
-}
-
-.myt-theme-toggle:focus-visible {
-    outline: 2px solid var(--myt-accent);
-    outline-offset: 3px;
-}
-
-.myt-theme-toggle svg {
-    display: block;
-    width: 16px;
-    height: 16px;
-    flex: none;
-}
-
-.myt-theme-toggle[data-theme="light"] .myt-theme-toggle__sun,
-.myt-theme-toggle[data-theme="dark"] .myt-theme-toggle__moon {
-    display: none;
-}
-
 
 :host::before, :host::after, :host::backdrop { content: none !important; display: none !important; }
 
@@ -407,7 +365,7 @@
 }
 .myt-settings-button:hover { color: var(--myt-ink); background: var(--myt-soft); }
 .myt-settings-button svg { width: 22px; height: 22px; }
-:host([data-settings-open]) :is(.myt-home__brand, .myt-search, .myt-theme-toggle) { visibility: hidden; pointer-events: none; }
+:host([data-settings-open]) :is(.myt-home__brand, .myt-search) { visibility: hidden; pointer-events: none; }
 .myt-settings-backdrop { position: fixed; inset: 0; z-index: 2; background: rgba(0,0,0,.48); backdrop-filter: blur(10px); }
 .myt-settings-panel {
     position: fixed; left: 50%; top: 50%; z-index: 3; transform: translate(-50%,-50%);
@@ -587,14 +545,6 @@
             const pressed = String(choice.dataset.mytThemeChoice === root.dataset.mytTheme);
             if (choice.getAttribute("aria-pressed") !== pressed) choice.setAttribute("aria-pressed", pressed);
         }
-        const button = home?.firstElementChild.shadowRoot.querySelector("#myt-theme-toggle");
-        if (!button) return;
-        const dark = theme ? theme === "dark" : root.hasAttribute("dark");
-        const buttonTheme = dark ? "dark" : "light";
-        if (button.dataset.theme !== buttonTheme) button.dataset.theme = buttonTheme;
-        const text = dark ? copy.light : copy.dark;
-        if (button.querySelector("span").textContent !== text) button.querySelector("span").textContent = text;
-        if (button.getAttribute("aria-label") !== text) button.setAttribute("aria-label", text);
     }
 
     function setCommentsOpen(open) {
@@ -1082,11 +1032,6 @@
                 <input class="myt-search__input" id="myt-query" name="search_query" type="search" autofocus autocomplete="off" aria-label="${copy.label}" placeholder="${copy.search}">
                 <button class="myt-search__clear" type="button" aria-label="${copy.clear}" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
             </form>
-            <button class="myt-theme-toggle" id="myt-theme-toggle" type="button">
-                <svg class="myt-theme-toggle__sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
-                <svg class="myt-theme-toggle__moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20.8 13A9 9 0 0 1 11 3.2 9 9 0 1 0 20.8 13Z"/></svg>
-                <span></span>
-            </button>
             <button class="myt-settings-button" id="myt-settings-button" type="button" aria-label="${copy.settings}" title="${copy.settings}" aria-expanded="${settingsOpen}" aria-controls="myt-settings-panel">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m9 3-.6 2.3-2 .9L4.3 5.5 2.8 8.1l1.7 1.6-.2 2.3-1.7 1.5 1.5 2.7 2.3-.7 1.9 1.1.6 2.4h3l.6-2.4 1.9-1.1 2.3.7 1.5-2.7-1.7-1.5-.2-2.3 1.7-1.6-1.5-2.6-2.1.7-2-.9L12 3Z" transform="translate(1 1)"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
@@ -1124,10 +1069,6 @@
             view.querySelector("form").action = "https://www.youtube.com/results";
             view.querySelector(".myt-home__brand").href = chrome.runtime.getURL("src/home/index.html") + location.search;
         }
-        view.querySelector("#myt-theme-toggle").addEventListener("click", () => {
-            const dark = theme ? theme === "dark" : root.hasAttribute("dark");
-            saveTheme(dark ? "light" : "dark");
-        });
         const panel = view.querySelector("#myt-settings-panel");
         const settingsButton = view.querySelector("#myt-settings-button");
         const cookieStatus = view.querySelector("#myt-cookie-status");
@@ -1142,7 +1083,7 @@
             panel.hidden = !open;
             view.querySelector("#myt-settings-backdrop").hidden = !open;
             surface.toggleAttribute("data-settings-open", open);
-            for (const element of view.querySelectorAll(".myt-home__brand, .myt-search, .myt-theme-toggle")) element.inert = open;
+            for (const element of view.querySelectorAll(".myt-home__brand, .myt-search")) element.inert = open;
             settingsButton.setAttribute("aria-expanded", String(open));
             confirmation.hidden = true;
             if (open) {
@@ -1474,10 +1415,10 @@
             if (!target) return false;
             if (target.closest("title")) { cleanTitle(); return false; }
             if (stableHome) return record.target === root && record.attributeName === "dark";
-            if (target.closest("#myt-watch, #myt-home, #myt-playlist-summary")) return false;
+            if (target.closest("#myt-watch, #myt-home, #myt-playlist-summary, [data-myt-search-avatar-overlay]")) return false;
             if(record.type==='childList'){
                 const changes=[...record.addedNodes,...record.removedNodes];
-                if(changes.length&&changes.every(node=>node instanceof Element&&node.matches('#myt-watch,#myt-home,#myt-playlist-summary,[data-myt-search-playlist-card],.myt-masthead-brand'))&&(!changes.some(node=>node.matches('.myt-masthead-brand'))||target.querySelectorAll(':scope > .myt-masthead-brand').length<=1))return false;
+                if(changes.length&&changes.every(node=>node instanceof Element&&node.matches('#myt-watch,#myt-home,#myt-playlist-summary,[data-myt-search-playlist-card],[data-myt-search-avatar-overlay],.myt-masthead-brand'))&&(!changes.some(node=>node.matches('.myt-masthead-brand'))||target.querySelectorAll(':scope > .myt-masthead-brand').length<=1))return false;
             }
             if(stableSearch){
                 if(target.closest('yt-video-preview,ytd-popup-container'))return false;

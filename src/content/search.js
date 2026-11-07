@@ -76,7 +76,7 @@
     }
 
     class Search {
-        constructor(){this.cards=new Map();this.filters=new Map();this.layout=new Map();this.metadata=new Map();this.click=event=>this.toggleFilter(event);document.addEventListener('click',this.click,true);}
+        constructor(){this.cards=new Map();this.avatars=new Map();this.filters=new Map();this.layout=new Map();this.metadata=new Map();this.click=event=>this.toggleFilter(event);document.addEventListener('click',this.click,true);}
         static isPlaylist(card){
             if(card.matches('ytd-playlist-renderer,ytd-grid-playlist-renderer'))return true;
             if(!card.matches('yt-lockup-view-model'))return false;
@@ -90,6 +90,7 @@
             const raw=document.documentElement.getAttribute('data-myt-search-playlists')||'';
             if(raw!==this.metadataRaw){this.metadataRaw=raw;this.metadata.clear();try{const values=JSON.parse(raw);if(Array.isArray(values))for(const value of values.slice(-200))if(typeof value.id==='string')this.metadata.set(value.id,{image:safeURL(value.image)?.href||'',count:countNumber(value.count)});}catch{}}
             this.syncLayout(searches);
+            this.syncAvatars(searches);
             for(const search of searches){
                 for(const source of search.querySelectorAll('[data-myt-search-playlist]')){
                     wanted.add(source);let card=this.cards.get(source);if(!card){card=new PlaylistCard(source);this.cards.set(source,card);}card.update(this.metadata);
@@ -112,6 +113,30 @@
             this.pendingCards ||=new Set();this.pendingCards.add(source);
             if(this.cardFrame)return;
             this.cardFrame=requestAnimationFrame(()=>{this.cardFrame=0;for(const source of this.pendingCards)if(source.isConnected)this.cards.get(source)?.update(this.metadata);this.pendingCards.clear();});
+        }
+        restoreAvatar(host,state){
+            host.removeAttribute('data-myt-search-avatar-host');state.link.removeAttribute('data-myt-search-avatar-link');
+            if(state.owned)state.link.remove();this.avatars.delete(host);
+        }
+        syncAvatars(searches){
+            const wanted=new Set();
+            const channelURL=link=>{const url=safeURL(link.href);return url?.protocol==='https:'&&(url.hostname==='youtube.com'||url.hostname.endsWith('.youtube.com'))&&channelPath.test(url.pathname)?url:null;};
+            for(const search of searches)for(const card of search.querySelectorAll('[data-myt-search-channel]')){
+                const host=card.querySelector('#avatar-section,yt-img-shadow#avatar');if(!host)continue;
+                const links=[...card.querySelectorAll('a[href]:not([data-myt-search-avatar-overlay])')].filter(channelURL);
+                const native=links.find(link=>host.contains(link)||link.contains(host));
+                const destination=native||links[0];if(!destination)continue;
+                let state=this.avatars.get(host);
+                if(state&&!(native?state.link===native:state.owned&&state.link.parentElement===host)){this.restoreAvatar(host,state);state=null;}
+                if(!state){
+                    const link=native||document.createElement('a');state={link,owned:!native};
+                    if(state.owned){link.dataset.mytSearchAvatarOverlay='';link.setAttribute('aria-label','Open channel');link.addEventListener('click',event=>event.stopPropagation());}
+                    link.dataset.mytSearchAvatarLink='';host.dataset.mytSearchAvatarHost='';this.avatars.set(host,state);
+                }
+                if(state.owned){if(state.link.href!==destination.href)state.link.href=destination.href;if(state.link.parentElement!==host)host.append(state.link);}
+                wanted.add(host);
+            }
+            for(const[host,state]of this.avatars)if(!wanted.has(host))this.restoreAvatar(host,state);
         }
         syncLayout(searches){
             const wanted=new Map(),mark=(node,name,value='')=>{if(!node)return;if(!wanted.has(node))wanted.set(node,new Map());wanted.get(node).set('data-myt-search-'+name,value);};
@@ -176,7 +201,7 @@
             for(const[name,value]of [['hidden',state.hidden],['aria-hidden',state.aria]]){if(value===null)panel.removeAttribute(name);else panel.setAttribute(name,value);}
             for(const[button,value]of state.buttons){if(value===null)button.removeAttribute('aria-expanded');else button.setAttribute('aria-expanded',value);}
         }
-        destroy(){cancelAnimationFrame(this.cardFrame);this.pendingCards?.clear();document.removeEventListener('click',this.click,true);for(const card of this.cards.values())card.destroy();this.cards.clear();for(const[panel,state]of this.filters)this.restoreFilter(panel,state);this.filters.clear();for(const[node,attributes]of this.layout)for(const name of attributes.keys())node.removeAttribute(name);this.layout.clear();this.metadata.clear();}
+        destroy(){cancelAnimationFrame(this.cardFrame);this.pendingCards?.clear();document.removeEventListener('click',this.click,true);for(const card of this.cards.values())card.destroy();this.cards.clear();for(const[host,state]of this.avatars)this.restoreAvatar(host,state);for(const[panel,state]of this.filters)this.restoreFilter(panel,state);this.filters.clear();for(const[node,attributes]of this.layout)for(const name of attributes.keys())node.removeAttribute(name);this.layout.clear();this.metadata.clear();}
     }
     Search.playlistSelector=playlistSelector;
     globalThis.MinimalYouTubeSearch=Search;

@@ -124,6 +124,37 @@ def covers_and_sections(browser,width,dark):
     print(f'PASS lazy covers/count badges, compact mixed sections and special panels: width={width}, dark={dark}',flush=True)
 
 
+def avatar_navigation(browser,width,native):
+    image=f'<img src="{cover()}" alt="Creator">'
+    if native:image='<a id="native-avatar" href="/@creator">'+image+'</a>'
+    body=f'<ytd-app>{MASTHEAD}<ytd-search><ytd-section-list-renderer><div id="contents"><ytd-channel-renderer><div id="content-section"><div id="avatar-section">{image}</div><div id="info-section"><a id="main-link" href="/@creator">Creator</a></div></div></ytd-channel-renderer></div></ytd-section-list-renderer></ytd-search></ytd-app>'
+    page=setup(browser,'/results?search_query=creator',body,width=width)
+    page.context.route('https://www.youtube.com/**',lambda route:route.fulfill(content_type='text/html',body='<title>Channel</title>'))
+    link=page.locator('[data-myt-search-avatar-link]');expect(link).to_have_attribute('href','/@creator' if native else 'https://www.youtube.com/@creator')
+    page.evaluate('window.__avatarParent=document.querySelector("#avatar-section img").parentElement')
+    link.hover();expect(link).to_have_css('cursor','pointer')
+    box=page.locator('#avatar-section img').bounding_box()
+    # Chromium starts background-tab requests before interception. Keep this
+    # gesture offline; the routed normal click below verifies its destination.
+    page.context.set_offline(True)
+    with page.context.expect_page() as opened:page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2,button='middle')
+    opened.value.close();page.context.set_offline(False)
+    page.locator('ytd-channel-renderer').evaluate('''card=>{
+      for(const a of card.querySelectorAll('a:not([data-myt-search-avatar-overlay])'))a.href='/@updated';
+    }''')
+    expect(link).to_have_attribute('href','/@updated' if native else 'https://www.youtube.com/@updated')
+    assert_stable(page)
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('[data-myt-search-avatar-link],[data-myt-search-avatar-host],[data-myt-search-avatar-overlay]')).to_have_count(0)
+    assert page.evaluate('document.querySelector("#avatar-section img").parentElement===__avatarParent')
+    expect(page.locator('#native-avatar')).to_have_count(1 if native else 0)
+    page.evaluate('__setEnabled(true)');expect(link).to_have_count(1)
+    box=page.locator('#avatar-section img').bounding_box()
+    page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
+    page.wait_for_url('**/@updated');page.close()
+    print(f'PASS channel avatar navigation, new tab, recycled URL and cleanup: {width}px, native={native}',flush=True)
+
+
 def main():
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -131,6 +162,8 @@ def main():
             for dark in [True,False]:
                 check(browser,width,dark)
                 covers_and_sections(browser,width,dark)
+        for width in [1440,390]:
+            for native in [False,True]:avatar_navigation(browser,width,native)
         browser.close()
 
 

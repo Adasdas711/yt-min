@@ -113,6 +113,12 @@ def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, nati
     return page
 
 
+def select_home_theme(page, value):
+    page.locator('#myt-settings-button').click()
+    page.locator('#myt-theme-'+value).click()
+    page.locator('#myt-settings-close').click()
+
+
 def centered(page, selector, tolerance=3):
     bounds = page.locator(selector).bounding_box()
     assert bounds and bounds["width"] > 0, f"Missing layout box: {selector}"
@@ -226,7 +232,7 @@ def check_home_isolation(browser, theme):
     page.locator('#myt-query').press('Escape')
     expect(page.locator('#myt-query')).to_have_value('')
     expect(page.locator('#myt-home')).to_be_visible()
-    page.locator('#myt-theme-toggle').click()
+    select_home_theme(page, 'light' if theme=='dark' else 'dark')
     assert_uniform_full_page(page)
     navigate_spa(page, '/results?search_query=restored')
     expect(page.locator('#myt-home')).to_have_count(0)
@@ -414,7 +420,7 @@ def check_home_settings(browser, width):
     }""")
     expect(page.locator('#myt-settings-panel')).to_be_hidden()
     brand=page.locator('#myt-home .myt-home__brand').bounding_box()
-    theme=page.locator('#myt-theme-toggle').bounding_box()
+    theme=page.locator('#myt-home .myt-search').bounding_box()
     assert abs((brand['y']+theme['y']+theme['height'])/2-page.viewport_size['height']/2)<1, (brand,theme)
     page.locator('#myt-settings-button').click()
     expect(page.locator('#myt-settings-panel')).to_be_visible()
@@ -457,7 +463,7 @@ def check_home_settings(browser, width):
     expect(page.locator('html')).to_have_attribute('data-myt-theme','light')
     assert page.evaluate('__stored.theme') == 'light'
     page.locator('#myt-settings-close').click()
-    page.locator('#myt-theme-toggle').click()
+    select_home_theme(page, 'dark')
     page.locator('#myt-settings-button').click()
     expect(page.locator('#myt-theme-dark')).to_have_attribute('aria-pressed','true')
     page.evaluate("chrome.storage.local.set({language:'ru'})")
@@ -2217,19 +2223,19 @@ def main():
 
         page = setup(browser, native_dark=True)
         expect(page.locator("#myt-home h1, #myt-home .myt-home__eyebrow, #myt-home .myt-home__description, #myt-home .myt-home__hint")).to_have_count(0)
-        expect(page.locator("#myt-theme-toggle")).to_be_visible()
+        expect(page.locator("#myt-theme-toggle")).to_have_count(0)
         expect(page.locator("html")).to_have_attribute("data-myt-theme", "dark")
         dark_bg = page.locator("#myt-home").evaluate("element => getComputedStyle(element).backgroundColor")
-        page.locator("#myt-theme-toggle").click()
+        select_home_theme(page, "light")
         expect(page.locator("html")).to_have_attribute("data-myt-theme", "light")
         light_bg = page.locator("#myt-home").evaluate("element => getComputedStyle(element).backgroundColor")
         assert dark_bg != light_bg, (dark_bg, light_bg)
         assert page.evaluate("__stored.theme") == "light"
         assert page.locator("html[dark]").count() == 1, "Homepage theme must preserve YouTube's native theme"
-        page.locator("#myt-theme-toggle").click()
+        select_home_theme(page, "dark")
         expect(page.locator("html")).to_have_attribute("data-myt-theme", "dark")
         assert page.evaluate("__stored.theme") == "dark"
-        ok("homepage contains only brand/search/theme and switches persisted local theme without changing YouTube theme")
+        ok("homepage keeps brand/search without a theme toggle and switches persisted theme through settings")
         page.close()
 
         page = setup(browser, theme="light", native_dark=True)
@@ -2291,7 +2297,7 @@ def main():
             for size in [{"width":1996,"height":1248}, {"width":390,"height":844}]:
                 page.set_viewport_size(size)
                 assert_uniform_full_page(page)
-            page.locator('#myt-theme-toggle').click()
+            select_home_theme(page, 'light' if theme=='dark' else 'dark')
             assert_uniform_full_page(page)
             page.evaluate('__setEnabled(false)')
             assert page.locator('html').evaluate("element => getComputedStyle(element, '::before').content") == '""'
