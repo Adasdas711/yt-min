@@ -107,6 +107,7 @@ def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, nati
     page.add_script_tag(path=str(ROOT / "src/content/ads.js"))
     if watch_ui:
         page.add_script_tag(path=str(ROOT / "src/content/watch.js"))
+    page.add_script_tag(path=str(ROOT / "src/content/playlist.js"))
     page.add_script_tag(path=str(ROOT / "src/content/content.js"))
     return page
 
@@ -157,7 +158,7 @@ def setup_at_document_start(browser, path, enabled=True, defer_settings=False):
     page = browser.new_page(viewport={"width": 1440, "height": 960})
     page.errors = []
     page.on("pageerror", lambda error: page.errors.append(str(error)))
-    code = (ROOT / "src/content/watch.js").read_text() + "\n" + (ROOT / "src/content/content.js").read_text()
+    code = (ROOT / "src/content/watch.js").read_text() + "\n" + (ROOT / "src/content/playlist.js").read_text() + "\n" + (ROOT / "src/content/content.js").read_text()
     initial = json.dumps({"enabled": enabled})
     script = f"({MOCK})({initial});\n"
     if defer_settings:
@@ -2254,6 +2255,7 @@ def main():
             page.evaluate(MOCK, {"theme":theme})
             page.add_style_tag(path=str(ROOT / "src/styles/styles.css"))
             page.add_script_tag(path=str(ROOT / "src/content/watch.js"))
+            page.add_script_tag(path=str(ROOT / "src/content/playlist.js"))
             page.add_script_tag(path=str(ROOT / "src/content/content.js"))
             page.emulate_media(reduced_motion="reduce")
             expect(page.locator("#myt-home")).to_be_visible()

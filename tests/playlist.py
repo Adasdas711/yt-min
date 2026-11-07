@@ -48,7 +48,8 @@ def check(browser, legacy, width, dark):
     for row_node in page.locator('ytd-playlist-video-renderer').all():
         rect=row_node.bounding_box()
         assert rect and rect['x']>=b['x']-1 and rect['x']+rect['width']<=b['x']+b['width']+1,rect
-        thumb=row_node.locator('a#thumbnail').bounding_box();title=row_node.locator('#meta').bounding_box()
+        owned=row_node.locator('[data-myt-owned-playlist-card=video]')
+        thumb=owned.locator('a.cover').bounding_box();title=owned.locator('.meta').bounding_box()
         assert thumb['x']+thumb['width']<=title['x'],(thumb,title)
     summary.get_by_role('button',name='Play all',exact=True).click()
     assert page.evaluate('__play')
@@ -58,7 +59,7 @@ def check(browser, legacy, width, dark):
     assert page.evaluate('__playlistMenu')
     # Preserve source nodes/parents, playlist-context URLs, menus and pagination.
     page.evaluate('''() => {window.__sourceRow=document.querySelector('ytd-playlist-video-renderer');window.__sourceParent=__sourceRow.parentElement;}''')
-    playlist.locator('#video-title').first.click()
+    playlist.locator('[data-myt-owned-playlist-card=video] a.title').first.click()
     assert 'v=video0' in page.evaluate('__visit') and 'list=PLfixture' in page.evaluate('__visit')
     playlist.get_by_role('button',name='Video actions').first.click()
     assert page.evaluate('__menu')==1
@@ -68,7 +69,7 @@ def check(browser, legacy, width, dark):
     expect(playlist.locator('ytd-playlist-video-renderer')).to_have_count(13)
     assert page.evaluate('__sourceRow===document.querySelector("ytd-playlist-video-renderer")&&__sourceParent===__sourceRow.parentElement')
     # A creator-color update must not reintroduce a tinted panel or gradient.
-    summary.evaluate("e=>{e.style.background='linear-gradient(red,blue)';e.querySelector('.page-header-sidebar').style.background='linear-gradient(magenta,green)';}")
+    page.locator('ytd-playlist-header-renderer,ytd-playlist-sidebar-renderer').evaluate("e=>{e.style.background='linear-gradient(red,blue)';e.querySelector('.page-header-sidebar').style.background='linear-gradient(magenta,green)';}")
     expect(summary).to_have_css('background-color',neutral['color'])
     expect(summary).to_have_css('background-image','none')
     assert_stable(page)
@@ -88,6 +89,89 @@ def check(browser, legacy, width, dark):
     print(f'PASS standalone playlist: legacy={legacy}, width={width}, dark={dark}',flush=True)
 
 
+def mixed_markup(browser, width=1440, modern_rows=False):
+    html=body().replace('ytd-playlist-header-renderer','yt-page-header-renderer')
+    legacy=body(True).split('<ytd-playlist-sidebar-renderer>',1)[1].split('</ytd-playlist-sidebar-renderer>',1)[0]
+    html=html.replace('</ytd-browse>', '<ytd-playlist-sidebar-renderer class="inactive-legacy">'+legacy+'</ytd-playlist-sidebar-renderer></ytd-browse>')
+    html+='<style>yt-page-header-renderer{display:block}.inactive-legacy{display:none}img{width:100vw!important;height:70vh!important;max-width:none} .page-header-sidebar{position:fixed!important;width:100vw!important;height:100vh!important;background:linear-gradient(green,black)!important}</style>'
+    if modern_rows:
+        html=html.replace('<ytd-playlist-video-list-renderer>','<div id="modern-list">').replace('</ytd-playlist-video-list-renderer>','</div>').replace('ytd-playlist-video-renderer','yt-lockup-view-model')
+    page=setup(browser,'/playlist?list=PLfixture',html,width=width,native_dark=True)
+    summary=page.locator('#myt-playlist-summary')
+    expect(summary).to_have_count(1)
+    expect(summary.locator('h1')).to_have_text('German A1 | For Absolute Beginners')
+    expect(page.locator('.inactive-legacy')).to_be_hidden()
+    expect(page.locator('[data-myt-owned-playlist-card=video]')).to_have_count(12)
+    expect(summary).to_have_css('background-color','rgb(36, 36, 42)')
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    for img in page.locator('img').all():
+        if img.is_visible():assert img.bounding_box()['width']<=max(340,width-32),img.bounding_box()
+    cards=page.locator('[data-myt-owned-playlist-card=video]')
+    previous=-1
+    for card in cards.all():
+        rect=card.bounding_box();assert rect['y']>previous;previous=rect['y']
+    summary.get_by_role('button',name='Play all',exact=True).click()
+    assert page.evaluate('__play')
+    cards.first.locator('a.title').click()
+    assert 'v=video0' in page.evaluate('__visit')
+    # Native menu commands use an invisible top-layer anchor at the owned button.
+    page.locator('yt-page-header-renderer button[aria-label="Playlist actions"]').evaluate('e=>e.onclick=function(){window.__menuBox={x:this.getBoundingClientRect().x,y:this.getBoundingClientRect().y};}')
+    menu=summary.get_by_role('button',name='Playlist actions');menu.click()
+    expected=menu.bounding_box();actual=page.evaluate('__menuBox')
+    assert abs(actual['x']-expected['x'])<1 and abs(actual['y']-expected['y'])<1,(actual,expected)
+    assert_stable(page)
+    page.screenshot(path=f'/tmp/yt-min-owned-playlist-mixed-{width}-{modern_rows}.png')
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('[data-myt-owned-playlist-card],[data-myt-playlist-row],[data-myt-playlist-native-row-part],[data-myt-playlist-action-anchor]')).to_have_count(0)
+    expect(page.locator('.inactive-legacy')).to_be_hidden()
+    page.close()
+    print(f'PASS mixed native versions and hostile styles: width={width}, modern_rows={modern_rows}',flush=True)
+
+
+def lifecycle(browser):
+    page=setup(browser,'/playlist?list=PLfixture',body(),native_dark=True)
+    expect(page.locator('[data-myt-owned-playlist-card=video]')).to_have_count(12)
+    # Native header restamping must update data without recreating owned cards.
+    page.evaluate('''() => {
+      window.__summary=document.querySelector('#myt-playlist-summary');
+      window.__first=document.querySelector('[data-myt-owned-playlist-card=video]');
+      const header=document.querySelector('ytd-playlist-header-renderer'),next=header.cloneNode(true);
+      next.querySelector('h1').textContent='Updated playlist';header.replaceWith(next);
+    }''')
+    expect(page.locator('#myt-playlist-summary h1')).to_have_text('Updated playlist')
+    assert page.evaluate('__summary===document.querySelector("#myt-playlist-summary")&&__first===document.querySelector("[data-myt-owned-playlist-card=video]")')
+    # Native row rerenders preserve the owned row and reconnect action sources.
+    page.evaluate('''() => {
+      const container=document.querySelector('ytd-playlist-video-renderer #container'),next=container.cloneNode(true);
+      next.querySelector('#video-title').textContent='Updated video';container.replaceWith(next);
+    }''')
+    expect(page.locator('[data-myt-owned-playlist-card=video] a.title').first).to_have_text('Updated video')
+    assert page.evaluate('__first===document.querySelector("[data-myt-owned-playlist-card=video]")')
+    page.locator('[data-myt-owned-playlist-card=video] a.title').first.click()
+    assert 'v=video0' in page.evaluate('__visit')
+    # Keep the native continuation in flow for its original intersection observer.
+    page.evaluate('''html => {
+      const continuation=document.querySelector('ytd-continuation-item-renderer');
+      window.__continuedByIntersection=0;
+      window.__continuationObserver=new IntersectionObserver(entries=>{
+        if(entries.some(entry=>entry.isIntersecting)){
+          __continuedByIntersection++;continuation.insertAdjacentHTML('beforebegin',html);
+          __continuationObserver.disconnect();
+        }
+      });
+      __continuationObserver.observe(continuation);
+    }''',row(12))
+    page.locator('ytd-continuation-item-renderer').scroll_into_view_if_needed()
+    expect(page.locator('[data-myt-owned-playlist-card=video]')).to_have_count(13)
+    assert page.evaluate('__continuedByIntersection')==1
+    assert_stable(page)
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('[data-myt-owned-playlist-card],[data-myt-playlist-native-row-part]')).to_have_count(0)
+    expect(page.locator('ytd-playlist-header-renderer h1')).to_be_visible()
+    page.close()
+    print('PASS header/row restamping preserves owned cards; native intersection pagination remains active',flush=True)
+
+
 def main():
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -96,6 +180,10 @@ def main():
                 check(browser,legacy,width,True)
         for legacy in [False,True]:
             check(browser,legacy,1440,False)
+        for modern_rows in [False,True]:
+            for width in [1440,390]:
+                mixed_markup(browser,width,modern_rows)
+        lifecycle(browser)
         empty=body().replace('<ytd-playlist-video-list-renderer>','<ytd-playlist-video-list-renderer hidden>')
         empty=empty.replace('</ytd-playlist-video-list-renderer>','</ytd-playlist-video-list-renderer><ytd-message-renderer id="empty-playlist">No videos yet</ytd-message-renderer>')
         page=setup(browser,'/playlist?list=empty',empty,native_dark=True)

@@ -15,8 +15,8 @@ for content_script in manifest['content_scripts']:
         assert ROOT / path in files, f'Missing content script: {path}'
 assert ROOT / manifest['action']['default_popup'] in files, 'Missing popup'
 assert ROOT / manifest['background']['service_worker'] in files, 'Missing background worker'
-for required in ['src/optimization.js', 'src/content/data-pruning.js', 'src/home/index.html', 'src/home/home.js', 'src/home/home.css']:
-    assert ROOT / required in files, f'Missing memory-optimization resource: {required}'
+for required in ['src/content/playlist.js', 'src/optimization.js', 'src/content/data-pruning.js', 'src/home/index.html', 'src/home/home.js', 'src/home/home.css']:
+    assert ROOT / required in files, f'Missing required resource: {required}'
 for font in ['BarlowCondensed-BlackItalic', 'MinimalCondensed-BlackItalic']:
     path = f'src/assets/fonts/{font}.ttf'
     assert ROOT / path in files, f'Missing title font: {path}'

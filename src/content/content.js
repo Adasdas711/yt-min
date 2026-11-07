@@ -146,6 +146,7 @@
     const brandedLinks = new Set();
     const searchDecorations = new Set();
     const playlistLayoutNodes = new Map();
+    let playlistView = null;
     // A shadow root isolates the home controls from document-wide CSS.
     const homeStyles = `:host {
     all: initial !important;
@@ -1267,40 +1268,57 @@
     function syncPlaylistLayout() {
         const wanted = new Map();
         const active = enabled && [root.dataset.mytPage, root.dataset.mytPreviousPage].includes("playlist");
-        if (active) {
-            for (const browse of document.querySelectorAll("ytd-browse:not([hidden])")) {
-                if (browse.closest("[hidden],[aria-hidden='true']")) continue;
-                const summary = [...browse.querySelectorAll("ytd-playlist-header-renderer,ytd-playlist-sidebar-renderer,yt-playlist-header-view-model")].find(node => !node.closest("[hidden],[aria-hidden='true']"));
-                const list = [...browse.querySelectorAll("ytd-playlist-video-list-renderer")].find(node => !node.closest("[hidden],[aria-hidden='true']")) ||
-                    [...browse.querySelectorAll("ytd-message-renderer,ytd-background-promo-renderer")].find(node => !summary?.contains(node) && !node.closest("[hidden],[aria-hidden='true']"));
-                if (!summary || !list || summary.contains(list)) continue;
-                let layout = summary.parentElement;
-                while (layout && layout !== browse && !layout.contains(list)) layout = layout.parentElement;
-                if (!layout?.contains(list)) continue;
-                const mark = (node, name) => {
-                    if (!wanted.has(node)) wanted.set(node, new Set());
-                    wanted.get(node).add(name);
-                };
-                mark(layout, "layout");mark(summary, "summary");mark(list, "list");
-                for (const [node, name] of [[summary, "summary-slot"], [list, "list-slot"]]) {
-                    let slot = node;
-                    while (slot.parentElement !== layout) slot = slot.parentElement;
-                    mark(slot, name);
-                    for (let wrapper = node.parentElement; wrapper && wrapper !== layout; wrapper = wrapper.parentElement) mark(wrapper, "wrapper");
+        const mark = (node, name) => { if (!wanted.has(node)) wanted.set(node, new Set());wanted.get(node).add(name); };
+        let selected = null;
+        if (active && globalThis.MinimalYouTubePlaylist) {
+            const visible = node => {
+                if (node.closest("[hidden],[aria-hidden='true']")) return false;
+                const owned = node.closest('[data-myt-playlist-source-summary]');
+                for (let parent = node; parent && parent !== document.body; parent = parent.parentElement) {
+                    const style = getComputedStyle(parent);
+                    if (style.display === "none" || (!owned && style.visibility === "hidden")) return false;
                 }
+                return true;
+            };
+            for (const browse of document.querySelectorAll('ytd-browse:not([hidden])')) {
+                if (!visible(browse)) continue;
+                const lists = [...browse.querySelectorAll('ytd-playlist-video-list-renderer')];
+                let list = lists.find(visible) || (playlistView?.list?.isConnected && browse.contains(playlistView.list) && visible(playlistView.list) ? playlistView.list : null);
+                const types = ['yt-page-header-renderer','ytd-page-header-renderer','ytd-playlist-header-renderer','yt-playlist-header-view-model','yt-page-header-view-model','ytd-playlist-sidebar-renderer'];
+                let source = null;
+                for (const type of types) { source = [...browse.querySelectorAll(type)].find(node => visible(node) && !node.contains(list) && node.querySelector('h1,#title'));if (source) break; }
+                if (!source) {
+                    const heading = [...browse.querySelectorAll('h1')].find(visible);
+                    source = heading?.closest('#header,#page-header') || heading?.parentElement;
+                    if (source?.contains(list)) source = heading.parentElement;
+                }
+                if (!list) {
+                    const rows = [...browse.querySelectorAll('ytd-playlist-video-renderer,yt-lockup-view-model,ytd-video-renderer')].filter(node => !source?.contains(node) && visible(node));
+                    list = rows[0]?.parentElement;
+                    while (list && rows.some(row => !list.contains(row))) list = list.parentElement;
+                    if (list === browse || list?.contains(source)) list = null;
+                }
+                list ||= [...browse.querySelectorAll('ytd-message-renderer,ytd-background-promo-renderer')].find(node => !source?.contains(node) && visible(node));
+                if (!source || !list || source.contains(list)) continue;
+                let sourceRoot = source;
+                while (sourceRoot.parentElement && sourceRoot.parentElement !== browse && !sourceRoot.parentElement.contains(list)) sourceRoot = sourceRoot.parentElement;
+                selected = {browse,source,list,sourceRoot};break;
             }
         }
-        // Keep native renderers, handlers, scrolling and continuation observers
-        // in their original parents. Only opt their existing paths into our grid.
-        for (const [node, names] of playlistLayoutNodes) for (const name of names) {
-            if (!wanted.get(node)?.has(name)) node.removeAttribute("data-myt-playlist-" + name);
-        }
-        for (const [node, names] of wanted) for (const name of names) {
-            const attribute = "data-myt-playlist-" + name;
-            if (!node.hasAttribute(attribute)) node.setAttribute(attribute, "");
-        }
-        playlistLayoutNodes.clear();
-        for (const [node, names] of wanted) playlistLayoutNodes.set(node, names);
+        if (selected) {
+            const {browse,source,list,sourceRoot} = selected;
+            if (playlistView?.list !== list) {
+                playlistView?.destroy();playlistView = new globalThis.MinimalYouTubePlaylist({source,list,onChange:schedule});
+            } else playlistView.setSource(source);
+            const layout = list.parentElement, card = playlistView.host;
+            if (card.parentElement !== layout || card.nextElementSibling !== list) layout.insertBefore(card,list);
+            playlistView.sync();
+            mark(layout,'layout');mark(card,'summary');mark(card,'summary-slot');mark(list,'list');mark(list,'list-slot');mark(sourceRoot,'source-summary');
+            for (let wrapper = layout.parentElement; wrapper && browse.contains(wrapper); wrapper = wrapper.parentElement) mark(wrapper,'wrapper');
+        } else {playlistView?.destroy();playlistView = null;}
+        for (const [node,names] of playlistLayoutNodes) for (const name of names) if (!wanted.get(node)?.has(name)) node.removeAttribute('data-myt-playlist-'+name);
+        for (const [node,names] of wanted) for (const name of names) if (!node.hasAttribute('data-myt-playlist-'+name)) node.setAttribute('data-myt-playlist-'+name,'');
+        playlistLayoutNodes.clear();for (const [node,names] of wanted) playlistLayoutNodes.set(node,names);
     }
 
     function destinationMounted(path) {
@@ -1439,7 +1457,7 @@
             if (!target) return false;
             if (target.closest("title")) { cleanTitle(); return false; }
             if (stableHome) return record.target === root && record.attributeName === "dark";
-            if (target.closest("#myt-watch, #myt-home")) return false;
+            if (target.closest("#myt-watch, #myt-home, #myt-playlist-summary")) return false;
             // Player clocks, captions, progress aria labels and popup animations
             // do not change our metadata UI. React only to media-node replacement.
             if (watchView && target.closest("ytd-player, #movie_player, .html5-video-player")) {
@@ -1447,6 +1465,7 @@
                     node instanceof Element && (node.matches("video, ytd-player") || node.querySelector("video, ytd-player")));
             }
             if (watchView && target.closest("ytd-popup-container, ytd-comments")) return false;
+            if (playlistView && target.closest("ytd-popup-container,ytd-masthead,yt-video-preview")) return false;
             // Native playlist virtualization and playback markers never change
             // the watch metadata. Its scoped observer handles header/state only.
             if (watchView && target.closest("ytd-playlist-panel-renderer")) return false;
