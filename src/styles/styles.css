@@ -748,6 +748,8 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     width: 100% !important;
     min-width: 0 !important;
     max-width: none !important;
+    justify-content: stretch !important; justify-items: stretch !important;
+    margin-inline: 0 !important;
 }
 
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) > * {
@@ -1003,6 +1005,12 @@ html.minimal-youtube [data-myt-hidden="shorts"] {
     display: none !important;
 }
 
+/* Hidden recycled shelves must stay hidden even after search layout markers
+   add more specific display:grid or display:contents rules. */
+@layer myt-visibility {
+    html.minimal-youtube [data-myt-hidden="shorts"] { display: none !important; }
+}
+
 /* Dedicated modern search shelves must disappear before the JS scan, too.
    A mixed shelf with ordinary video lockups keeps those results visible. */
 html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-section-renderer):has(ytm-shorts-lockup-view-model, yt-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2):not(:has(ytd-video-renderer a[href*="/watch?"], yt-lockup-view-model a[href*="/watch?"])) {
@@ -1243,11 +1251,13 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
 }
 /* Ordinary native result sections share a grid. Their nodes and continuation
    controllers keep their original parents; only layout wrappers are flattened. */
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-section-list-renderer > #contents[data-myt-search-flow] {
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-section-list-renderer > #contents,[data-myt-search-flow])[data-myt-search-flow] {
     display: grid !important; grid-template-columns: repeat(calc(var(--myt-search-columns) * 2),minmax(0,1fr));
     grid-auto-flow: row dense; align-items: start; gap: 16px 24px;
+    justify-content: stretch !important; justify-items: stretch !important;
+    box-sizing: border-box; width: 100% !important; max-width: none !important; margin-inline: 0 !important; padding-inline: 0 !important;
 }
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer,ytd-item-section-renderer > #contents,[data-myt-search-grid],ytd-shelf-renderer,grid-shelf-view-model,ytd-rich-section-renderer)[data-myt-search-flat] {
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer,ytd-item-section-renderer > #contents,[data-myt-search-grid],ytd-shelf-renderer,grid-shelf-view-model,ytd-rich-section-renderer,[data-myt-search-flat])[data-myt-search-flat] {
     display: contents !important;
 }
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-flow] > :not([data-myt-search-cell],[data-myt-search-playlist-cell],[data-myt-search-channel-cell]) {
@@ -1264,6 +1274,17 @@ html.minimal-youtube [data-myt-search-special-heading] {
     color: var(--myt-ink); font-size: 18px; font-weight: 600;
 }
 html.minimal-youtube [data-myt-search-special-heading] :is(h2,h3,#title) { margin: 0 !important; }
+html.minimal-youtube [data-myt-search-heading-text],
+html.minimal-youtube [data-myt-search-heading-text] :is(span,a,yt-formatted-string,yt-attributed-string) {
+    font-family: "MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif !important;
+    font-size: 32px !important; font-weight: 900 !important; font-style: italic !important;
+    text-transform: uppercase; line-height: 1 !important; letter-spacing: -.025em;
+    color: var(--myt-ink) !important; -webkit-text-fill-color: currentColor !important; -webkit-text-stroke: 0 transparent !important;
+}
+/* Native carousel offsets must never center or shift a partial search row. */
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is([data-myt-search-cell],[data-myt-search-channel-cell],[data-myt-search-playlist-cell]) {
+    justify-self: stretch !important; translate: none !important; transform: none !important; float: none !important;
+}
 html.minimal-youtube [data-myt-search-special] > #contents > [data-myt-search-special-heading] { margin-bottom: 0 !important; }
 html.minimal-youtube [data-myt-search-balanced="2"] { --myt-search-columns: 2; }
 @media(max-width:600px) {

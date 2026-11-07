@@ -49,8 +49,8 @@ main.has-sidecar .details { min-height:0; }
 .subscription-state { position:relative;grid-column:3;grid-row:1 / 3;display:flex;align-items:center;pointer-events:none;color:var(--ink); }.subscription-state svg { width:18px;height:18px; }.channel-card .stats { position:relative;grid-column:2;grid-row:2;align-self:start;pointer-events:none;font-size:13px;line-height:1.5; }.channel-card:not(:has(.avatar-link img)) { grid-template-columns:minmax(0,1fr) 20px; }.channel-card:not(:has(.avatar-link img)) .owner-text,.channel-card:not(:has(.avatar-link img)) .stats { grid-column:1; }.channel-card:not(:has(.avatar-link img)) .subscription-state { grid-column:2; }.sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0; }
 .actions { display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0; }
 .playlist-toggle,.more-toggle { border-radius:999px; }.more-actions { display:flex; }.more-toggle { width:44px;min-width:44px;padding:10px; }.more-popup { position:fixed;inset:auto;margin:0;padding:8px;width:min(260px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;border:1px solid var(--border);border-radius:24px;background:var(--surface);color:var(--ink);box-shadow:0 12px 36px #0002; }.more-popup::backdrop { background:transparent; }.more-popup button { border-radius:16px;display:flex;width:100%;justify-content:flex-start;white-space:normal;text-align:left;border:0;background:transparent; }.more-popup button:hover,.more-popup button:focus-visible { background:var(--soft); }.more-popup button:focus-visible { outline-offset:-2px; }
-#myt-comments-toggle { display:inline-flex;align-items:center;gap:9px; }.description { margin-top:28px;border:1px solid var(--border);border-radius:20px;background:var(--surface);padding:28px; }
-.stats { font-size:14px;font-weight:500;color:var(--muted);margin:0; }.prose { font-family:"SFMono-Regular","SF Mono",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace;font-size:17px;font-weight:400;line-height:1.75;letter-spacing:normal;font-variant-ligatures:none;overflow-wrap:anywhere;white-space:pre-wrap; }.prose p { margin:0 0 18px; }.prose ul,.prose ol { padding-left:24px; }.prose:not(.expanded) { max-height:8.75em;overflow:hidden; }.expand { display:flex;width:100%;margin-top:18px;background:transparent; }
+#myt-comments-toggle { display:inline-flex;align-items:center;gap:9px; }.description { --description-side:28px;--description-bottom:28px;--description-round:20px;margin-top:28px;border:1px solid var(--border);border-radius:20px;background:var(--surface);padding:28px; }
+.stats { font-size:14px;font-weight:500;color:var(--muted);margin:0; }.prose { font-family:"SFMono-Regular","SF Mono",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace;font-size:17px;font-weight:400;line-height:1.75;letter-spacing:normal;font-variant-ligatures:none;overflow-wrap:anywhere;white-space:pre-wrap; }.prose p { margin:0 0 18px; }.prose ul,.prose ol { padding-left:24px; }.prose:not(.expanded) { max-height:8.75em;overflow:hidden; }.expand { display:flex;width:calc(100% + var(--description-side) + var(--description-side));margin:18px calc(0px - var(--description-side)) calc(0px - var(--description-bottom));min-height:48px;padding:12px var(--description-side);border-radius:0 0 var(--description-round) var(--description-round);background:transparent; }
 .channel-card .stats { display:flex;align-items:flex-start;gap:6px; }.views-icon { display:inline-flex;flex:none;margin-top:3px; }.views-icon svg { width:14px;height:14px; }.stats-value { min-width:0; }
 .prose a { font-weight:700; }.prose .link-symbol { display:inline-block;width:.95em;height:.95em;margin-right:.3em;vertical-align:-.12em;pointer-events:none; }
 .section { margin-top:32px; }.section-head { display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px; }.hint { color:var(--muted);font-size:15px;line-height:1.6; }
@@ -67,7 +67,7 @@ main.has-sidecar .details { min-height:0; }
 :host([theater]) .has-sidecar .primary { display:contents; }:host([theater]) .has-sidecar .media { grid-column:1 / -1;grid-row:1; }:host([theater]) .has-sidecar .details { grid-column:1;grid-row:2;justify-self:center;margin:0; }:host([theater]) .has-sidecar .sidecar { grid-column:2;grid-row:2; }:host([theater]) .layout.has-sidecar { row-gap:28px; }
 :host([theater]) main,:host([theater]) .layout,:host([theater]) .media { width:100%;min-width:0;max-width:100%; }:host([theater]) .layout { overflow-x:clip; }
 @media(max-width:900px) { .layout.has-sidecar { grid-template-columns:minmax(0,1fr); } main { padding-inline:20px; }main.has-sidecar .primary { padding:20px 20px 0; }.has-sidecar .sidecar { width:calc(100% - 40px);margin:28px auto 0;border-radius:16px; }:host([theater]) .has-sidecar .details { width:calc(100% - 40px); }:host([theater]) .has-sidecar .sidecar { grid-column:1;grid-row:3;margin-top:0; } }
-@media(max-width:600px) { .header { height:66px;padding:10px 16px;gap:14px; }.brand svg { width:32px;height:24px; }.brand span { display:none; }.search { height:44px; }.search input { font-size:16px; } main { padding:12px 16px 48px; }.media { border-radius:12px; }.details { margin-top:24px;min-height:calc(100dvh - 114px); }.meta-row { gap:12px; }.channel-card { grid-template-columns:var(--owner-avatars-small,40px) minmax(0,1fr) 18px;padding:12px 18px;gap:2px 10px; }.owner img { width:40px;height:40px; }.actions { width:100%; }.actions button { flex:1 1 auto; }.description { padding:22px 20px;border-radius:16px; }.prose { font-size:16px;line-height:1.75; }.chapter { flex-basis:min(200px,calc((100% - 12px) / 2));padding:14px 12px;border-radius:20px; }.chapter-title { font-size:17px; } h2 { font-size:21px; }.avatar-group .avatar-link { width:40px;height:40px; }.transcript-card { padding:22px 20px; }.transcript-head>button { width:100%; }.transcript-intro { align-items:start; }.segment { grid-template-columns:55px minmax(0,1fr);gap:12px; }.person { width:100%; }.section { margin-top:28px; } }
+@media(max-width:600px) { .header { height:66px;padding:10px 16px;gap:14px; }.brand svg { width:32px;height:24px; }.brand span { display:none; }.search { height:44px; }.search input { font-size:16px; } main { padding:12px 16px 48px; }.media { border-radius:12px; }.details { margin-top:24px;min-height:calc(100dvh - 114px); }.meta-row { gap:12px; }.channel-card { grid-template-columns:var(--owner-avatars-small,40px) minmax(0,1fr) 18px;padding:12px 18px;gap:2px 10px; }.owner img { width:40px;height:40px; }.actions { width:100%; }.actions button { flex:1 1 auto; }.description { --description-side:20px;--description-bottom:22px;--description-round:16px;padding:22px 20px;border-radius:16px; }.prose { font-size:16px;line-height:1.75; }.chapter { flex-basis:min(200px,calc((100% - 12px) / 2));padding:14px 12px;border-radius:20px; }.chapter-title { font-size:17px; } h2 { font-size:21px; }.avatar-group .avatar-link { width:40px;height:40px; }.transcript-card { padding:22px 20px; }.transcript-head>button { width:100%; }.transcript-intro { align-items:start; }.segment { grid-template-columns:55px minmax(0,1fr);gap:12px; }.person { width:100%; }.section { margin-top:28px; } }
 .expand { border-color:transparent;background:transparent; }.expand:hover,.expand:focus-visible { background:var(--soft); }.expand[aria-expanded=true] svg { transform:rotate(180deg); }
 `;
     const words = {
@@ -660,14 +660,18 @@ main.has-sidecar .details { min-height:0; }
             const card=this.q('.channel-card'),hidden=!this.subscriptionData?.owner&&!stats;
             if(card.hidden!==hidden)card.hidden=hidden;
         }
-        compactViews(value) {
-            if(!value)return '';
+        viewCount(value) {
+            if(!value)return null;
             const unit=value.match(/(тыс\.?|млн\.?|млрд\.?|[kmb])\s*(?:просмотр[а-яё]*|views?)$/iu)?.[1].toLowerCase();
             const digits=value.match(/[\d][\d\s.,]*/u)?.[0].replace(/\s/g,'');
             let count=digits?(unit?Number(digits.replace(',','.')):Number(digits.replace(/[.,]/g,''))):(/no views|нет просмотров|без просмотров/iu.test(value)?0:NaN);
-            if(unit)count*=({k:1e3,m:1e6,b:1e9,'тыс':1e3,'млн':1e6,'млрд':1e9})[unit.replace('.','')]||1;
+            const scale=unit?({k:1e3,m:1e6,b:1e9,'тыс':1e3,'млн':1e6,'млрд':1e9})[unit.replace('.','')]||1:1;
+            if(unit)count*=scale;
             count=Math.round(count);
-            if(!Number.isSafeInteger(count)||count<0)return '';
+            return Number.isSafeInteger(count)&&count>=0?{count,exact:!unit,precision:unit?scale/10**(digits?.split(/[.,]/u)[1]?.length||0):1}:null;
+        }
+        compactViews(value) {
+            const parsed=this.viewCount(value);if(!parsed)return '';const count=parsed.count;
             const locale=this.options.language==='ru'?'ru-RU':'en-US';
             if(this.viewsLocale!==locale){this.viewsLocale=locale;this.viewsFormat=new Intl.NumberFormat(locale,{notation:'compact',minimumFractionDigits:2,maximumFractionDigits:2});}
             const scale=count>=1e12?1e12:count>=1e9?1e9:count>=1e6?1e6:1e3;
@@ -703,7 +707,8 @@ main.has-sidecar .details { min-height:0; }
             return '';
         }
         statsText(root) {
-            const info = root?.querySelector('#info-container, #info') || this.native.querySelector('ytd-watch-info-text #info, ytd-video-primary-info-renderer #info, #info-strings');
+            const liveInfo=this.native.querySelector('ytd-watch-info-text, ytd-video-primary-info-renderer #info, #info-strings');
+            const info = liveInfo || root?.querySelector('#info-container, #info');
             const semantic = node => {
                 if (node.nodeType === Node.TEXT_NODE) return node.data.trim();
                 if (!(node instanceof Element) || node.matches('tp-yt-paper-tooltip, yt-tooltip, [role="tooltip"], [aria-hidden="true"]') || (node !== info && node.matches('button, [role="button"]'))) return '';
@@ -725,16 +730,20 @@ main.has-sidecar .details { min-height:0; }
             let sameVideo = false;
             try { sameVideo = Boolean(expected && canonical && new URL(canonical.href).searchParams.get('v') === expected); } catch {}
             const meta = selector => localMeta(selector) || (sameVideo ? document.querySelector(selector) : null);
-            if (!views) {
-                const value = meta('meta[itemprop="interactionCount"], meta[itemprop="viewCount"]')?.content || '';
-                const number = value.match(/^(?:UserPlays:)?(\d{1,16})$/)?.[1];
-                if (number && Number.isSafeInteger(Number(number))) {
-                    const count = Number(number), ru = this.options.language === 'ru';
-                    const suffix = ru ? ({one:'просмотр',few:'просмотра',many:'просмотров',other:'просмотров'}[new Intl.PluralRules('ru').select(count)]) : (count === 1 ? 'view' : 'views');
-                    views = new Intl.NumberFormat(ru ? 'ru-RU' : 'en-US').format(count) + ' ' + suffix;
-                }
-            }
-            const count=this.compactViews(views);this.statsHasViews=Boolean(count);
+            const value = meta('meta[itemprop="interactionCount"], meta[itemprop="viewCount"]')?.content || '';
+            const number = value.match(/^(?:UserPlays:)?(\d{1,16})$/)?.[1];
+            const metadata=number&&Number.isSafeInteger(Number(number))?{count:Number(number),exact:true}:null;
+            if(this.statsCount?.video!==expected){this.statsCount=null;this.statsMetadata=null;}
+            let parsed=this.viewCount(views);if(parsed)parsed.from=liveInfo?'live':'description';
+            // Description expansion swaps rounded/exact labels. A matching
+            // video's numeric metadata wins; a real live counter may update it.
+            if(!(liveInfo&&parsed?.exact)&&metadata)parsed=this.statsCount?.from==='live'&&this.statsCount.exact&&metadata.count===this.statsMetadata?this.statsCount:{...metadata,from:'metadata'};
+            this.statsMetadata=metadata?.count;
+            // Keep precision when the rounded label still describes the same
+            // count, but allow a genuinely different count or missing label.
+            const sameRounded=parsed&&!parsed.exact&&this.statsCount?.exact&&Math.abs(parsed.count-this.statsCount.count)<parsed.precision;
+            if(!sameRounded)this.statsCount=parsed?{...parsed,video:expected}:null;
+            const count=this.statsCount?this.compactViews(this.statsCount.count+' views'):'';this.statsHasViews=Boolean(count);
             return [count,this.publicationDate(meta,info,readable)].filter(Boolean).join(' · ');
         }
         nativePlayer() {
@@ -1076,5 +1085,6 @@ main.has-sidecar .details { min-height:0; }
         closeTranscript() {this.transcriptOpen=false;clearTimeout(this.transcriptTimeout);if(this.q){this.q('#watch-transcript').hidden=true;this.q('.transcript-menu-toggle')?.setAttribute('aria-expanded','false');this.q('.transcript-content').hidden=true;this.q('.transcript-toggle').setAttribute('aria-expanded','false');}if(this.nativePanelState){for(const[name,value]of this.nativePanelState.attrs){if(value===null)this.nativePanelState.node.removeAttribute(name);else this.nativePanelState.node.setAttribute(name,value);}this.nativePanelState=null;}}
         destroy() {this.playlistStateObserver?.disconnect();this.restorePlaylistChrome();clearTimeout(this.titleTimer);cancelAnimationFrame(this.geometryFrame);cancelAnimationFrame(this.sourceFrame);this.subscriptionPress?.cancel();this.subscriptionPress=null;this.clearSubscription(true);this.clearFullscreenPreview();this.restoreFullscreenLayout();for(const type of ['click','dblclick','keydown'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('touchmove',this.fullscreenTouch,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);for(const type of ['timeupdate','seeked'])this.media?.removeEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.removeEventListener(type,this.videoMetadata);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;window.dispatchEvent(new Event('resize'));}
     }
+    WatchView.loadTitleFonts=loadTitleFonts;
     globalThis.MinimalYouTubeWatch=WatchView;
 })();

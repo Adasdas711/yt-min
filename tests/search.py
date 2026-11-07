@@ -88,6 +88,9 @@ def covers_and_sections(browser,width,dark):
     for source,count,id in [('badge-playlist','256 videos','abcdefghijk'),('payload-playlist','64 videos','12345678901')]:
         card=page.locator(f'#{source} [data-myt-search-playlist-card]')
         expect(card.locator('.count')).to_have_text(count)
+        cover_box,count_box=card.locator('.cover').bounding_box(),card.locator('.count').bounding_box()
+        assert count_box['y']>=cover_box['y'] and count_box['y']+count_box['height']<=cover_box['y']+cover_box['height'],(cover_box,count_box)
+        assert card.locator('.count').evaluate('e=>e.parentElement.classList.contains("cover")')
         expect(card.locator('img')).to_have_attribute('src',f'https://i.ytimg.com/vi/{id}/hqdefault.jpg')
         card.locator('img').scroll_into_view_if_needed()
         expect(card.locator('img')).to_be_visible()

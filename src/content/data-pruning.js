@@ -74,13 +74,15 @@
     }
     function shortItem(item) {
         if (!item || typeof item !== "object") return false;
-        if (Object.keys(item).some(key => shorts.has(key))) return true;
+        if (Object.keys(item).some(key => shorts.has(key)||/^shorts(?:LockupViewModel|Shelf(?:Renderer|ViewModel))(?:V\d+)?$/.test(key))) return true;
         const header=item.sectionHeaderRenderer||item.sectionHeaderViewModel;
         const headerTitle=header?.title?.simpleText||header?.title?.runs?.map(run=>run.text).join('')||header?.title?.content;
-        if(typeof headerTitle==='string'&&/^(shorts|короткие видео|short videos)$/iu.test(headerTitle.trim()))return true;
+        if(typeof headerTitle==='string'&&/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(headerTitle))return true;
         if (item.richShelfRenderer?.isShorts === true) return true;
         if (item.richSectionRenderer) return shortItem(item.richSectionRenderer.content);
         if (item.richItemRenderer) return shortItem(item.richItemRenderer.content);
+        const lockup=item.lockupViewModel;
+        if(/SHORTS/.test(lockup?.contentType||'')||item.videoRenderer?.navigationEndpoint?.reelWatchEndpoint||lockup?.rendererContext?.commandContext?.onTap?.innertubeCommand?.reelWatchEndpoint)return true;
         const url = item.videoRenderer?.navigationEndpoint?.commandMetadata?.webCommandMetadata?.url;
         return typeof url === "string" && /^\/shorts(?:\/|$)/.test(url);
     }
@@ -96,6 +98,7 @@
         const shelf = content?.shelfRenderer || content?.richShelfRenderer;
         if (!shelf) return false;
         const title = shelf.title?.simpleText || shelf.title?.runs?.map(run => run.text).join("") || "";
+        if(/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(title))return true;
         if (location.pathname === "/results") return /^(latest(?: videos)? from|new videos from|новые видео на канале|последние видео (?:на канале|от))\s+/iu.test(title);
         return /^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)(?:\/|$)/.test(location.pathname) && /^(new uploads|новые (?:видео|загрузки)|последние (?:видео|загрузки))(?=$|\s)/iu.test(title);
     }

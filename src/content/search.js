@@ -23,13 +23,13 @@
         for(const node of covers){const value=getComputedStyle(node).backgroundImage.match(/url\(["']?(.*?)["']?\)/)?.[1];if(valid(value))return value;}
         return '';
     }
-    const stylesheet=`:host{display:block;min-width:0;height:100%;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--myt-ink)}*{box-sizing:border-box}[hidden]{display:none!important}a{color:inherit;text-decoration:none}a:focus-visible{outline:2px solid var(--myt-muted);outline-offset:3px}.surface{display:flex;align-items:center;gap:20px;min-height:128px;height:100%;padding:16px;border-radius:16px;background:var(--myt-card-bg,var(--myt-surface,#19191d))}.surface:hover,.surface:focus-within{background:var(--myt-card-hover-bg,var(--myt-soft))}.cover{position:relative;display:grid;place-items:center;flex:0 0 38%;max-width:280px;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:var(--myt-soft)}.cover img{position:absolute;width:100%;height:100%;object-fit:cover}.cover svg{width:36px;height:36px;color:var(--myt-muted)}.info{min-width:0;flex:1}h3{margin:0;font-size:17px;line-height:1.4;font-weight:600}.title{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.owner{display:block;margin-top:8px;color:var(--myt-muted);overflow-wrap:anywhere}.owner:hover{text-decoration:underline}.count,.updated{margin:5px 0 0;font-size:13px;color:var(--myt-muted);overflow-wrap:anywhere}@media(max-width:600px){.surface{padding:12px;gap:12px}.cover{flex-basis:38%}h3{font-size:15px}}`;
+    const stylesheet=`:host{display:block;min-width:0;height:100%;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--myt-ink)}*{box-sizing:border-box}[hidden]{display:none!important}a{color:inherit;text-decoration:none}a:focus-visible{outline:2px solid var(--myt-muted);outline-offset:3px}.surface{display:flex;align-items:center;gap:28px;min-height:160px;height:100%;padding:14px;border-radius:16px;background:var(--myt-card-bg,var(--myt-surface,#19191d))}.surface:hover,.surface:focus-within{background:var(--myt-card-hover-bg,var(--myt-soft))}.cover{position:relative;display:grid;place-items:center;flex:0 0 54%;max-width:none;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:var(--myt-soft)}.cover img{position:absolute;width:100%;height:100%;object-fit:cover}.cover svg{width:36px;height:36px;color:var(--myt-muted)}.info{min-width:0;flex:1;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:18px 10px}h3{margin:0;font-size:17px;line-height:1.4;font-weight:600}.title{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.owner{display:block;margin:0;color:var(--myt-muted);overflow-wrap:anywhere}.owner:hover{text-decoration:underline}.updated{margin:0;font-size:13px;color:var(--myt-muted);overflow-wrap:anywhere}.count{position:absolute;right:10px;bottom:10px;max-width:calc(100% - 20px);padding:4px 8px;border-radius:8px;background:#000c;color:#fff;font-size:12px;font-weight:600;line-height:1.5;pointer-events:none}@media(max-width:600px){.surface{display:block;padding:12px}.cover{width:100%}.info{padding:18px 4px 8px;gap:10px}h3{font-size:17px}}`;
 
     class PlaylistCard {
         constructor(source){
             this.source=source;this.parts=new Set();this.host=document.createElement('div');this.host.dataset.mytSearchPlaylistCard='';
             this.shadow=this.host.attachShadow({mode:'open'});
-            this.shadow.innerHTML=`<style>${stylesheet}</style><article class="surface"><a class="cover" aria-label="Open playlist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 5h16M3 10h16M3 15h9m3-1 6 4-6 4Z"/></svg><img alt="" loading="lazy" decoding="async"></a><div class="info"><h3><a class="title"></a></h3><a class="owner"></a><p class="count"></p><p class="updated"></p></div></article>`;
+            this.shadow.innerHTML=`<style>${stylesheet}</style><article class="surface"><a class="cover" aria-label="Open playlist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 5h16M3 10h16M3 15h9m3-1 6 4-6 4Z"/></svg><img alt="" loading="lazy" decoding="async"><span class="count"></span></a><div class="info"><h3><a class="title"></a></h3><a class="owner"></a><p class="updated"></p></div></article>`;
             this.q=selector=>this.shadow.querySelector(selector);
             this.q('img').onerror=()=>{this.q('img').hidden=true;};
         }
@@ -85,6 +85,7 @@
             const main=card.querySelector(titleSelector);return safeURL(main?.href)?.pathname==='/playlist';
         }
         sync(searches){
+            cancelAnimationFrame(this.cardFrame);this.cardFrame=0;this.pendingCards?.clear();
             const wanted=new Set();
             const raw=document.documentElement.getAttribute('data-myt-search-playlists')||'';
             if(raw!==this.metadataRaw){this.metadataRaw=raw;this.metadata.clear();try{const values=JSON.parse(raw);if(Array.isArray(values))for(const value of values.slice(-200))if(typeof value.id==='string')this.metadata.set(value.id,{image:safeURL(value.image)?.href||'',count:countNumber(value.count)});}catch{}}
@@ -107,6 +108,11 @@
             for(const[source,card]of this.cards)if(!wanted.has(source)){card.destroy();this.cards.delete(source);}
             for(const[panel,state]of this.filters)if(!panel.isConnected||!panel.closest('ytd-search')){this.restoreFilter(panel,state);this.filters.delete(panel);}
         }
+        queueCard(source){
+            this.pendingCards ||=new Set();this.pendingCards.add(source);
+            if(this.cardFrame)return;
+            this.cardFrame=requestAnimationFrame(()=>{this.cardFrame=0;for(const source of this.pendingCards)if(source.isConnected)this.cards.get(source)?.update(this.metadata);this.pendingCards.clear();});
+        }
         syncLayout(searches){
             const wanted=new Map(),mark=(node,name,value='')=>{if(!node)return;if(!wanted.has(node))wanted.set(node,new Map());wanted.get(node).set('data-myt-search-'+name,value);};
             const result='[data-myt-search-video],[data-myt-search-playlist],[data-myt-search-channel]';
@@ -118,8 +124,10 @@
                     const header=[...container.querySelectorAll('yt-section-header-view-model,yt-section-header-renderer,#title-container,:scope > #header,h2,[role="heading"]')].find(node=>node.closest(containers)===container&&!node.closest(result)&&!node.closest('[data-myt-hidden],[data-myt-hidden-section]'));
                     const heading=header?.querySelector('#title,h2,h3,.ytSectionHeaderViewModelTitle')||header;
                     const name=text(heading);
-                    if(!name||/^(shorts|короткие видео|short videos)$/iu.test(name))continue;
-                    special.add(container);mark(container,'special');mark(header,'special-heading');
+                    if(!name||/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(name))continue;
+                    special.add(container);mark(container,'special');mark(header,'special-heading');mark(heading,'heading-text');
+                    this.headingLabels ||= new WeakMap();
+                    if(this.headingLabels.get(heading)!==name){this.headingLabels.set(heading,name);globalThis.MinimalYouTubeWatch?.loadTitleFonts?.(name);}
                     const grid=container.querySelector(':scope > #contents,:scope > #content');
                     if(grid)for(const nested of grid.querySelectorAll('[data-myt-search-grid]'))mark(nested,'flat');
                     const videos=[...container.querySelectorAll('[data-myt-search-video]')];
@@ -127,7 +135,19 @@
                 }
                 const inSpecial=node=>[...special].some(container=>container===node||container.contains(node));
                 const flows=[...search.querySelectorAll('ytd-section-list-renderer > #contents')].filter(list=>!inSpecial(list));
+                const roots=[...search.querySelectorAll(result)].filter(node=>!node.parentElement.closest(result)&&!node.closest('[data-myt-hidden],[data-myt-hidden-section],[hidden],[aria-hidden="true"]'));
+                if(roots.length>1&&!flows.some(flow=>roots.every(node=>flow.contains(node)))){
+                    let common=roots[0].parentElement;
+                    while(common&&common!==search&&!roots.every(node=>common.contains(node)))common=common.parentElement;
+                    if(common&&common!==search&&!inSpecial(common))flows.push(common);
+                }
                 for(const list of flows)mark(list,'flow');
+                for(const node of roots){
+                    const unit=[...special].find(container=>container.contains(node))||node;
+                    const flow=flows.find(list=>list.contains(unit));
+                    if(!flow)continue;
+                    for(let wrapper=unit.parentElement;wrapper&&wrapper!==flow;wrapper=wrapper.parentElement)if(!inSpecial(wrapper)&&!wrapper.matches('[data-myt-search-cell],[data-myt-search-channel-cell],[data-myt-search-playlist-cell]'))mark(wrapper,'flat');
+                }
                 for(const container of search.querySelectorAll(containers)){
                     if(inSpecial(container)||!container.querySelector(result)||!flows.some(list=>list.contains(container)))continue;
                     mark(container,'flat');
@@ -156,7 +176,7 @@
             for(const[name,value]of [['hidden',state.hidden],['aria-hidden',state.aria]]){if(value===null)panel.removeAttribute(name);else panel.setAttribute(name,value);}
             for(const[button,value]of state.buttons){if(value===null)button.removeAttribute('aria-expanded');else button.setAttribute('aria-expanded',value);}
         }
-        destroy(){document.removeEventListener('click',this.click,true);for(const card of this.cards.values())card.destroy();this.cards.clear();for(const[panel,state]of this.filters)this.restoreFilter(panel,state);this.filters.clear();for(const[node,attributes]of this.layout)for(const name of attributes.keys())node.removeAttribute(name);this.layout.clear();this.metadata.clear();}
+        destroy(){cancelAnimationFrame(this.cardFrame);this.pendingCards?.clear();document.removeEventListener('click',this.click,true);for(const card of this.cards.values())card.destroy();this.cards.clear();for(const[panel,state]of this.filters)this.restoreFilter(panel,state);this.filters.clear();for(const[node,attributes]of this.layout)for(const name of attributes.keys())node.removeAttribute(name);this.layout.clear();this.metadata.clear();}
     }
     Search.playlistSelector=playlistSelector;
     globalThis.MinimalYouTubeSearch=Search;

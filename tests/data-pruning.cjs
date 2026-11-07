@@ -127,6 +127,15 @@ async function main() {
     assert.equal(headedItems.length,2);
     assert.equal(headedItems[0].sectionHeaderRenderer.title.runs[0].text,'Videos');
     assert.equal(headedItems[1].videoRenderer.videoId,'keep-title');
+    const latest=parse({contents:{twoColumnSearchResultsRenderer:{contents:[
+        {shelfRenderer:{title:{simpleText:'Latest Shorts from MrBeast'},content:{horizontalListRenderer:{items:[{videoRenderer:{videoId:'vertical-with-watch-endpoint'}}]}}}},
+        {sectionHeaderRenderer:{title:{simpleText:'Latest Shorts from Creator'}}},
+        {shortsLockupViewModelV3:{entityId:'new-version'}},
+        {lockupViewModel:{contentId:'short',rendererContext:{commandContext:{onTap:{innertubeCommand:{reelWatchEndpoint:{videoId:'short'}}}}}}},
+        {videoRenderer:{videoId:'keep-long',title:{simpleText:'Latest Shorts from my channel explained'}}},
+    ]}}});
+    assert.equal(latest.contents.twoColumnSearchResultsRenderer.contents.length,1);
+    assert.equal(latest.contents.twoColumnSearchResultsRenderer.contents[0].videoRenderer.videoId,'keep-long');
 
     const next = await new Response({ onResponseReceivedActions: [
         { appendContinuationItemsAction: { targetId: "watch-next-feed", continuationItems: [{ compactVideoRenderer: {} }] } },

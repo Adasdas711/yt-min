@@ -17,6 +17,10 @@
     const hiddenAttribute = "data-myt-hidden";
     const hiddenElements = new Set();
     const pendingRoots = new Set();
+    function compactRoots(nodes) {
+        const roots=new Set([...nodes].filter(node=>node instanceof Element&&node.isConnected));
+        return [...roots].filter(node=>{for(let parent=node.parentElement;parent;parent=parent.parentElement)if(roots.has(parent))return false;return true;});
+    }
     const suspendedChatFrames = new Map();
     const playerAds = globalThis.MinimalYouTubeAds ? new globalThis.MinimalYouTubeAds() : null;
     const nativeShorts = [
@@ -24,6 +28,8 @@
         "ytd-reel-video-renderer", "yt-shorts-lockup-view-model", "ytm-shorts-lockup-view-model",
         "yt-shorts-shelf-view-model", "ytd-rich-shelf-renderer[is-shorts]",
         "ytm-shorts-lockup-view-model-v2", "yt-shorts-shelf-view-model-v2",
+        "yt-shorts-lockup-view-model-v2", "ytm-shorts-lockup-view-model-v3", "yt-shorts-shelf-view-model-v3",
+        "[content-type='shorts']", "[data-content-type='shorts']",
         ".ytShortsLockupViewModelHost", ".shortsLockupViewModelHost", ".ytmShortsLockupViewModelHost",
         "ytd-video-renderer[is-shorts]", "ytd-rich-item-renderer[is-shorts]",
     ].join(",");
@@ -785,18 +791,21 @@
             const channels = [...search.querySelectorAll("ytd-channel-renderer")].filter(card => !card.closest("[data-myt-hidden-section]"));
             const playlists = [...search.querySelectorAll(playlistSelector)].filter(card => globalThis.MinimalYouTubeSearch?.isPlaylist(card) && !card.parentElement.closest(playlistSelector) && !card.closest("[data-myt-hidden-section],[data-myt-hidden]"));
             const cells = [...videos, ...channels, ...playlists];
+            const channelSet=new Set(channels),playlistSet=new Set(playlists),descendantKind=new Map();
             const descendantCounts = new Map();
             for (const card of cells) {
-                if (channels.includes(card)) {
+                const kind=channelSet.has(card)?'channel':playlistSet.has(card)?'playlist':'video';
+                if (kind==='channel') {
                     mark(card, "data-myt-search-channel");
                     mark(card, "data-myt-search-channel-cell");
-                } else if (playlists.includes(card)) {
+                } else if (kind==='playlist') {
                     mark(card, "data-myt-search-playlist");mark(card,"data-myt-search-playlist-cell");
                 } else {
                     mark(card, "data-myt-search-video");
                     mark(card, "data-myt-search-cell");
                 }
                 for (let parent = card.parentElement; parent && parent !== search; parent = parent.parentElement) {
+                    if(!descendantCounts.has(parent))descendantKind.set(parent,kind);
                     descendantCounts.set(parent, (descendantCounts.get(parent) || 0) + 1);
                 }
             }
@@ -816,10 +825,11 @@
             for (const parent of wrappers) {
                 const count = descendantCounts.get(parent);
                 const structuralList = parent.matches(`${listContainers}, yt-horizontal-list-renderer`);
+                if(structuralList||count>1){mark(parent,'data-myt-search-grid');continue;}
                 const mixed = parent.matches(otherResults) || parent.querySelector(`${otherResults}, ${shelves}`);
-                if (!structuralList && count === 1 && parent.querySelector("ytd-channel-renderer") && !parent.querySelector(shelves)) mark(parent, "data-myt-search-channel-cell");
-                else if (!structuralList && count === 1 && playlists.some(card=>parent.contains(card)) && !parent.querySelector(shelves)) mark(parent,"data-myt-search-playlist-cell");
-                else if (structuralList || count > 1 || mixed) mark(parent, "data-myt-search-grid");
+                if (count === 1 && descendantKind.get(parent)==='channel' && !parent.querySelector(shelves)) mark(parent, "data-myt-search-channel-cell");
+                else if (count === 1 && descendantKind.get(parent)==='playlist' && !parent.querySelector(shelves)) mark(parent,"data-myt-search-playlist-cell");
+                else if (mixed) mark(parent, "data-myt-search-grid");
                 else if (count === 1) mark(parent, "data-myt-search-cell");
             }
             for (const element of searchVideoCards) {
@@ -1005,10 +1015,10 @@
         for(const heading of select('yt-section-header-view-model,yt-section-header-renderer,ytd-shelf-renderer #title-container,grid-shelf-view-model #header,ytd-rich-section-renderer #header,h2,[role="heading"]')){
             if(heading.closest('ytd-video-renderer,yt-lockup-view-model,ytd-channel-renderer,ytd-playlist-renderer'))continue;
             const title=heading.querySelector('#title,h2,h3,.ytSectionHeaderViewModelTitle')||heading;
-            if(!isShortsTab(title))continue;
+            if(!(/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(title.textContent||'')||/\bshorts\b/iu.test(title.getAttribute('aria-label')||'')))continue;
             const shelf=heading.closest('ytd-shelf-renderer,grid-shelf-view-model,ytd-rich-section-renderer');
             const regular=shelf&&[...shelf.querySelectorAll('a[href]')].some(a=>{if(shortsDestination(a.href)!==null||a.closest(nativeShorts))return false;try{return /\/(watch|playlist)$/.test(new URL(a.href,pageLocation()).pathname);}catch{return false;}});
-            hide(shelf&&!regular?shelf:heading);
+            hide(shelf&&(!regular||!isShortsTab(title))?shelf:heading);
         }
     }
 
@@ -1417,6 +1427,7 @@
         frame = requestAnimationFrame(() => {
             frame = 0;
             if (!enabled) return;
+            const changedRoots=compactRoots(pendingRoots);pendingRoots.clear();
             updateRoute();
             renderTheme();
             syncPlaylistLayout();
@@ -1433,16 +1444,15 @@
             syncWatch();
             syncWatchDetails();
             syncSections();
-            refreshHidden([...pendingRoots]);
-            for (const node of pendingRoots) {
+            refreshHidden(changedRoots);
+            for (const node of changedRoots) {
                 if (node.isConnected) {
                     scanShorts(node);
                 }
             }
             // Added thumbnails/labels can produce many mutation roots in one
             // frame. Reconcile each search once, rather than once per new node.
-            if (pendingRoots.size) syncSearch();
-            pendingRoots.clear();
+            if (changedRoots.some(node=>node.closest('ytd-search')||node.querySelector('ytd-search'))) syncSearch();
             cleanTitle();
         });
     }
@@ -1457,6 +1467,7 @@
         }
         const stableHome = root.dataset.mytPage === "home" && home?.isConnected && !pendingNavigation && !transitionActive;
         const stableWatch = watchView && root.dataset.mytPage === "watch" && !pendingNavigation && !transitionActive;
+        const stableSearch=searchView&&root.dataset.mytPage==='search'&&!pendingNavigation&&!transitionActive;
         let statsChanged = false;
         const relevant = records.filter(record => {
             const target = record.target instanceof Element ? record.target : record.target.parentElement;
@@ -1464,6 +1475,23 @@
             if (target.closest("title")) { cleanTitle(); return false; }
             if (stableHome) return record.target === root && record.attributeName === "dark";
             if (target.closest("#myt-watch, #myt-home, #myt-playlist-summary")) return false;
+            if(record.type==='childList'){
+                const changes=[...record.addedNodes,...record.removedNodes];
+                if(changes.length&&changes.every(node=>node instanceof Element&&node.matches('#myt-watch,#myt-home,#myt-playlist-summary,[data-myt-search-playlist-card],.myt-masthead-brand'))&&(!changes.some(node=>node.matches('.myt-masthead-brand'))||target.querySelectorAll(':scope > .myt-masthead-brand').length<=1))return false;
+            }
+            if(stableSearch){
+                if(target.closest('yt-video-preview,ytd-popup-container'))return false;
+                if(record.type==='attributes'&&['aria-hidden','aria-expanded'].includes(record.attributeName)&&target.closest('ytd-search-sub-menu-renderer'))return false;
+                const card=target.closest('[data-myt-search-video],[data-myt-search-playlist]');
+                const textOnly=record.type==='characterData'||record.type==='childList'&&[...record.addedNodes,...record.removedNodes].every(node=>node.nodeType===Node.TEXT_NODE);
+                const imageOnly=record.type==='attributes'&&(['src','srcset','data-src','data-srcset','data-video-count'].includes(record.attributeName)||['aria-label','aria-valuetext'].includes(record.attributeName)&&target.matches('img,source,yt-image,yt-img-shadow'));
+                const imageChildren=record.type==='childList'&&[...record.addedNodes,...record.removedNodes].every(node=>node instanceof Element&&node.matches('img,source,picture,yt-image,yt-img-shadow'));
+                if(card&&(textOnly||imageOnly||imageChildren)){
+                    if(card.hasAttribute('data-myt-search-playlist'))searchView.queueCard(card);
+                    else if(textOnly&&target.closest('yt-thumbnail-overlay-badge-view-model,.yt-badge-shape__text,.badge-shape-wiz__text,.ytBadgeShapeText')){refreshHidden([card]);scanShorts(card);}
+                    return false;
+                }
+            }
             // Player clocks, captions, progress aria labels and popup animations
             // do not change our metadata UI. React only to media-node replacement.
             if (watchView && target.closest("ytd-player, #movie_player, .html5-video-player")) {
@@ -1494,10 +1522,10 @@
             for(const record of relevant){
                 for(const node of record.addedNodes||[])if(node instanceof Element)added.add(node);
                 const target=record.target instanceof Element?record.target:record.target.parentElement;
-                const heading=target?.closest('yt-section-header-view-model,yt-section-header-renderer,h2,[role="heading"]');
-                if(heading)added.add(heading);
+                const heading=target?.closest('yt-section-header-view-model,yt-section-header-renderer,h2,[role="heading"],#title-container');
+                if(heading){added.add(heading);pendingRoots.add(heading);}
             }
-            for(const node of added)if(node.closest('ytd-search'))scanShorts(node);
+            for(const node of compactRoots(added))if(node.closest('ytd-search'))scanShorts(node);
         }
         for (const record of relevant) {
             if (record.type === "attributes") {
@@ -1538,10 +1566,11 @@
             classObserver.observe(root, { attributes: true, attributeFilter: ["class"] });
             observer.observe(document.documentElement, {
                 subtree: true, childList: true, characterData: true,
-                attributes: true, attributeFilter: ["href", "aria-label", "aria-hidden", "visibility", "is-shorts", "is-playlist", "data-myt-search-playlists", "content-type", "data-content-type", "overlay-style", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "expanded", "is-expanded", "aria-pressed", "subscribed", "is-subscribed", "disabled", "aria-disabled", "aria-busy", "aria-valuetext", "data-value", "value", "content"],
+                attributes: true, attributeFilter: ["href", "aria-label", "aria-hidden", "visibility", "is-shorts", "is-playlist", "data-myt-search-playlists", "data-video-count", "content-type", "data-content-type", "overlay-style", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "data-srcset", "expanded", "is-expanded", "aria-pressed", "subscribed", "is-subscribed", "disabled", "aria-disabled", "aria-busy", "aria-valuetext", "data-value", "value", "content"],
             });
             updateRoute(true);
             syncBrand();
+            syncSearchDecorations();
             cleanTitle();
         } else {
             classObserver.disconnect();
