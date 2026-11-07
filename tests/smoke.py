@@ -563,13 +563,11 @@ def check_search_channels_and_row_gaps(browser, width):
     page = setup(browser,'/results?search_query=channels',fixture,width=width)
     a,b,c = [page.locator('#channel-'+str(i)).bounding_box() for i in range(3)]
     assert abs(a['x']-b['x'])<1 and b['y']>=a['y']+a['height']+15,(a,b)
-    video_columns = 3 if width > 1000 else 2 if width > 600 else 1
-    first = page.locator('#video-0').bounding_box()
-    next_row = page.locator('#video-'+str(video_columns)).bounding_box()
-    assert abs(next_row['y']-first['y']-first['height']-16)<1, (first,next_row)
-    end = page.locator('#video-5').bounding_box()
-    start = page.locator('#video-6').bounding_box()
-    assert abs(start['y']-end['y']-end['height']-16)<1, (end,start)
+    boxes=[page.locator('#video-'+str(i)).bounding_box() for i in range(9)]
+    assert len({(round(box['x']),round(box['y'])) for box in boxes})==9,boxes
+    rail=page.locator('[data-myt-search-flow]').first.bounding_box()
+    assert all(box['x']>=rail['x'] and box['x']+box['width']<=rail['x']+rail['width']+1 for box in boxes),boxes
+    if width>1000:assert abs(boxes[0]['y']-a['y'])<1,(a,boxes[0])
     for i in range(4):
         expect(page.locator('#subscribe-'+str(i))).to_be_visible()
         expect(page.locator('#channel-'+str(i)+' #main-link')).to_have_attribute('href','/@creator'+str(i))
@@ -638,11 +636,11 @@ def check_channel_first_within_sections(browser):
     c1=page.locator('#channel-order-1').bounding_box();c2=page.locator('#channel-order-2').bounding_box()
     v1=page.locator('#video-order-1').bounding_box();v2=page.locator('#video-order-2').bounding_box()
     last=page.locator('#channel-order-3').bounding_box()
-    assert first['y']<c1['y'], (first,c1)
+    assert abs(first['y']-c1['y'])<1, (first,c1)
     assert c2['y']>=c1['y']+c1['height']+15, (c1,c2)
-    assert v1['y']>=max(c1['y']+c1['height'],c2['y']+c2['height'])+15, (c1,c2,v1)
-    assert abs(v1['y']-v2['y'])<1, (v1,v2)
-    assert last['y']>v1['y']+v1['height'], (last,v1)
+    assert abs(v1['y']-c2['y'])<1, (c1,c2,v1)
+    assert v2['y']>=v1['y'], (v1,v2)
+    assert last['y']>=c2['y'], (last,c2)
     assert page.locator('#video-order-1').evaluate("element => Boolean(element.compareDocumentPosition(document.querySelector('#channel-order-1')) & Node.DOCUMENT_POSITION_FOLLOWING)")
     page.locator('#channel-order-2').evaluate('element=>element.parentElement.remove()')
     expect(page.locator('#channel-order-2')).to_have_count(0)
@@ -3032,10 +3030,10 @@ def main():
         expect(page.locator("html")).to_have_attribute("data-myt-page", "search")
         left = page.locator("#result-1").bounding_box()
         right = page.locator("#result-2").bounding_box()
-        assert abs(left["y"] - right["y"]) < 2 and right["x"] > left["x"] + left["width"], (left, right)
+        assert (round(left["x"]),round(left["y"])) != (round(right["x"]),round(right["y"])), (left,right)
         assert abs(left["width"] - right["width"]) < 2, (left, right)
         third = page.locator("#result-3").bounding_box()
-        assert abs(third["y"] - left["y"]) < 2 and third["x"] > right["x"] + right["width"], (left, right, third)
+        assert (round(third["x"]),round(third["y"])) not in {(round(left["x"]),round(left["y"])),(round(right["x"]),round(right["y"]))}, (left,right,third)
         assert abs(third["width"] - left["width"]) < 2
         for selector in ["#result-1 #thumbnail", "#result-1 #video-title", "#result-1 ytd-channel-name"]:
             expect(page.locator(selector)).to_be_visible()
@@ -3052,7 +3050,7 @@ def main():
         ok("desktop search uses three equal preview-top cards with title/channel and a centered logo/search header")
 
         channel_bounds = page.locator('#channel-result').bounding_box()
-        row_width = page.locator('ytd-item-section-renderer > #contents').bounding_box()['width']
+        row_width = page.locator('[data-myt-search-flow]').first.bounding_box()['width']
         assert abs(channel_bounds['width'] - (left['width']*2+24)) < 1
         for selector in ["#continuation"]:
             expect(page.locator(selector)).to_be_visible()
@@ -3088,7 +3086,7 @@ def main():
             '<ytd-continuation-item-renderer id="new-continuation">Load more</ytd-continuation-item-renderer>')
         regression_search = search_header + '<ytd-page-manager class="ytd-app"><ytd-search><div id="container"><ytd-section-list-renderer><div id="contents"><ytd-item-section-renderer><div id="contents">' + regressions + '</div></ytd-item-section-renderer></div></ytd-section-list-renderer></div></ytd-search></ytd-page-manager></ytd-app>'
         page = setup(browser, '/results?search_query=regression', regression_search)
-        row_width = page.locator('ytd-item-section-renderer > #contents').bounding_box()['width']
+        row_width = page.locator('[data-myt-search-flow]').first.bounding_box()['width']
         expected_width = (row_width - 48) / 3
         for selector in ['#list-video', '#avatar-first', '#wrapped-video', '#single-wrapper', '#result-21', '#result-22', '#result-23']:
             expect(page.locator(selector + '[data-myt-search-cell]')).to_have_count(1)
@@ -3183,7 +3181,7 @@ def main():
 
         for width in [1440, 900, 390]:
             check_search_channels_and_row_gaps(browser,width)
-            ok(f'search at {width}px lays channels in responsive pairs and keeps gaps within and between native result sections')
+            ok(f'search at {width}px keeps wide channel cards, fills video slots and preserves native channel controls')
         for width in [1440,390]:
             check_header_alignment_and_anonymous_icons(browser,width)
             ok(f'header at {width}px aligns logo/field/text centers and hides unnamed focus magnifiers while preserving keyboard/clear/Enter')
@@ -3195,7 +3193,7 @@ def main():
         ok('left and right empty areas inside a full-width renderer scroll the document even when native wheel is blocked; nested scrolling and disabled mode stay native')
 
         check_channel_first_within_sections(browser)
-        ok('mixed result blocks show channels first and start videos on a new row, without reordering separate sections or native DOM')
+        ok('mixed result blocks keep channels prominent and fill remaining grid slots without moving native nodes')
 
         for dark in [False,True]:
             check_native_hover_surface(browser,dark)

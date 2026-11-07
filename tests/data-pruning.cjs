@@ -11,7 +11,7 @@ async function main() {
     const context = vm.createContext({
         Response, location: { pathname: "/watch" },
         document: {
-            documentElement: { hasAttribute: name => attributes.has(name), setAttribute: (name, value) => attributes.set(name, value) },
+            documentElement: { hasAttribute: name => attributes.has(name), setAttribute: (name, value) => attributes.set(name, value),removeAttribute:name=>attributes.delete(name) },
             addEventListener: (name, handler) => handlers.set(name, handler),
             querySelector: () => playerAPI,
         },
@@ -95,6 +95,27 @@ async function main() {
     assert(!("inlinePlaybackEndpoint" in items[0].videoRenderer));
     assert(!("richThumbnail" in items[0].videoRenderer));
     assert.equal(items[1].playlistRenderer.playlistId, "keep-search-playlist");
+
+    context.location.pathname='/results';
+    const cards=parse({contents:{twoColumnSearchResultsRenderer:{contents:[
+        {playlistRenderer:{playlistId:'PLlegacy',videoCount:'256',thumbnails:[{url:'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg',width:480}],privateTracking:'never-copy'}},
+        {lockupViewModel:{
+            contentId:'PLmodern',contentType:'LOCKUP_CONTENT_TYPE_PLAYLIST',
+            contentImage:{collectionThumbnailViewModel:{primaryThumbnail:{thumbnailViewModel:{
+                image:{sources:[{url:'https://i.ytimg.com/vi/12345678901/mqdefault.jpg',width:320},{url:'https://i.ytimg.com/vi/12345678901/hqdefault.jpg',width:480}]},
+                overlays:[{thumbnailBottomOverlayViewModel:{badges:[{thumbnailBadgeViewModel:{text:'64 videos'}}]}}],
+            }}}},
+            metadata:{lockupMetadataViewModel:{title:{content:'Do not copy title'},metadata:{contentMetadataViewModel:{metadataRows:[]}}}},
+        }},
+    ]}}});
+    const summaries=JSON.parse(attributes.get('data-myt-search-playlists')).sort((a,b)=>a.id.localeCompare(b.id));
+    assert.deepEqual(summaries,[{id:'PLlegacy',image:'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg',count:'256'},{id:'PLmodern',image:'https://i.ytimg.com/vi/12345678901/hqdefault.jpg',count:'64'}]);
+    assert.equal(cards.contents.twoColumnSearchResultsRenderer.contents[0].playlistRenderer.privateTracking,'never-copy');
+    await new Response({onResponseReceivedActions:[{appendContinuationItemsAction:{continuationItems:[{playlistRenderer:{playlistId:'PLlegacy',videoCount:'257'}}]}}]}).json();
+    assert.equal(JSON.parse(attributes.get('data-myt-search-playlists')).find(item=>item.id==='PLlegacy').count,'257');
+    parse({contents:{twoColumnSearchResultsRenderer:{contents:Array.from({length:205},(_,i)=>({playlistRenderer:{playlistId:'PLlimit'+i,videoCount:String(i)}}))}}});
+    assert.equal(JSON.parse(attributes.get('data-myt-search-playlists')).length,200);
+    context.location.pathname='/watch';
 
     const headed = parse({contents:{twoColumnSearchResultsRenderer:{contents:[
         {sectionHeaderRenderer:{title:{simpleText:'Shorts'}}},

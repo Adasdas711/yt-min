@@ -13,6 +13,36 @@
     let processed = new WeakSet();
     let enabled = false;
     const initialHooks = new Map();
+    // Only public playlist IDs, cover URLs and counts are retained. Lazy native
+    // thumbnails may never mount once their source card is visually hidden.
+    const searchPlaylists = new Map();
+    function playlistSummary(node) {
+        const legacy=node.playlistRenderer||node.gridPlaylistRenderer,modern=node.lockupViewModel;
+        if(!legacy&&!(modern&&(modern.contentImage?.collectionThumbnailViewModel||/PLAYLIST/.test(modern.contentType||''))))return null;
+        const value=legacy||modern,id=value.playlistId||value.contentId;
+        if(typeof id!=='string'||!/^[-\w]{2,200}$/.test(id))return null;
+        const strings=[];let image='',width=-1;
+        const visit=(root,images=false)=>{
+            const stack=[root];let visited=0;
+            while(stack.length&&visited++<800){
+                const item=stack.pop();if(!item)continue;
+                if(typeof item==='string'){if(!images&&item.length<200)strings.push(item);continue;}
+                if(typeof item!=='object')continue;
+                if(images&&typeof item.url==='string'&&/^https:\/\//.test(item.url)&&item.url.length<2048){const size=Number(item.width)||0;if(size>width){image=item.url;width=size;}}
+                if(Array.isArray(item)){for(let i=item.length-1;i>=0;i--)stack.push(item[i]);}
+                else for(const[key,child]of Object.entries(item))if(images||['text','content','simpleText','runs','metadata','metadataRows','metadataParts','contentMetadataViewModel','lockupMetadataViewModel','badges','thumbnailBadges','thumbnailBadgeViewModel','thumbnailOverlayBadgeViewModel','thumbnailBottomOverlayViewModel','overlays'].includes(key))stack.push(child);
+            }
+        };
+        visit(legacy?.thumbnail||legacy?.thumbnails||modern?.contentImage?.collectionThumbnailViewModel?.primaryThumbnail||modern?.contentImage,true);
+        if(legacy?.thumbnailRenderer)visit(legacy.thumbnailRenderer,true);
+        visit(legacy?.videoCountText);visit(legacy?.videoCountShortText);visit(modern?.metadata);
+        // Count badges can live on the thumbnail rather than in metadata rows.
+        const imageStack=[modern?.contentImage];let scans=0;
+        while(imageStack.length&&scans++<800){const item=imageStack.pop();if(!item||typeof item!=='object')continue;for(const[key,child]of Object.entries(item)){if(/badge|overlay/i.test(key))visit(child);if(child&&typeof child==='object')imageStack.push(child);}}
+        let count=legacy?.videoCount!=null?String(legacy.videoCount):'';
+        if(!/^[\d][\d\s,.]*\+?$/.test(count))count=strings.map(text=>text.match(/([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*)/iu)?.[1]?.trim()).find(Boolean)||strings.find(text=>/^[\d][\d\s,.]*\+?$/.test(text))||'';
+        return image||count?{id,image,count}:null;
+    }
     function hookInitial(name) {
         let descriptor = Object.getOwnPropertyDescriptor(window, name);
         if (descriptor && !descriptor.configurable) return;
@@ -109,7 +139,7 @@
         try { stripPlayerAds(data);stripPlayerAds(data.playerResponse); } catch { /* Immutable/revived player data stays native. */ }
         if (!feed(data) || processed.has(data)) return data;
         try {
-            let removed = 0;
+            let removed = 0, playlistDataChanged = false;
             const secondary = data.contents?.twoColumnWatchNextResults?.secondaryResults;
             if (secondary) removed += trimRecommendations(secondary);
             const seen = new WeakSet();
@@ -122,6 +152,14 @@
                     removed += compact(node, item => shortItem(item) || hiddenShelf(item) || chatItem(item));
                     for (const child of node) if (child && typeof child === "object") stack.push(child);
                     continue;
+                }
+                if(location.pathname==='/results'){
+                    const summary=playlistSummary(node);
+                    if(summary){
+                        const previous=searchPlaylists.get(summary.id)||{};
+                        const next={id:summary.id,image:summary.image||previous.image||'',count:summary.count||previous.count||''};
+                        if(next.image!==previous.image||next.count!==previous.count){searchPlaylists.delete(next.id);searchPlaylists.set(next.id,next);playlistDataChanged=true;while(searchPlaylists.size>200)searchPlaylists.delete(searchPlaylists.keys().next().value);}
+                    }
                 }
                 // Discard both live and archived chat before an iframe/polling
                 // controller is created; player streaming metadata is excluded.
@@ -138,6 +176,7 @@
                 for (const value of Object.values(node)) if (value && typeof value === "object") stack.push(value);
             }
             processed.add(data);
+            if(playlistDataChanged)document.documentElement?.setAttribute('data-myt-search-playlists',JSON.stringify([...searchPlaylists.values()]));
             if (removed && document.documentElement && !document.documentElement.hasAttribute("data-myt-pruned")) {
                 document.documentElement.setAttribute("data-myt-pruned", "");
             }
@@ -162,7 +201,7 @@
         if (enabled === value) return;
         enabled = value;
         if (enabled) { processed = new WeakSet(); install(); }
-        else uninstall();
+        else {uninstall();searchPlaylists.clear();document.documentElement?.removeAttribute?.('data-myt-search-playlists');}
     }
     document.addEventListener("minimal-youtube:optimization", event => {
         if (typeof event.detail?.enabled === "boolean") configure(event.detail.enabled);

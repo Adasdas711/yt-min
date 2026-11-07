@@ -25,7 +25,7 @@ def check(browser,width,dark):
     assert abs(wide['width']-a['width'])<1,(a,wide)
     if width>1000:
         assert abs(wide['width']-regular['width']*2-24)<1,(wide,regular)
-        assert abs(wide['y']-regular['y'])<1 and regular['x']>=wide['x']+wide['width']+23,(wide,regular)
+        assert wide['width']>regular['width'],(wide,regular)
     elif width>600:assert abs(wide['width']-regular['width']*2-24)<1,(wide,regular)
     else:assert abs(wide['width']-regular['width'])<1,(wide,regular)
     filters=page.locator('ytd-search-sub-menu-renderer').bounding_box()
@@ -67,11 +67,67 @@ def check(browser,width,dark):
     print(f'PASS search playlists/Shorts/filter cycles: width={width}, dark={dark}',flush=True)
 
 
+def covers_and_sections(browser,width,dark):
+    badge=f'''<yt-lockup-view-model id="badge-playlist" content-type="playlist"><div><a href="/playlist?list=PLbadge"><yt-collection-thumbnail-view-model><picture><source data-srcset="https://i.ytimg.com/vi/abcdefghijk/mqdefault.jpg 320w, https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg 480w"><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></picture><yt-thumbnail-overlay-badge-view-model><yt-badge-shape><span class="ytBadgeShapeText">256 видео</span></yt-badge-shape></yt-thumbnail-overlay-badge-view-model></yt-collection-thumbnail-view-model></a><h3><a href="/playlist?list=PLbadge">A real playlist cover</a></h3><a href="/@creator">Creator</a><p id="published-time-text">Updated 2 days ago</p></div></yt-lockup-view-model>'''
+    payload='''<yt-lockup-view-model id="payload-playlist" content-type="playlist"><div><a href="/playlist?list=PLpayload"><yt-collection-thumbnail-view-model></yt-collection-thumbnail-view-model></a><h3><a href="/playlist?list=PLpayload">A lazy playlist</a></h3><a href="/@creator">Creator</a></div></yt-lockup-view-model>'''
+    def section(content):return '<ytd-item-section-renderer><div id="contents">'+content+'</div></ytd-item-section-renderer>'
+    special=section('<yt-section-header-view-model id="for-you-heading"><h2>For you</h2></yt-section-header-view-model>'+''.join(video(i) for i in range(6,10)))
+    special=special.replace('<ytd-item-section-renderer>','<ytd-item-section-renderer id="for-you">',1)
+    shelf='<ytd-shelf-renderer id="watch-again"><div id="title-container"><h2>Watch again</h2></div><div id="content"><div id="shelf-items"><div class="native-row">'+''.join(video(i) for i in range(10,13))+'</div><div class="native-row">'+video(13)+'</div></div></div></ytd-shelf-renderer>'
+    sections=section(video(1)+video(2))+section(badge)+section(video(3)+video(4))+section(payload)+section(video(5))+special+section(shelf)
+    html='<style>ytd-item-section-renderer,ytd-shelf-renderer,yt-collection-thumbnail-view-model{display:block}ytd-thumbnail img{width:100%;height:auto}</style><ytd-app>'+MASTHEAD+'<ytd-page-manager><ytd-search><ytd-section-list-renderer><div id="contents">'+sections+'<ytd-continuation-item-renderer id="paging">More</ytd-continuation-item-renderer></div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>'
+    page=setup(browser,'/results?search_query=playlist',html,width=width,native_dark=dark,enabled=False,prune_data=True)
+    page.route('https://i.ytimg.com/**',lambda route:route.fulfill(status=200,content_type='image/svg+xml',body='<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#596f9c"/><circle cx="320" cy="180" r="80" fill="#ddd"/></svg>'))
+    page.evaluate('__setEnabled(true)')
+    expect(page.locator('[data-myt-search-playlist-card]')).to_have_count(2)
+    # Capture public data while native cover/count widgets are still lazy.
+    page.evaluate('''() => {
+      window.__parents=new Map([...document.querySelectorAll('ytd-video-renderer,yt-lockup-view-model')].map(node=>[node,node.parentElement]));
+      window.ytInitialData={contents:{twoColumnSearchResultsRenderer:{contents:[{playlistRenderer:{playlistId:'PLpayload',videoCount:'64',thumbnail:{thumbnails:[{url:'https://i.ytimg.com/vi/12345678901/hqdefault.jpg',width:480}]}}}]}}};
+    }''')
+    for source,count,id in [('badge-playlist','256 videos','abcdefghijk'),('payload-playlist','64 videos','12345678901')]:
+        card=page.locator(f'#{source} [data-myt-search-playlist-card]')
+        expect(card.locator('.count')).to_have_text(count)
+        expect(card.locator('img')).to_have_attribute('src',f'https://i.ytimg.com/vi/{id}/hqdefault.jpg')
+        card.locator('img').scroll_into_view_if_needed()
+        expect(card.locator('img')).to_be_visible()
+        page.wait_for_function('''id=>document.querySelector('#'+id+' [data-myt-search-playlist-card]').shadowRoot.querySelector('img').naturalWidth>1''',arg=source)
+    if width>1000:
+        boxes={i:page.locator('#video-'+str(i)).bounding_box() for i in range(1,6)}
+        a=page.locator('#badge-playlist').bounding_box();b=page.locator('#payload-playlist').bounding_box()
+        assert abs(boxes[1]['y']-boxes[3]['y'])<1,(boxes,a)
+        assert abs(a['y']-boxes[4]['y'])<1,(boxes,a)
+        assert abs(b['y']-boxes[5]['y'])<1,(boxes,b)
+    for source,start in [('#for-you',6),('#watch-again',10)]:
+        panel=page.locator(source)
+        expect(panel).to_have_attribute('data-myt-search-special','')
+        expect(panel).to_have_css('background-color','rgb(36, 36, 42)' if dark else 'rgb(241, 241, 244)')
+        boxes=[page.locator('#video-'+str(i)).bounding_box() for i in range(start,start+4)]
+        if width>600:
+            assert abs(boxes[0]['y']-boxes[1]['y'])<1,(source,boxes)
+            assert abs(boxes[2]['y']-boxes[3]['y'])<1 and boxes[2]['y']>boxes[0]['y'],(source,boxes)
+        assert all(box['x']>=panel.bounding_box()['x'] for box in boxes)
+    page.evaluate('''() => window.ytInitialData={contents:{twoColumnSearchResultsRenderer:{contents:[{playlistRenderer:{playlistId:'PLpayload',videoCount:'65',thumbnail:{thumbnails:[{url:'https://i.ytimg.com/vi/12345678901/hqdefault.jpg',width:480}]}}}]}}}''')
+    expect(page.locator('#payload-playlist [data-myt-search-playlist-card] .count')).to_have_text('65 videos')
+    assert page.evaluate('[...__parents].every(([node,parent])=>node.parentElement===parent)')
+    expect(page.locator('#paging')).to_be_visible()
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    assert_stable(page)
+    page.evaluate('scrollTo(0,0)');page.screenshot(path=f'/tmp/yt-min-search24-{width}-{dark}.png',full_page=True)
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('[data-myt-search-flow],[data-myt-search-flat],[data-myt-search-special],[data-myt-search-special-heading],[data-myt-search-balanced]')).to_have_count(0)
+    assert page.evaluate('[...__parents].every(([node,parent])=>node.parentElement===parent)')
+    page.close()
+    print(f'PASS lazy covers/count badges, compact mixed sections and special panels: width={width}, dark={dark}',flush=True)
+
+
 def main():
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         for width in [1440,900,390]:
-            for dark in [True,False]:check(browser,width,dark)
+            for dark in [True,False]:
+                check(browser,width,dark)
+                covers_and_sections(browser,width,dark)
         browser.close()
 
 

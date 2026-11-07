@@ -822,16 +822,6 @@
                 else if (structuralList || count > 1 || mixed) mark(parent, "data-myt-search-grid");
                 else if (count === 1) mark(parent, "data-myt-search-cell");
             }
-            const grids = new Set(search.querySelectorAll("ytd-item-section-renderer > #contents"));
-            for (const [element, names] of wanted) {
-                if (names.has("data-myt-search-grid")) grids.add(element);
-            }
-            for (const grid of grids) {
-                const children = [...grid.children];
-                if (!children.some(child => wanted.get(child)?.has("data-myt-search-channel-cell"))) continue;
-                const firstResult = children.find(child => wanted.get(child)?.has("data-myt-search-cell") || wanted.get(child)?.has("data-myt-search-playlist-cell"));
-                if (firstResult) mark(firstResult,wanted.get(firstResult)?.has("data-myt-search-playlist-cell")?"data-myt-search-result-start":"data-myt-search-video-start");
-            }
             for (const element of searchVideoCards) {
                 if (!search.contains(element)) continue;
                 for (const name of attributes) {
@@ -1548,7 +1538,7 @@
             classObserver.observe(root, { attributes: true, attributeFilter: ["class"] });
             observer.observe(document.documentElement, {
                 subtree: true, childList: true, characterData: true,
-                attributes: true, attributeFilter: ["href", "aria-label", "aria-hidden", "visibility", "is-shorts", "is-playlist", "content-type", "data-content-type", "overlay-style", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "expanded", "is-expanded", "aria-pressed", "subscribed", "is-subscribed", "disabled", "aria-disabled", "aria-busy", "aria-valuetext", "data-value", "value", "content"],
+                attributes: true, attributeFilter: ["href", "aria-label", "aria-hidden", "visibility", "is-shorts", "is-playlist", "data-myt-search-playlists", "content-type", "data-content-type", "overlay-style", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "expanded", "is-expanded", "aria-pressed", "subscribed", "is-subscribed", "disabled", "aria-disabled", "aria-busy", "aria-valuetext", "data-value", "value", "content"],
             });
             updateRoute(true);
             syncBrand();

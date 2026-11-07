@@ -741,6 +741,7 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     box-sizing: border-box;
     display: grid !important;
     grid-template-columns: repeat(calc(var(--myt-search-columns) * 2), minmax(0, 1fr));
+    grid-auto-flow: row dense;
     align-items: start;
     gap: 16px 24px;
     width: 100% !important;
@@ -1236,6 +1237,35 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-playlist] {
     display: block !important; height: 100% !important; min-width: 0 !important;
     margin: 0 !important; padding: 0 !important; background: transparent !important;
+}
+/* Ordinary native result sections share a grid. Their nodes and continuation
+   controllers keep their original parents; only layout wrappers are flattened. */
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-section-list-renderer > #contents[data-myt-search-flow] {
+    display: grid !important; grid-template-columns: repeat(calc(var(--myt-search-columns) * 2),minmax(0,1fr));
+    grid-auto-flow: row dense; align-items: start; gap: 16px 24px;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer,ytd-item-section-renderer > #contents,[data-myt-search-grid],ytd-shelf-renderer,grid-shelf-view-model,ytd-rich-section-renderer)[data-myt-search-flat] {
+    display: contents !important;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-flow] > :not([data-myt-search-cell],[data-myt-search-playlist-cell],[data-myt-search-channel-cell]) {
+    grid-column: 1 / -1;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-special] {
+    display: block !important; grid-column: 1 / -1 !important; box-sizing: border-box;
+    width: 100% !important; min-width: 0 !important; margin: 0 !important; padding: 20px !important;
+    border: 1px solid var(--myt-border); border-radius: 24px;
+    background: var(--myt-soft) !important;
+}
+html.minimal-youtube [data-myt-search-special-heading] {
+    margin: 0 0 16px !important; padding: 0 !important; min-height: 0 !important;
+    color: var(--myt-ink); font-size: 18px; font-weight: 600;
+}
+html.minimal-youtube [data-myt-search-special-heading] :is(h2,h3,#title) { margin: 0 !important; }
+html.minimal-youtube [data-myt-search-special] > #contents > [data-myt-search-special-heading] { margin-bottom: 0 !important; }
+html.minimal-youtube [data-myt-search-balanced="2"] { --myt-search-columns: 2; }
+@media(max-width:600px) {
+    html.minimal-youtube [data-myt-search-balanced="2"] { --myt-search-columns: 1; }
+    html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-special] { padding: 14px !important; border-radius: 20px; }
 }
 html.minimal-youtube [data-myt-search-playlist-source] {
     position: absolute !important; width: 0 !important; height: 0 !important; min-width: 0 !important; min-height: 0 !important;
