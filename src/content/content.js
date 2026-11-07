@@ -129,6 +129,7 @@
     let home = null;
     let query = "";
     let frame = 0;
+    let watchStatsFrame = 0;
     let storageRevision = 0;
     let theme = null;
     let themeRevision = 0;
@@ -861,6 +862,7 @@
             !node.closest("[hidden], [aria-hidden='true']") && node.querySelector("video, ytd-player"));
         playerAds?.bind(watch ? (watch.querySelector("#movie_player, .html5-video-player") || watch.querySelector("ytd-player")) : null);
         if (watchView && (!watch || watchView.native !== watch)) {
+            cancelAnimationFrame(watchStatsFrame);watchStatsFrame = 0;
             watchView.destroy();
             watchView = null;
         }
@@ -1343,8 +1345,18 @@
         if (next !== document.title) document.title = next;
     }
 
+    function scheduleWatchStats() {
+        if (!enabled || !watchView || frame || watchStatsFrame) return;
+        watchStatsFrame = requestAnimationFrame(() => {
+            watchStatsFrame = 0;
+            if (enabled && watchView) watchView.syncStats();
+        });
+    }
+
     function schedule() {
-        if (!enabled || frame) return;
+        if (!enabled) return;
+        cancelAnimationFrame(watchStatsFrame);watchStatsFrame = 0;
+        if (frame) return;
         frame = requestAnimationFrame(() => {
             frame = 0;
             if (!enabled) return;
@@ -1386,6 +1398,8 @@
             updateRoute();
         }
         const stableHome = root.dataset.mytPage === "home" && home?.isConnected && !pendingNavigation && !transitionActive;
+        const stableWatch = watchView && root.dataset.mytPage === "watch" && !pendingNavigation && !transitionActive;
+        let statsChanged = false;
         const relevant = records.filter(record => {
             const target = record.target instanceof Element ? record.target : record.target.parentElement;
             if (!target) return false;
@@ -1399,9 +1413,20 @@
                     node instanceof Element && (node.matches("video, ytd-player") || node.querySelector("video, ytd-player")));
             }
             if (watchView && target.closest("ytd-popup-container, ytd-comments")) return false;
+            if (stableWatch) {
+                // Clocks and counters in hidden native surfaces must not rebuild
+                // the watch UI. Keep structural playlist/transcript/chat mounts.
+                if (target.closest("#related, ytd-watch-next-secondary-results-renderer, ytd-masthead, ytd-guide-renderer, ytd-mini-guide-renderer")) return false;
+                if (!watchView.native.contains(target) && target.closest("ytd-browse, ytd-search")) return false;
+                if (watchView.native.contains(target) && target.closest("#owner-sub-count, #subscriber-count")) return false;
+                if ((watchView.native.contains(target) && target.closest("ytd-watch-info-text, #info-container, #info-strings, ytd-watch-metadata #description #info, ytd-video-primary-info-renderer #info")) ||
+                    target.matches('meta[itemprop="interactionCount"],meta[itemprop="viewCount"],meta[itemprop="datePublished"],meta[itemprop="uploadDate"],link[rel="canonical"]')) {
+                    statsChanged = true;return false;
+                }
+            }
             return true;
         });
-        if (!relevant.length) return;
+        if (!relevant.length) { if (statsChanged) scheduleWatchStats();return; }
         for (const record of relevant) {
             if (record.type === "attributes") {
                 if (commentsOpen && commentPanelStates.has(record.target) &&
@@ -1450,6 +1475,7 @@
             classObserver.disconnect();
             observer.disconnect();
             cancelAnimationFrame(frame);
+            cancelAnimationFrame(watchStatsFrame);watchStatsFrame = 0;
             frame = 0;
             pendingRoots.clear();
             for (const element of hiddenElements) element.removeAttribute(hiddenAttribute);

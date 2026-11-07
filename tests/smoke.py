@@ -1848,6 +1848,13 @@ def check_chapter_follow(browser, width):
     # A chapter click uses the same follow behavior and retains native playback.
     page.locator('.chapter').nth(5).click()
     current_is_visible(300)
+    # Fullscreen hides the rail; crossing a boundary there must still reveal
+    # the selected chapter when the page becomes visible again.
+    page.locator('.chapter-list').evaluate('e=>e.hidden=true')
+    seek(660,'timeupdate')
+    page.locator('.chapter-list').evaluate('e=>e.hidden=false')
+    seek(661,'timeupdate')
+    current_is_visible(660)
     assert_stable(page)
     page.close()
 
