@@ -1,7 +1,7 @@
 "use strict";
 
 (() => {
-    let russian = navigator.language.toLowerCase().startsWith("ru");
+    const russian = false;
     const translations = { ru: {
         tagline: "Больше внимания. Меньше шума.",
         title: "Режим фокуса",
@@ -30,7 +30,7 @@
     let enabled = true;
     let ready = false;
     function applyLanguage(value) {
-        russian = value === "ru" || (value !== "en" && navigator.language.toLowerCase().startsWith("ru"));
+        // The extension interface is English for every browser/profile language.
         copy = translations[russian ? "ru" : "en"];
         document.documentElement.lang = russian ? "ru" : "en";
         document.getElementById("tagline").textContent = copy.tagline;

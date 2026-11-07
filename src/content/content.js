@@ -36,7 +36,7 @@
     const tabSelector = "yt-tab-shape, tp-yt-paper-tab, [role='tab'], yt-chip-cloud-chip-renderer";
     const channelRoute = /^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)(?:\/|$)/;
     const channelShorts = /^(\/(?:@[^/]+|(?:channel|c|user)\/[^/]+))\/shorts\/?$/;
-    const defaultLanguage = (root.lang || navigator.language).toLowerCase().startsWith("ru") ? "ru" : "en";
+    const defaultLanguage = "en";
     const messages = {
     "ru": {
         "search": "Поиск на YouTube",
@@ -115,7 +115,7 @@
         "theme": "Theme"
     }
 };
-    let language = null;
+    let language = "en";
     let languageRevision = 0;
     let copy = messages[defaultLanguage];
     let settingsOpen = false;
@@ -141,6 +141,7 @@
     const searchVideoCards = new Set();
     const hiddenSections = new Set();
     let watchView = null;
+    let watchBootSource = null;
     const commentPanelStates = new Map();
     const brandedLinks = new Set();
     const searchDecorations = new Set();
@@ -533,15 +534,21 @@
         "[target-id='watch-like']", "[target-id='watch-dislike']",
     ].join(",");
 
-    function applyLanguage(value) {
-        language = value === "ru" || value === "en" ? value : null;
-        copy = messages[language || defaultLanguage];
-        if (home?.isConnected) {
-            home.remove();
-            home = createHome();
-            renderTheme();
-        }
-        if (settingsReady) { syncWatch(); syncWatchDetails(); }
+    function applyLanguage() {
+        language = "en";
+        copy = messages.en;
+    }
+
+    function useEnglishNativeInterface() {
+        // Native player/playlist menus also need English. Apply YouTube's own
+        // page-language parameter only during startup, after enabled is known;
+        // never reload an already playing page or translate its content.
+        if (standaloneHome || !enabled || document.readyState !== "loading" ||
+            !root.lang || /^en(?:-|$)/i.test(root.lang)) return;
+        const url = new URL(location.href);
+        if (url.searchParams.get("hl") === "en") return;
+        url.searchParams.set("hl", "en");
+        location.replace(url.href);
     }
 
     function saveTheme(value) {
@@ -859,14 +866,14 @@
         syncChatFrames();
         const active = enabled && (root.dataset.mytPage === "watch" || root.dataset.mytPreviousPage === "watch");
         const watch = active && [...document.querySelectorAll("ytd-watch-flexy:not([hidden])")].find(node =>
-            !node.closest("[hidden], [aria-hidden='true']") && node.querySelector("video, ytd-player"));
+            !node.closest("[hidden], [aria-hidden='true']")) || (active && root.dataset.mytPage === "watch" ? (watchBootSource ||= document.createElement("div")) : null);
         playerAds?.bind(watch ? (watch.querySelector("#movie_player, .html5-video-player") || watch.querySelector("ytd-player")) : null);
         if (watchView && (!watch || watchView.native !== watch)) {
             cancelAnimationFrame(watchStatsFrame);watchStatsFrame = 0;
             watchView.destroy();
             watchView = null;
         }
-        if (!watch || !globalThis.MinimalYouTubeWatch || !watch.querySelector("ytd-watch-metadata, ytd-video-primary-info-renderer, ytd-video-secondary-info-renderer")) return;
+        if (!watch || !globalThis.MinimalYouTubeWatch) return;
         if (!watchView) watchView = new globalThis.MinimalYouTubeWatch({ native: watch });
         watchView.sync({
             native: watch, language: language || defaultLanguage,
@@ -1088,7 +1095,7 @@
                     <section>
                         <div class="myt-section-heading"><span class="myt-section-icon">${settingsIcon("theme")}</span><h3>${copy.appearance}</h3></div>
                         <div class="myt-preferences">
-                            <div class="myt-preference-row"><div><label for="myt-settings-language">${copy.language}</label><p>${copy.languageInfo}</p></div><select id="myt-settings-language"><option value="">${copy.system}</option><option value="ru">Русский</option><option value="en">English</option></select></div>
+
                             <div class="myt-preference-row"><div><span class="myt-preference-label">${copy.theme}</span><p>${copy.themeInfo}</p></div><div class="myt-theme-switch" id="myt-settings-theme" role="group" aria-label="${copy.theme}"><button type="button" class="myt-theme-choice" id="myt-theme-light" data-myt-theme-choice="light" aria-label="${copy.light}" aria-pressed="false">${settingsIcon("sun")}${copy.lightShort}</button><button type="button" class="myt-theme-choice" id="myt-theme-dark" data-myt-theme-choice="dark" aria-label="${copy.dark}" aria-pressed="false">${settingsIcon("moon")}${copy.darkShort}</button></div></div>
                         </div>
                     </section>
@@ -1201,23 +1208,6 @@
         for (const choice of view.querySelectorAll("[data-myt-theme-choice]")) {
             choice.addEventListener("click", () => saveTheme(choice.dataset.mytThemeChoice));
         }
-        const languageSelect = view.querySelector("#myt-settings-language");
-        languageSelect.value = language || "";
-        languageSelect.addEventListener("change", () => {
-            const selected = languageSelect.value;
-            chrome.storage.local.set({ language: selected }, () => {
-                if (chrome.runtime?.lastError) {
-                    languageSelect.value = language || "";
-                    settingsError.textContent = copy.saveError;
-                    return;
-                }
-                if (language !== (selected || null)) applyLanguage(selected);
-                const url = new URL(pageLocation());
-                url.searchParams.set("hl", selected || defaultLanguage);
-                url.searchParams.set("persist_hl", "1");
-                location.assign(standaloneHome ? chrome.runtime.getURL("src/home/index.html") + url.search : url.href);
-            });
-        });
         const input = view.querySelector("input");
         const clear = view.querySelector(".myt-search__clear");
         input.value = query;
@@ -1315,7 +1305,6 @@
         const path = url.pathname;
         root.dataset.mytPage = nextPage;
         renderTheme();
-        if (!settingsReady) return;
         // A verified browser rule may open the lightweight local home. Native
         // and SPA arrivals always have this own UI as a fallback: never blindly
         // navigate to an extension file that could be missing after an update.
@@ -1329,6 +1318,8 @@
             home = null;
         }
         renderTheme();
+        // Both own page shells mount before native metadata or async storage.
+        if (!settingsReady) { syncWatchDetails(); return; }
         syncWatch();
         syncWatchDetails();
         syncSections();
@@ -1371,7 +1362,7 @@
                 syncBrand();
                 syncSearchDecorations();
             }
-            if (!settingsReady) return;
+            if (!settingsReady) { syncWatchDetails(); return; }
             syncWatch();
             syncWatchDetails();
             syncSections();
@@ -1413,6 +1404,9 @@
                     node instanceof Element && (node.matches("video, ytd-player") || node.querySelector("video, ytd-player")));
             }
             if (watchView && target.closest("ytd-popup-container, ytd-comments")) return false;
+            // Native playlist virtualization and playback markers never change
+            // the watch metadata. Its scoped observer handles header/state only.
+            if (watchView && target.closest("ytd-playlist-panel-renderer")) return false;
             if (stableWatch) {
                 // Clocks and counters in hidden native surfaces must not rebuild
                 // the watch UI. Keep structural playlist/transcript/chat mounts.
@@ -1661,6 +1655,7 @@
         if (storageRevision === initialRevision) {
             setEnabled(typeof data?.enabled === "undefined" ? true : Boolean(data.enabled));
         }
+        useEnglishNativeInterface();
         if (enabled) { updateRoute(true); cleanTitle(); schedule(); }
         renderTheme();
     }

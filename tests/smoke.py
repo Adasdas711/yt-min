@@ -459,9 +459,9 @@ def check_home_settings(browser, width):
     page.locator('#myt-settings-button').click()
     expect(page.locator('#myt-theme-dark')).to_have_attribute('aria-pressed','true')
     page.evaluate("chrome.storage.local.set({language:'ru'})")
-    expect(page.locator('#myt-settings-panel h2')).to_have_text('Настройки')
-    expect(page.locator('#myt-settings-language')).to_have_value('ru')
-    expect(page.locator('#myt-query')).to_have_attribute('placeholder','Поиск на YouTube')
+    expect(page.locator('#myt-settings-panel h2')).to_have_text('Settings')
+    expect(page.locator('#myt-settings-language')).to_have_count(0)
+    expect(page.locator('#myt-query')).to_have_attribute('placeholder','Search YouTube')
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
     page.locator('#myt-settings-close').click()
     expect(page.locator('#myt-settings-panel')).to_be_hidden()
@@ -473,9 +473,8 @@ def check_home_settings(browser, width):
     expect(page.locator('#myt-settings-panel')).to_be_hidden()
     expect(page.locator('#myt-home')).to_be_visible()
     page.locator('#myt-settings-button').click()
-    page.locator('#myt-settings-language').select_option('en')
-    page.wait_for_url('**/?**hl=en**')
-    assert parse_qs(urlparse(page.url).query)['persist_hl'] == ['1']
+    expect(page.locator('#myt-settings-language')).to_have_count(0)
+    expect(page.locator('#myt-settings-panel h2')).to_have_text('Settings')
     page.close()
 
 
@@ -495,8 +494,7 @@ def check_settings_failures(browser):
     expect(page.locator('html')).to_have_attribute('data-myt-theme','dark')
     expect(page.locator('#myt-theme-dark')).to_have_attribute('aria-pressed','true')
     expect(page.locator('#myt-settings-error')).to_contain_text('Could not save')
-    page.locator('#myt-settings-language').select_option('ru')
-    expect(page.locator('#myt-settings-language')).to_have_value('')
+    expect(page.locator('#myt-settings-language')).to_have_count(0)
     assert page.url == 'https://www.youtube.com/'
     page.close()
 
@@ -1402,7 +1400,7 @@ def check_playlist_layout(browser, theater=False, width=1440):
     assert_stable(page)
     if width>900:
         page.screenshot(path='/tmp/yt-min-playlist-'+('theater' if theater else 'normal')+'.png')
-    page.locator('#playlist #header button').click()
+    page.locator('#playlist .myt-playlist-close').click()
     expect(page.locator('.sidecar')).to_be_hidden()
     expect(page.locator('main')).not_to_have_class('has-sidecar')
     expect(page.locator('#playlist')).to_be_hidden()
@@ -1436,11 +1434,11 @@ def check_collapsed_playlist(browser,theater=False,width=1440,state='collapsed')
     }''',state)
     expect(page.locator('.sidecar')).to_be_visible()
     expect(page.locator('.playlist-toggle')).to_be_hidden()
-    page.locator('#playlist #header button').click()
+    page.locator('#playlist .myt-playlist-close').click()
     expect(page.locator('.sidecar')).to_be_hidden()
     expect(page.locator('main')).not_to_have_class('has-sidecar')
     opener=page.locator('.playlist-toggle')
-    expect(opener).to_be_visible();expect(opener).to_have_text('Открыть плейлист')
+    expect(opener).to_be_visible();expect(opener).to_have_text('Open playlist')
     expect(opener).to_have_attribute('aria-expanded','false')
     page.wait_for_function('''() => {
       const root=document.querySelector('#myt-watch').firstElementChild.shadowRoot,view=root.querySelector('.viewport'),info=root.querySelector('.details').getBoundingClientRect(),media=root.querySelector('.media').getBoundingClientRect();
@@ -1468,14 +1466,14 @@ def check_collapsed_playlist(browser,theater=False,width=1440,state='collapsed')
     # Reopening again continues using the same native state and media.
     page.locator('.viewport').evaluate('''e=>{const panel=e.getRootNode().querySelector('.sidecar');e.scrollTop+=panel.getBoundingClientRect().top-100;}''')
     page.wait_for_function('''() => Math.abs(document.querySelector('#playlist').getBoundingClientRect().y-document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.sidecar').getBoundingClientRect().y)<1''')
-    page.locator('#playlist #header button').click()
+    page.locator('#playlist .myt-playlist-close').click()
     expect(opener).to_be_visible();expect(page.locator('.sidecar')).to_be_hidden()
     opener.focus();opener.press('Enter')
     expect(page.locator('.sidecar')).to_be_visible()
     assert page.evaluate('__playlistToggleCalls')==4
     page.locator('.viewport').evaluate('''e=>{const panel=e.getRootNode().querySelector('.sidecar');e.scrollTop+=panel.getBoundingClientRect().top-100;}''')
     page.wait_for_function('''() => Math.abs(document.querySelector('#playlist').getBoundingClientRect().y-document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.sidecar').getBoundingClientRect().y)<1''')
-    page.locator('#playlist #header button').click()
+    page.locator('#playlist .myt-playlist-close').click()
     expect(opener).to_be_visible()
     navigate_spa(page,'/watch?v=other-video')
     expect(opener).to_be_hidden()
@@ -1782,9 +1780,9 @@ def check_subscription_card(browser, dark, width, modern=False):
         button.click(position={'x':box['width']-12,'y':box['height']/2})
 
     expect(button).to_have_attribute('aria-pressed',str(modern).lower())
-    expect(card.locator('.stats')).to_have_text('906 тыс. · 8 марта 2025 г.')
+    expect(card.locator('.stats')).to_have_text('906k · 8 March 2025')
     expect(page.locator('#watch-chapters h2')).to_have_count(0)
-    expect(page.locator('#watch-chapters')).to_have_attribute('aria-label','Эпизоды')
+    expect(page.locator('#watch-chapters')).to_have_attribute('aria-label','Chapters')
     assert card.evaluate('e=>getComputedStyle(e).backgroundColor')!=page.locator('.viewport').evaluate('e=>getComputedStyle(e).backgroundColor')
     page.evaluate('__setSubscribed(false)')
     expect(button).to_have_attribute('aria-pressed','false')
@@ -1928,7 +1926,7 @@ def check_collaboration_card(browser, width, attributed=False):
     expect(page.locator('.channel-card')).not_to_contain_text('Устаревший канал')
     expect(page.locator('.owner img')).to_have_count(2)
     expect(page.locator('.channel-card')).to_have_attribute('data-collaborative','')
-    expect(page.locator('.channel-card .stats')).to_have_text('906 тыс.')
+    expect(page.locator('.channel-card .stats')).to_have_text('906k')
     for name in names.all():name.click()
     for avatar_link in page.locator('.owner .avatar-link').all():avatar_link.click()
     if attributed:assert page.evaluate('__authorsOpened')==3
@@ -2009,17 +2007,17 @@ def check_watch_language_change(browser, legacy=False):
     page=setup(browser,'/watch?v=details',watch_details_fixture(legacy),language='ru')
     stats=page.locator('#myt-watch .stats')
     page.evaluate('window.__originalVideo=document.querySelector("video")')
-    expect(stats).to_have_text('906 тыс. · 8 марта 2025 г.')
+    expect(stats).to_have_text('906k · 8 March 2025')
     page.evaluate("chrome.storage.local.set({language:'en'})")
     expect(stats).to_have_text('906k · 8 March 2025')
     page.evaluate("chrome.storage.local.set({language:'ru'})")
-    expect(stats).to_have_text('906 тыс. · 8 марта 2025 г.')
+    expect(stats).to_have_text('906k · 8 March 2025')
     page.locator('#info-container').evaluate('e=>e.textContent="3,33 млн просмотров · 8 марта 2025 г."')
-    expect(stats).to_have_text('3,33 млн. · 8 марта 2025 г.')
+    expect(stats).to_have_text('3.33m · 8 March 2025')
     page.evaluate("chrome.storage.local.set({language:'en'})")
     expect(stats).to_have_text('3.33m · 8 March 2025')
     page.evaluate("chrome.storage.local.set({language:''})")
-    expect(stats).to_have_text('3,33 млн. · 8 марта 2025 г.')
+    expect(stats).to_have_text('3.33m · 8 March 2025')
     assert page.evaluate('__originalVideo===document.querySelector("video")')
     page.close()
 
@@ -2027,7 +2025,7 @@ def check_watch_language_change(browser, legacy=False):
 def check_watch_stats(browser, language):
     page=setup(browser,'/watch?v=details',watch_details_fixture(),language=language)
     stats=page.locator('#myt-watch .stats')
-    ru=language=='ru'
+    ru=False  # Raw source may be Russian; the extension interface is English.
     date=lambda ru_value,en_value:ru_value if ru else en_value
     expect(stats).to_have_text(('906 тыс.' if ru else '906k')+' · '+date('8 марта 2025 г.','8 March 2025'))
     for raw,compact in [('1234 views','1,23 тыс.' if ru else '1.23k'),('3,33 млн просмотров','3,33 млн.' if ru else '3.33m'),('1.2K views','1,2 тыс.' if ru else '1.2k'),('999999 views','1 млн.' if ru else '1m'),('No views','0')]:
@@ -2051,6 +2049,12 @@ def check_watch_stats(browser, language):
     page.locator('link[rel=canonical]').evaluate('e=>e.href="https://www.youtube.com/watch?v=previous"')
     page.locator('#info-container').evaluate('e=>e.insertAdjacentHTML("beforeend",\'<tp-yt-paper-tooltip hidden>6 августа 2020 г.</tp-yt-paper-tooltip>\')')
     expect(stats).to_have_text('853 · '+date('6 августа 2020 г.','6 August 2020'))
+    page.locator('#info-container').evaluate('e=>e.textContent="Mar 8, 2025"')
+    expect(stats).to_have_text('8 March 2025')
+    expect(stats.locator('.views-icon')).to_be_hidden()
+    page.locator('#info-container').evaluate('e=>e.textContent="No views · Mar 8, 2025"')
+    expect(stats).to_have_text('0 · 8 March 2025')
+    expect(stats.locator('.views-icon')).to_be_visible()
     page.close()
 
 
@@ -2574,7 +2578,7 @@ def main():
 
         for path, renderer in [("/watch?v=scroll", "ytd-watch-flexy"), ("/results?search_query=scroll", "ytd-search")]:
             scroll_fixture = channel_scroll.replace("ytd-browse", renderer)
-            page = setup(browser, path, scroll_fixture)
+            page = setup(browser, path, scroll_fixture, watch_ui=False)
             page.evaluate("document.documentElement.style.cssText = 'height:100%;overflow:hidden'; document.body.style.cssText = 'height:100%;overflow:hidden'")
             page.mouse.move(10, 400)
             page.mouse.wheel(0, 300)
@@ -2607,7 +2611,7 @@ def main():
             ok(f'{renderer} forwards both blocked gutters to the document scrollport without double scrolling, and stays inactive when disabled')
 
         for path in ["/watch?v=header", "/results?search_query=header", "/@creator/videos", "/feed/subscriptions"]:
-            page = setup(browser, path, '<ytd-app>' + MASTHEAD + '<ytd-page-manager class="ytd-app"><ytd-browse>Native content</ytd-browse></ytd-page-manager></ytd-app>')
+            page = setup(browser, path, '<ytd-app>' + MASTHEAD + '<ytd-page-manager class="ytd-app"><ytd-browse>Native content</ytd-browse></ytd-page-manager></ytd-app>', watch_ui=False)
             centered_header(page)
             page.locator('#logo').focus()
             assert page.locator('#logo').evaluate('element => getComputedStyle(element).outlineStyle') == 'none'
@@ -2725,7 +2729,7 @@ def main():
         ok('packaged title fonts render real Latin/Cyrillic glyphs under a restrictive font policy and load each asset only once')
         for legacy in [False,True]:
             check_watch_language_change(browser,legacy)
-            ok(f'watch language (legacy={legacy}) updates counts and full dates immediately through storage changes, without a reload or native metadata mutation')
+            ok(f'watch language (legacy={legacy}) keeps English counts/full dates through legacy language settings, preserving source content')
         for language in ['ru','en']:
             check_watch_stats(browser,language)
             ok(f'watch stats ({language}) use compact counts without a views label and an exact calendar day, without relative-date guesses or stale-video metadata')
@@ -2875,11 +2879,11 @@ def main():
         classic = legacy.replace('ytd-watch-metadata', 'ytd-video-primary-info-renderer')
         page = setup(browser, "/watch?v=classic", classic, language="ru", watch_ui=False)
         expect(page.locator("#myt-comments-toggle")).to_have_count(1)
-        expect(page.locator("#myt-comments-toggle")).to_contain_text("Комментарии")
+        expect(page.locator("#myt-comments-toggle")).to_contain_text("Comments")
         expect(page.locator("#video-votes")).to_be_hidden()
         page.locator("#myt-comments-toggle").click()
         expect(page.locator("ytd-comments")).to_be_visible()
-        ok("classic primary-info layout mounts a localized Russian comments control")
+        ok("classic primary-info layout keeps the comments control English with Russian native markup")
         page.close()
 
         delayed = watch.replace('''<div id="actions"><div id="top-level-buttons-computed">
@@ -3157,9 +3161,9 @@ def main():
 
         for width in [1440, 390]:
             check_home_settings(browser,width)
-            ok(f'home settings at {width}px expose official account controls, confirm scoped cookie deletion, save theme/language and close accessibly')
+            ok(f'home settings at {width}px expose official account controls, confirm scoped cookie deletion, save theme and keep English UI and close accessibly')
         check_settings_failures(browser)
-        ok('settings show cookie permission failures and restore theme/language after failed storage writes')
+        ok('settings show cookie permission failures and restore theme after failed storage writes')
 
         for width in [1440, 900, 390]:
             check_search_channels_and_row_gaps(browser,width)
@@ -3223,12 +3227,12 @@ def main():
         page.set_content(popup_html)
         page.evaluate(MOCK, {'language':'ru'})
         page.add_script_tag(path=str(ROOT / 'src/popup/popup.js'))
-        expect(page.locator('html')).to_have_attribute('lang','ru')
-        expect(page.locator('#setting-title')).to_have_text('Режим фокуса')
+        expect(page.locator('html')).to_have_attribute('lang','en')
+        expect(page.locator('#setting-title')).to_have_text('Focus mode')
         page.evaluate("chrome.storage.local.set({language:'en'})")
         expect(page.locator('#setting-title')).to_have_text('Focus mode')
         expect(page.locator('#toggle')).to_be_checked()
-        ok('popup uses the saved language and follows language changes without resetting focus mode')
+        ok('popup stays English with legacy language settings and retains focus mode')
         page.close()
 
         browser.close()

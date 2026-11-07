@@ -52,15 +52,15 @@ def local_home(browser):
     assert not [url for url in requests if urlparse(url).netloc!='minimal-extension.test'], requests
     assert page.locator('script').evaluate_all("nodes=>nodes.every(node=>!node.src.includes('youtube.com'))")
     expect(page.locator('#myt-home')).to_have_attribute('data-myt-theme','dark')
-    expect(page.locator('#myt-query')).to_have_attribute('placeholder','Поиск на YouTube')
+    expect(page.locator('#myt-query')).to_have_attribute('placeholder','Search YouTube')
     page.locator('#myt-settings-button').click()
     expect(page.locator('#myt-cookie-status')).to_contain_text('1')
     assert page.evaluate('window.__messages[0].tabId')==7
     assert page.locator('#myt-account-manage').get_attribute('href')=='https://www.youtube.com/account'
     page.locator('#myt-theme-light').click()
     expect(page.locator('#myt-home')).to_have_attribute('data-myt-theme','light')
-    page.locator('#myt-settings-language').select_option('en')
-    page.wait_for_url('**/src/home/index.html?hl=en&persist_hl=1')
+    expect(page.locator('#myt-settings-language')).to_have_count(0)
+    page.reload()
     expect(page.locator('#myt-query')).to_have_attribute('placeholder','Search YouTube')
     expect(page.locator('#myt-home')).to_have_attribute('data-myt-theme','light')
     page.locator('#myt-settings-button').click()
