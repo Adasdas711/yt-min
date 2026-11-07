@@ -145,6 +145,7 @@
     const commentPanelStates = new Map();
     const brandedLinks = new Set();
     const searchDecorations = new Set();
+    const playlistLayoutNodes = new Map();
     // A shadow root isolates the home controls from document-wide CSS.
     const homeStyles = `:host {
     all: initial !important;
@@ -1263,8 +1264,48 @@
         return container;
     }
 
+    function syncPlaylistLayout() {
+        const wanted = new Map();
+        const active = enabled && [root.dataset.mytPage, root.dataset.mytPreviousPage].includes("playlist");
+        if (active) {
+            for (const browse of document.querySelectorAll("ytd-browse:not([hidden])")) {
+                if (browse.closest("[hidden],[aria-hidden='true']")) continue;
+                const summary = [...browse.querySelectorAll("ytd-playlist-header-renderer,ytd-playlist-sidebar-renderer,yt-playlist-header-view-model")].find(node => !node.closest("[hidden],[aria-hidden='true']"));
+                const list = [...browse.querySelectorAll("ytd-playlist-video-list-renderer")].find(node => !node.closest("[hidden],[aria-hidden='true']")) ||
+                    [...browse.querySelectorAll("ytd-message-renderer,ytd-background-promo-renderer")].find(node => !summary?.contains(node) && !node.closest("[hidden],[aria-hidden='true']"));
+                if (!summary || !list || summary.contains(list)) continue;
+                let layout = summary.parentElement;
+                while (layout && layout !== browse && !layout.contains(list)) layout = layout.parentElement;
+                if (!layout?.contains(list)) continue;
+                const mark = (node, name) => {
+                    if (!wanted.has(node)) wanted.set(node, new Set());
+                    wanted.get(node).add(name);
+                };
+                mark(layout, "layout");mark(summary, "summary");mark(list, "list");
+                for (const [node, name] of [[summary, "summary-slot"], [list, "list-slot"]]) {
+                    let slot = node;
+                    while (slot.parentElement !== layout) slot = slot.parentElement;
+                    mark(slot, name);
+                    for (let wrapper = node.parentElement; wrapper && wrapper !== layout; wrapper = wrapper.parentElement) mark(wrapper, "wrapper");
+                }
+            }
+        }
+        // Keep native renderers, handlers, scrolling and continuation observers
+        // in their original parents. Only opt their existing paths into our grid.
+        for (const [node, names] of playlistLayoutNodes) for (const name of names) {
+            if (!wanted.get(node)?.has(name)) node.removeAttribute("data-myt-playlist-" + name);
+        }
+        for (const [node, names] of wanted) for (const name of names) {
+            const attribute = "data-myt-playlist-" + name;
+            if (!node.hasAttribute(attribute)) node.setAttribute(attribute, "");
+        }
+        playlistLayoutNodes.clear();
+        for (const [node, names] of wanted) playlistLayoutNodes.set(node, names);
+    }
+
     function destinationMounted(path) {
         const selector = path === "/watch" ? "ytd-watch-flexy" : path === "/results" ? "ytd-search" :
+            path === "/playlist" ? "ytd-browse[page-subtype='playlist'],ytd-browse:has(ytd-playlist-header-renderer,ytd-playlist-sidebar-renderer,yt-playlist-header-view-model)" :
             channelRoute.test(path) ? "ytd-browse[page-subtype='channels']" : "ytd-page-manager > :not(ytd-browse[page-subtype='home'])";
         return [...document.querySelectorAll(selector)].some(element =>
             !element.closest("[hidden], [aria-hidden='true']") && getComputedStyle(element).display !== "none" && element.getClientRects().length);
@@ -1278,7 +1319,7 @@
         const url = new URL(pendingNavigation || pageLocation());
         const urlChanged = currentURL !== url.href;
         const nextPage = url.pathname === "/" ? "home" : url.pathname === "/watch" ? "watch" :
-            url.pathname === "/results" ? "search" : channelRoute.test(url.pathname) ? "channel" : "other";
+            url.pathname === "/results" ? "search" : url.pathname === "/playlist" ? "playlist" : channelRoute.test(url.pathname) ? "channel" : "other";
         const previous = root.dataset.mytPage;
         if (previous && previous !== nextPage && previous !== "home" && !root.dataset.mytPreviousPage) {
             root.dataset.mytPreviousPage = previous;
@@ -1305,6 +1346,7 @@
         const path = url.pathname;
         root.dataset.mytPage = nextPage;
         renderTheme();
+        syncPlaylistLayout();
         // A verified browser rule may open the lightweight local home. Native
         // and SPA arrivals always have this own UI as a fallback: never blindly
         // navigate to an extension file that could be missing after an update.
@@ -1353,6 +1395,7 @@
             if (!enabled) return;
             updateRoute();
             renderTheme();
+            syncPlaylistLayout();
             if (root.dataset.mytPage === "home" && home?.isConnected && !pendingNavigation && !transitionActive) {
                 pendingRoots.clear();
                 cleanTitle();
@@ -1478,6 +1521,7 @@
             home = null;
             resetWatch();
             restoreBrand();
+            syncPlaylistLayout();
             syncWatchDetails();
             syncSections();
             syncSearch();
@@ -1572,6 +1616,14 @@
                 (element === document.scrollingElement && !/clip/.test(overflow));
         };
         const page = root.dataset.mytPage;
+        if (page === "playlist" && playlistLayoutNodes.size && canScroll(document.scrollingElement)) {
+            // This layout scrolls the document. Do not search thousands of
+            // playlist descendants to rediscover its scrollport on every tick.
+            for (let node = target; node && node !== document.body && node !== root; node = node.parentElement) if (canScroll(node)) return;
+            const unit = event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? innerHeight : event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 20 : 1;
+            document.scrollingElement.scrollBy({ top: event.deltaY * unit, behavior: "instant" });
+            event.preventDefault();event.stopPropagation();return;
+        }
         const mainSelector = page === "watch" ? "ytd-watch-flexy" :
             page === "search" ? "ytd-search" : page === "channel" ? "ytd-browse[page-subtype='channels']" : "ytd-browse";
         const visible = element => !element.closest("[hidden], [aria-hidden='true']") &&
