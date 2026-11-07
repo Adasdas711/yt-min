@@ -1306,6 +1306,24 @@ def check_theater_edges(browser,width,source_height):
     page.close()
 
 
+def check_theater_responsive_width(browser):
+    page=setup(browser,'/watch?v=native',native_watch_fixture(theater=True),native_dark=True,prune_data=True)
+    page.evaluate(VIDEO_STREAM)
+    page.locator('#attributed-description-text').evaluate("e=>e.textContent='W'.repeat(5000)")
+    # YouTube can retain very wide inline sizes from its previous layout.
+    page.locator('#movie_player').evaluate("e=>{e.style.width='5000px';e.style.minWidth='5000px';e.querySelector('video').style.width='5000px';}")
+    for width in [1920,1280,768,390,1440]:
+        page.set_viewport_size({'width':width,'height':700})
+        page.wait_for_function('''() => {
+          const root=document.querySelector('#myt-watch').firstElementChild.shadowRoot,media=root.querySelector('.media').getBoundingClientRect(),video=document.querySelector('video').getBoundingClientRect(),view=root.querySelector('.viewport');
+          return media.x===0&&Math.abs(media.width-view.clientWidth)<1&&Math.abs(video.width-media.width)<1&&Math.abs(video.x-media.x)<1&&media.width<=innerWidth&&view.scrollWidth===view.clientWidth;
+        }''')
+        assert page.locator('.media').bounding_box()['width']<=width
+    page.evaluate('clearInterval(__frames);__stream.getTracks().forEach(track=>track.stop())')
+    assert_stable(page)
+    page.close()
+
+
 def check_background_work(browser):
     results={}
     probe="""async () => {
@@ -1682,13 +1700,53 @@ def check_unsubscribe_staged_dialog(browser, modern=False, width=1440):
     page.close()
 
 
+def check_collaboration_card(browser, width, attributed=False):
+    avatar=lambda color:'data:image/svg+xml;base64,'+base64.b64encode(f'<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" rx="24" fill="{color}"/></svg>'.encode()).decode()
+    first,second=avatar('#df493c'),avatar('#527bd6')
+    if attributed:
+        owner=f'''<yt-video-owner-view-model><yt-avatar-stack-view-model><button id="native-authors-avatars"><img src="{first}"><img src="{second}"></button></yt-avatar-stack-view-model><button id="native-authors"><yt-attributed-string>Первый канал и Второй канал</yt-attributed-string></button><div id="subscribe-button"><button id="native-collab-subscribe" aria-pressed="false">Subscribe</button></div></yt-video-owner-view-model>'''
+    else:
+        owner=f'''<div id="owner"><yt-avatar-stack-view-model><a href="/@first"><img src="{first}"></a><a href="/channel/second"><img src="{second}"></a></yt-avatar-stack-view-model><yt-attributed-string><a href="/@first">Первый канал</a> и <a href="/channel/second">Второй канал</a></yt-attributed-string><div id="subscribe-button"><button id="native-collab-subscribe" aria-pressed="false">Subscribe</button></div></div>'''
+    page=setup(browser,'/watch?v=native',native_watch_fixture(),width=width,language='ru')
+    if attributed:owner='<div id=owner hidden><a href="/@old">Устаревший канал</a></div>'+owner
+    page.locator('#owner').evaluate('(e,html)=>e.outerHTML=html',owner)
+    page.evaluate('''() => {
+      window.__authorVisits=[];window.__authorsOpened=0;window.__collabSubscriptions=0;
+      for(const link of document.querySelectorAll('ytd-watch-metadata a[href^="/@"],ytd-watch-metadata a[href^="/channel/"]'))link.onclick=event=>{event.preventDefault();__authorVisits.push(new URL(link.href).pathname);};
+      for(const button of document.querySelectorAll('#native-authors,#native-authors-avatars'))button.onclick=()=>__authorsOpened++;
+      document.querySelector('#native-collab-subscribe').onclick=function(){__collabSubscriptions++;const subscribed=this.getAttribute('aria-pressed')==='true';this.setAttribute('aria-pressed',String(!subscribed));this.textContent=subscribed?'Subscribe':'Subscribed';};
+    }''')
+    names=page.locator('.owner-name')
+    expect(names).to_have_count(1 if attributed else 2)
+    expect(page.locator('.channel-card')).to_contain_text('Первый канал')
+    expect(page.locator('.channel-card')).to_contain_text('Второй канал')
+    expect(page.locator('.channel-card')).not_to_contain_text('Устаревший канал')
+    expect(page.locator('.owner img')).to_have_count(2)
+    expect(page.locator('.channel-card')).to_have_attribute('data-collaborative','')
+    expect(page.locator('.channel-card .stats')).to_have_text('906 тыс.')
+    for name in names.all():name.click()
+    for avatar_link in page.locator('.owner .avatar-link').all():avatar_link.click()
+    if attributed:assert page.evaluate('__authorsOpened')==3
+    else:assert page.evaluate('__authorVisits')==['/@first','/channel/second','/@first','/channel/second']
+    assert page.evaluate('__collabSubscriptions')==0
+    button=page.locator('.channel-subscribe');box=button.bounding_box();button.click(position={'x':box['width']-10,'y':box['height']/2})
+    expect(button).to_have_attribute('aria-pressed','true')
+    assert page.evaluate('__collabSubscriptions')==1
+    card=page.locator('.channel-card').bounding_box();assert card['x']>=0 and card['x']+card['width']<=width+1,card
+    assert page.locator('.viewport').evaluate('e=>e.scrollWidth<=e.clientWidth')
+    if width==1440:page.locator('.channel-card').screenshot(path='/tmp/yt-min-collaboration-'+str(attributed)+'.png')
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('#myt-watch')).to_have_count(0)
+    page.close()
+
+
 def check_local_title_fonts(browser):
     page=setup(browser,'/watch?v=details',watch_details_fixture(),native_dark=True,watch_ui=False)
     requests=[]
 
     def font_resource(route):
         name=route.request.url.rsplit('/',1)[-1]
-        assert name in ['BarlowCondensed-BlackItalic.ttf','RobotoCondensed-Italic.ttf']
+        assert name in ['BarlowCondensed-BlackItalic.ttf','MinimalCondensed-BlackItalic.ttf']
         requests.append(name)
         route.fulfill(status=200,content_type='font/ttf',body=(ROOT/'src/assets/fonts'/name).read_bytes())
 
@@ -1730,12 +1788,12 @@ def check_local_title_fonts(browser):
     page.set_viewport_size({'width':1440,'height':960})
     expect(page.locator('#watch-title .title-outline')).to_have_text(first_line)
     capture_title('barlow')
-    page.locator('ytd-watch-metadata h1').evaluate('e=>e.textContent="История музыки и люди, которые её изменили: важные встречи, легендарные песни и разговор о событиях за кадром"')
-    expect(page.locator('#watch-title')).to_contain_text('История музыки')
-    page.wait_for_function("[...document.fonts].some(f=>f.family.includes('Roboto')&&f.status==='loaded')")
-    assert any('Roboto Condensed' in f['familyName'] and f['isCustomFont'] for f in title_fonts())
+    page.locator('ytd-watch-metadata h1').evaluate('e=>e.textContent="Ледяной бастион! Восстание 2 ютуберов против 50 корейцев в Раст / RUST — история музыки и людей"')
+    expect(page.locator('#watch-title')).to_contain_text('Ледяной бастион')
+    page.wait_for_function("[...document.fonts].some(f=>f.family.includes('Cyrillic')&&f.status==='loaded')")
+    assert any('Minimal Condensed' in f['familyName'] and f['isCustomFont'] for f in title_fonts())
     capture_title('cyrillic')
-    assert requests==['BarlowCondensed-BlackItalic.ttf','RobotoCondensed-Italic.ttf']
+    assert requests==['BarlowCondensed-BlackItalic.ttf','MinimalCondensed-BlackItalic.ttf']
     page.locator('ytd-watch-metadata h1').evaluate('e=>e.textContent="A different video title"')
     expect(page.locator('#watch-title')).to_have_text('A different video title')
     assert len(requests)==2, 'Metadata rerenders must reuse loaded title fonts'
@@ -2428,6 +2486,8 @@ def main():
         for width,height in [(1440,480),(390,360)]:
             check_theater_edges(browser,width,height)
             ok(f'theater at {width}px is edge-to-edge at native aspect ratio, with no top gap, rounded corners or playlist side gutter')
+        check_theater_responsive_width(browser)
+        ok('theater follows the current browser width on resize, despite cached 5000px native sizes and long content')
         check_fast_fullscreen(browser)
         ok('native video fills the viewport in the same click before the fullscreen handler, without waiting or replacing media')
         check_player_ad_data(browser)
@@ -2439,6 +2499,10 @@ def main():
         for modern,width in [(False,1440),(True,1440),(True,390)]:
             check_unsubscribe_staged_dialog(browser,modern,width)
             ok(f'unsubscribe dialog (modern={modern}, {width}px) never paints its outer shell, late heading/buttons or closing backdrop')
+        for attributed in [False,True]:
+            for width in [1440,390]:
+                check_collaboration_card(browser,width,attributed)
+                ok(f'collaborating authors (attributed={attributed}, {width}px) retain names, avatars, native author links/panels and subscription actions')
         check_local_title_fonts(browser)
         ok('packaged title fonts render real Latin/Cyrillic glyphs under a restrictive font policy and load each asset only once')
         for legacy in [False,True]:

@@ -1,0 +1,13 @@
+Minimal Condensed Black Italic
+
+Derived from Roboto Condensed Italic, Copyright 2011 The Roboto Project Authors.
+Licensed under SIL Open Font License 1.1; see RobotoCondensed-OFL.txt.
+Source: https://github.com/google/fonts/tree/main/ofl/robotocondensed
+Original file: RobotoCondensed-Italic[wght].ttf
+Original SHA-256: 78f643b1923008b00dfc9b371a2ecd4d80a017722925f1a3fac9940be56d1b7d
+
+Changes: instantiate the wght=900 Black Italic face, union overlapping glyph
+construction contours, remove hinting, rename the modified family. This keeps
+CSS text-stroke on the true letter boundaries, without internal construction bars.
+Rebuild with scripts/prepare-title-font.py and fonttools + skia-pathops.
+No processing dependencies are required to install or run the extension.
