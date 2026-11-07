@@ -42,9 +42,9 @@ def check(browser, legacy, width, dark):
     assert (a['x']+a['width']<=b['x']-12) if width>900 else (a['y']+a['height']<=b['y']-12),(a,b)
     if width>900:assert abs(a['y']-b['y'])<1,(a,b)
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),(width,a,b)
-    neutral=summary.evaluate('''e=>{const s=getComputedStyle(e);return {color:s.backgroundColor,image:s.backgroundImage,height:e.getBoundingClientRect().height};}''')
+    neutral=summary.locator('.panel').evaluate('''e=>{const s=getComputedStyle(e);return {color:s.backgroundColor,image:s.backgroundImage,height:e.getBoundingClientRect().height};}''')
     assert neutral['image']=='none' and neutral['color']==('rgb(36, 36, 42)' if dark else 'rgb(241, 241, 244)'),neutral
-    assert neutral['height']<700,neutral
+    assert neutral['height']<=max(700,page.viewport_size['height']-120),neutral
     for row_node in page.locator('ytd-playlist-video-renderer').all():
         rect=row_node.bounding_box()
         assert rect and rect['x']>=b['x']-1 and rect['x']+rect['width']<=b['x']+b['width']+1,rect
@@ -70,8 +70,8 @@ def check(browser, legacy, width, dark):
     assert page.evaluate('__sourceRow===document.querySelector("ytd-playlist-video-renderer")&&__sourceParent===__sourceRow.parentElement')
     # A creator-color update must not reintroduce a tinted panel or gradient.
     page.locator('ytd-playlist-header-renderer,ytd-playlist-sidebar-renderer').evaluate("e=>{e.style.background='linear-gradient(red,blue)';e.querySelector('.page-header-sidebar').style.background='linear-gradient(magenta,green)';}")
-    expect(summary).to_have_css('background-color',neutral['color'])
-    expect(summary).to_have_css('background-image','none')
+    expect(summary.locator('.panel')).to_have_css('background-color',neutral['color'])
+    expect(summary.locator('.panel')).to_have_css('background-image','none')
     assert_stable(page)
     page.evaluate('window.scrollTo(0,0)')
     page.screenshot(path=f'/tmp/yt-min-playlist-page-{legacy}-{width}-{dark}.png')
@@ -102,7 +102,7 @@ def mixed_markup(browser, width=1440, modern_rows=False):
     expect(summary.locator('h1')).to_have_text('German A1 | For Absolute Beginners')
     expect(page.locator('.inactive-legacy')).to_be_hidden()
     expect(page.locator('[data-myt-owned-playlist-card=video]')).to_have_count(12)
-    expect(summary).to_have_css('background-color','rgb(36, 36, 42)')
+    expect(summary.locator('.panel')).to_have_css('background-color','rgb(36, 36, 42)')
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     for img in page.locator('img').all():
         if img.is_visible():assert img.bounding_box()['width']<=max(340,width-32),img.bounding_box()
@@ -172,6 +172,60 @@ def lifecycle(browser):
     print('PASS header/row restamping preserves owned cards; native intersection pagination remains active',flush=True)
 
 
+def menu_position(browser,width,dark):
+    # Native metadata can contain a channel byline as well as a separate author
+    # link. Preserve real counts/dates while removing both author appearances.
+    html=body().replace('<div id="video-info">3.2m · 24 July 2024</div>','<div id="video-info"><a href="/@easygerman">Easy German</a> · 3.2m · 24 July 2024</div>')
+    html+='<style>[data-myt-owned-playlist-card="summary"]{background:transparent!important;border:0!important}</style>'
+    page=setup(browser,'/playlist?list=PLfixture',html,width=width,theme='dark' if dark else 'light',native_dark=not dark)
+    summary=page.locator('#myt-playlist-summary')
+    expect(summary.locator('.panel')).to_have_css('background-color','rgb(36, 36, 42)' if dark else 'rgb(241, 241, 244)')
+    expect(summary.locator('.owner a')).to_have_text('Easy German')
+    cards=page.locator('[data-myt-owned-playlist-card=video]')
+    expect(cards.locator('.owner')).to_have_count(0)
+    expect(cards.first.locator('.metadata')).to_have_text('3.2m · 24 July 2024')
+    page.locator('ytd-playlist-video-renderer #video-info').first.evaluate('e=>e.textContent="Easy German"')
+    expect(cards.first.locator('.metadata')).to_be_hidden()
+    page.evaluate('''() => {
+      const popups=document.createElement('ytd-popup-container');document.body.append(popups);
+      window.__openNativeMenu=() => {
+        setTimeout(()=>{
+          popups.innerHTML='<tp-yt-iron-dropdown style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:280px"><ytd-menu-popup-renderer role="menu" style="display:block;padding:16px;border-radius:16px;background:#24242a;color:white"><button role="menuitem" onclick="window.__menuCommand=true;this.closest(\\\'tp-yt-iron-dropdown\\\').hidden=true">Shuffle</button><p>Playlist actions</p></ytd-menu-popup-renderer></tp-yt-iron-dropdown>';
+          document.querySelector('tp-yt-iron-dropdown').dataset.originalStyle=document.querySelector('tp-yt-iron-dropdown').getAttribute('style');
+        },10);
+      };
+      document.querySelector('ytd-playlist-header-renderer button[aria-label="Playlist actions"]').onclick=__openNativeMenu;
+      document.querySelector('ytd-playlist-video-renderer #menu button').onclick=__openNativeMenu;
+      document.addEventListener('keydown',event=>{if(event.key==='Escape')document.querySelector('tp-yt-iron-dropdown')?.setAttribute('hidden','');});
+    }''')
+    for control in [summary.get_by_role('button',name='Playlist actions'),cards.first.get_by_role('button',name='Video actions')]:
+        control.click()
+        popup=page.locator('tp-yt-iron-dropdown')
+        expect(popup).to_be_visible()
+        expect(control).to_have_attribute('aria-expanded','true')
+        button,menu=control.bounding_box(),popup.bounding_box()
+        assert menu['x']>=8 and menu['x']+menu['width']<=width-8,(button,menu)
+        assert abs(menu['y']-button['y']-button['height']-8)<1 or abs(menu['y']+menu['height']-button['y']+8)<1,(button,menu)
+        # Late Polymer layout updates must not move the menu back to the center.
+        popup.evaluate('e=>{e.style.left="50%";e.style.top="50%";e.style.transform="translate(-50%,-50%)";}')
+        page.wait_for_function('getComputedStyle(document.querySelector("tp-yt-iron-dropdown")).transform==="none"')
+        page.screenshot(path=f'/tmp/yt-min-playlist22-menu-{width}-{dark}.png')
+        popup.get_by_role('menuitem',name='Shuffle').click()
+        assert page.evaluate('__menuCommand')
+        expect(popup).to_be_hidden()
+        expect(control).to_have_attribute('aria-expanded','false')
+        assert popup.evaluate('e=>{const original=document.createElement("div");original.style.cssText=e.dataset.originalStyle;return [...original.style].every(name=>original.style.getPropertyValue(name)===e.style.getPropertyValue(name));}')
+    summary.get_by_role('button',name='Playlist actions').click()
+    expect(page.locator('tp-yt-iron-dropdown')).to_be_visible()
+    page.keyboard.press('Escape')
+    expect(page.locator('tp-yt-iron-dropdown')).to_be_hidden()
+    assert_stable(page)
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('[data-myt-owned-playlist-card]')).to_have_count(0)
+    page.close()
+    print(f'PASS playlist author removal and anchored native menus: width={width}, dark={dark}',flush=True)
+
+
 def main():
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -184,6 +238,9 @@ def main():
             for width in [1440,390]:
                 mixed_markup(browser,width,modern_rows)
         lifecycle(browser)
+        for width in [1440,390]:
+            for dark in [True,False]:
+                menu_position(browser,width,dark)
         empty=body().replace('<ytd-playlist-video-list-renderer>','<ytd-playlist-video-list-renderer hidden>')
         empty=empty.replace('</ytd-playlist-video-list-renderer>','</ytd-playlist-video-list-renderer><ytd-message-renderer id="empty-playlist">No videos yet</ytd-message-renderer>')
         page=setup(browser,'/playlist?list=empty',empty,native_dark=True)
