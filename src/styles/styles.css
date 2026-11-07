@@ -713,7 +713,8 @@ html.minimal-youtube:is(:is([data-myt-page="search"], [data-myt-previous-page="s
 /* Search: small native cards in three columns, without changing DOM order. */
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
     --myt-search-columns: 3;
-    --myt-search-channel-span: 4;
+    --myt-search-channel-span: 3;
+    --myt-search-playlist-span: 4;
     box-sizing: border-box;
     width: 100%;
     max-width: 1120px;
@@ -1024,6 +1025,7 @@ html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-sec
     html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
         --myt-search-columns: 2;
         --myt-search-channel-span: 4;
+        --myt-search-playlist-span: 4;
     }
 
     html.minimal-youtube ytd-watch-flexy:not([theater]):not([fullscreen]) #columns {
@@ -1054,6 +1056,7 @@ html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-sec
     html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
         --myt-search-columns: 1;
         --myt-search-channel-span: 2;
+        --myt-search-playlist-span: 2;
     }
 
     html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) {
@@ -1228,11 +1231,11 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
 }
 
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-playlist-cell] {
-    display: block; box-sizing: border-box; grid-column: span var(--myt-search-channel-span) !important;
+    display: block; box-sizing: border-box; grid-column: span var(--myt-search-playlist-span) !important;
     align-self: stretch; width: 100% !important; min-width: 0 !important; max-width: none !important; margin: 0 !important;
 }
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-result-start] {
-    grid-column: 1 / span var(--myt-search-channel-span) !important;
+    grid-column: 1 / span var(--myt-search-playlist-span) !important;
 }
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-playlist] {
     display: block !important; height: 100% !important; min-width: 0 !important;
@@ -1332,6 +1335,60 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="media"]::before,
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="media"]::after { content: none !important; display: none !important; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"],
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] { display: block !important; border-radius: 16px !important; clip-path: inset(var(--myt-island-clip, 0px) 0 0); }
+/* Native comment controls remain connected; only their visible surface changes. */
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] {
+    box-sizing: border-box !important; padding: 20px !important; border: 1px solid var(--myt-border) !important; border-radius: 24px !important;
+    background: var(--myt-surface) !important; color: var(--myt-ink) !important;
+    font: 14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+    overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--myt-border) var(--myt-surface);
+    contain: layout paint style !important;
+    --yt-spec-base-background: var(--myt-surface); --yt-spec-raised-background: var(--myt-soft);
+    --yt-spec-text-primary: var(--myt-ink); --yt-spec-text-secondary: var(--myt-muted);
+}
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] :is(ytd-comments-header-renderer,ytd-comment-simplebox-renderer) {
+    margin: 0 0 18px !important; padding: 0 !important; color: var(--myt-ink); background: transparent;
+}
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] ytd-comment-thread-renderer {
+    display: block; margin: 0 0 12px !important; padding: 16px !important;
+    border: 1px solid var(--myt-border); border-radius: 20px; background: var(--myt-soft) !important;
+    content-visibility: auto; contain-intrinsic-size: auto 160px;
+}
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] :is(ytd-comment-renderer,ytd-comment-view-model) {
+    color: var(--myt-ink); font-family: inherit; font-size: 14px; line-height: 1.6;
+}
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] #author-text {
+    color: var(--myt-ink) !important; font-size: 14px !important; font-weight: 600 !important;
+}
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] :is(#published-time-text,#published-time-text a,#vote-count-middle) {
+    color: var(--myt-muted) !important; font-size: 12px !important;
+}
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] #content-text {
+    color: var(--myt-ink) !important; font-size: 14px !important; line-height: 1.65 !important; overflow-wrap: anywhere;
+}
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] #content-text a {
+    color: var(--myt-accent) !important; font-weight: 600;
+}
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] :is(#author-thumbnail img,#author-thumbnail yt-img-shadow) {
+    width: 36px !important; height: 36px !important; border-radius: 50%; object-fit: cover;
+}
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] :is(button,tp-yt-paper-button) {
+    border-radius: 999px !important; font-family: inherit; color: var(--myt-ink);
+}
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] button:hover { background-color: var(--myt-border); }
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] :is(
+    ytd-comment-action-buttons-renderer,#action-buttons,#reply-button,#like-button,#dislike-button,
+    button.like,button.reply,button[aria-label^="Like" i],button[aria-label^="Dislike" i],button[aria-label^="Reply" i],
+    yt-icon-button[aria-label^="Like" i],yt-icon-button[aria-label^="Dislike" i],
+    button[aria-label^="Нравится"],button[aria-label^="Не нравится"],button[aria-label^="Ответить"]
+) { display: none !important; }
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] [contenteditable="true"] {
+    padding: 12px !important; border: 1px solid var(--myt-border); border-radius: 12px;
+    background: var(--myt-surface); color: var(--myt-ink); font: inherit;
+}
+@media(max-width:600px) {
+    html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] { padding: 14px !important; border-radius: 20px !important; }
+    html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] ytd-comment-thread-renderer { padding: 12px !important; border-radius: 16px; }
+}
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] {
     min-width: 0 !important; min-height: 0 !important; overflow: hidden !important;
     contain: layout paint !important;

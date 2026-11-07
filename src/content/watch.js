@@ -60,7 +60,7 @@ main.has-sidecar .details { min-height:0; }
 .transcript-card { padding:26px;border:1px solid var(--border);border-radius:20px;background:var(--surface); }.transcript-intro { display:flex;align-items:center;gap:16px; }.transcript-icon { display:grid;place-items:center;width:48px;height:48px;flex:none;border-radius:14px;background:var(--soft);color:var(--ink); }.transcript-copy { flex:1;min-width:0; }.transcript-copy h2 { margin-bottom:5px; }.transcript-head { display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap; }
 .transcript-content { margin-top:24px;padding-top:24px;border-top:1px solid var(--border); }.transcript-search { width:100%;height:46px;padding:0 14px;border:1px solid var(--border);border-radius:11px;background:var(--bg);color:var(--ink);font-size:16px; }.segments { display:flex;flex-direction:column;gap:5px;max-height:520px;overflow:auto;margin-top:16px;scrollbar-color:var(--border) transparent; }.segment { display:grid;grid-template-columns:70px minmax(0,1fr);gap:16px;align-items:start;justify-content:initial;text-align:left;white-space:normal;padding:14px 12px;border:0;background:transparent;font-size:16px;font-weight:400;line-height:1.65; }.segment span { min-width:0;overflow-wrap:anywhere; }.segment time { color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums; }.segment:hover { background:var(--soft); }.transcript-status { padding:20px 0;color:var(--muted);font-size:16px; }
 .socials { display:flex;flex-wrap:wrap;gap:10px; }.social { display:inline-flex;align-items:center;justify-content:center;gap:12px;min-height:44px;padding:10px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--ink);font-size:16px;line-height:1.4; }.social:hover { background:var(--soft);text-decoration:none; }
-.comments { height:600px;margin-top:20px;border:1px solid var(--border);border-radius:16px;background:var(--surface); }.comments-section { margin-top:32px; }
+.comments { height:clamp(360px,70dvh,680px);margin-top:16px;border-radius:24px;background:var(--surface); }.comments-section { margin-top:32px; }
 .section,.comments-section { scroll-margin-top:96px; }
 @media(max-width:600px) { .section,.comments-section { scroll-margin-top:82px; }:host([theater]) main { padding-bottom:48px; }:host([theater]) .details { width:calc(100% - 32px); } }
 :host([theater]) main { max-width:none;padding:0 0 72px; }:host([theater]) .details { max-width:960px;width:calc(100% - 48px); }:host([theater]) .media { max-width:none;max-height:none;aspect-ratio:var(--myt-video-aspect,16 / 9);height:auto;border-radius:0; }
@@ -152,9 +152,19 @@ main.has-sidecar .details { min-height:0; }
                     event.stopImmediatePropagation();return;
                 }
                 if(event.ctrlKey||!event.deltaY||Math.abs(event.deltaX)>Math.abs(event.deltaY))return;
-                const media=target?.closest('[data-myt-watch-island="media"]'),ownPage=path.includes(this.viewport);
+                const media=target?.closest('[data-myt-watch-island="media"]'),comments=target?.closest('[data-myt-watch-island="comments"]'),ownPage=path.includes(this.viewport);
                 if(target?.closest('[data-myt-watch-island="sidecar"]')){event.stopImmediatePropagation();return;}
-                if(!media&&!ownPage)return;
+                if(comments){
+                    // Keep native replies/menus and their own scrollports, but
+                    // never pass the gesture on to YouTube's hidden watch page.
+                    for(const node of path){
+                        const scrollable=node.scrollHeight>node.clientHeight+1&&/^(auto|scroll)$/.test(getComputedStyle(node).overflowY);
+                        const available=event.deltaY>0?node.scrollTop+node.clientHeight<node.scrollHeight-1:node.scrollTop>0;
+                        if(scrollable&&available){event.stopImmediatePropagation();return;}
+                        if(node===comments)break;
+                    }
+                }
+                if(!media&&!ownPage&&!comments)return;
                 if(media&&target.closest('.ytp-settings-menu,.ytp-popup,.ytp-panel,.ytp-volume-area,.ytp-volume-panel,[role="menu"],[role="dialog"],[role="listbox"],[role="slider"]'))return;
                 if(ownPage){
                     for(const node of path){

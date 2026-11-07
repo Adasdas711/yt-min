@@ -562,12 +562,12 @@ def check_search_channels_and_row_gaps(browser, width):
     fixture += '</div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>'
     page = setup(browser,'/results?search_query=channels',fixture,width=width)
     a,b,c = [page.locator('#channel-'+str(i)).bounding_box() for i in range(3)]
-    assert abs(a['x']-b['x'])<1 and b['y']>=a['y']+a['height']+15,(a,b)
+    assert (abs(a['y']-b['y'])<1 and b['x']>a['x']+a['width']) if width>1000 else (abs(a['x']-b['x'])<1 and b['y']>=a['y']+a['height']+15),(a,b)
     boxes=[page.locator('#video-'+str(i)).bounding_box() for i in range(9)]
     assert len({(round(box['x']),round(box['y'])) for box in boxes})==9,boxes
     rail=page.locator('[data-myt-search-flow]').first.bounding_box()
     assert all(box['x']>=rail['x'] and box['x']+box['width']<=rail['x']+rail['width']+1 for box in boxes),boxes
-    if width>1000:assert abs(boxes[0]['y']-a['y'])<1,(a,boxes[0])
+    if width>1000:assert abs(a['width']-(rail['width']-24)/2)<1,(a,rail)
     for i in range(4):
         expect(page.locator('#subscribe-'+str(i))).to_be_visible()
         expect(page.locator('#channel-'+str(i)+' #main-link')).to_have_attribute('href','/@creator'+str(i))
@@ -636,9 +636,9 @@ def check_channel_first_within_sections(browser):
     c1=page.locator('#channel-order-1').bounding_box();c2=page.locator('#channel-order-2').bounding_box()
     v1=page.locator('#video-order-1').bounding_box();v2=page.locator('#video-order-2').bounding_box()
     last=page.locator('#channel-order-3').bounding_box()
-    assert abs(first['y']-c1['y'])<1, (first,c1)
-    assert c2['y']>=c1['y']+c1['height']+15, (c1,c2)
-    assert abs(v1['y']-c2['y'])<1, (c1,c2,v1)
+    assert first['y']>=c1['y']+c1['height']+15, (first,c1)
+    assert abs(c2['y']-c1['y'])<1 and c2['x']>c1['x'], (c1,c2)
+    assert v1['y']>=c1['y']+c1['height']+15, (c1,c2,v1)
     assert v2['y']>=v1['y'], (v1,v2)
     assert last['y']>=c2['y'], (last,c2)
     assert page.locator('#video-order-1').evaluate("element => Boolean(element.compareDocumentPosition(document.querySelector('#channel-order-1')) & Node.DOCUMENT_POSITION_FOLLOWING)")
@@ -3051,7 +3051,7 @@ def main():
 
         channel_bounds = page.locator('#channel-result').bounding_box()
         row_width = page.locator('[data-myt-search-flow]').first.bounding_box()['width']
-        assert abs(channel_bounds['width'] - (left['width']*2+24)) < 1
+        assert abs(channel_bounds['width'] - (left['width']*1.5+12)) < 1
         for selector in ["#continuation"]:
             expect(page.locator(selector)).to_be_visible()
             bounds = page.locator(selector).bounding_box()

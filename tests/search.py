@@ -22,7 +22,7 @@ def check(browser,width,dark):
     page=setup(browser,'/results?search_query=fixture',fixture(),width=width,theme='dark' if dark else 'light',native_dark=not dark)
     channel=page.locator('#channel');a=channel.bounding_box()
     regular=page.locator('#video-1').bounding_box();wide=page.locator('#playlist-1').bounding_box()
-    assert abs(wide['width']-a['width'])<1,(a,wide)
+    assert abs((a['width']-(regular['width']*1.5+12)) if width>1000 else a['width']-wide['width'])<1,(a,wide,regular)
     if width>1000:
         assert abs(wide['width']-regular['width']*2-24)<1,(wide,regular)
         assert wide['width']>regular['width'],(wide,regular)
