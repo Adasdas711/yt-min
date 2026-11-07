@@ -155,6 +155,30 @@ def avatar_navigation(browser,width,native):
     print(f'PASS channel avatar navigation, new tab, recycled URL and cleanup: {width}px, native={native}',flush=True)
 
 
+def avatar_layout(browser,native):
+    image=f'<yt-img-shadow id="avatar" style="position:relative;display:inline-block;margin-left:112px;transform:translateX(24px)"><img src="{cover()}" alt="Creator" style="position:absolute;left:16px;top:12px;width:160px;height:160px"></yt-img-shadow>'
+    if native:image='<a id="main-link" href="/@creator" style="position:relative;left:24px;width:360px;padding:12px">'+image+'</a>'
+    body=f'<ytd-app>{MASTHEAD}<ytd-search><ytd-section-list-renderer><div id="contents"><ytd-channel-renderer><div id="content-section"><div id="avatar-section" style="display:flex;justify-content:center">{image}</div><div id="info-section"><a id="main-link" href="/@creator"><div id="channel-info"><h3>Joe Speen</h3><p>2.24M subscribers</p><p>A channel description that wraps onto multiple lines.</p></div></a><button>Subscribe</button></div></div></ytd-channel-renderer></div></ytd-section-list-renderer></ytd-search></ytd-app>'
+    page=setup(browser,'/results?search_query=creator',body)
+    page.evaluate('window.__avatarNodes=[...document.querySelectorAll("#avatar-section,#avatar-section img,#avatar-section yt-img-shadow")].map(node=>[node,node.parentElement,node.getAttribute("style")])')
+    for width in [1440,900,390]:
+        page.set_viewport_size({'width':width,'height':960})
+        expect(page.locator('[data-myt-search-avatar-link]')).to_have_count(1)
+        slot=page.locator('#avatar-section').bounding_box();image=page.locator('#avatar-section img').bounding_box()
+        link=page.locator('[data-myt-search-avatar-link]').bounding_box();info=page.locator('#channel-info').bounding_box()
+        assert all(abs(image[key]-slot[key])<1 and abs(link[key]-slot[key])<1 for key in ['x','y','width','height']),(slot,image,link)
+        assert info['x']>=slot['x']+slot['width']+12,(slot,info)
+        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+        assert page.locator('#avatar-section img').evaluate('img=>{const r=img.getBoundingClientRect(),a=document.querySelector("[data-myt-search-avatar-link]"),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return a===hit||a.contains(hit)}')
+        assert_stable(page)
+        page.screenshot(path=f'/tmp/yt-min-avatar28-{width}-{native}.png')
+        print(f'PASS avatar, link and text stay aligned through resize: {width}px, native={native}',flush=True)
+    page.evaluate('__setEnabled(false)')
+    assert page.evaluate('__avatarNodes.every(([node,parent,style])=>node.parentElement===parent&&node.getAttribute("style")===style)')
+    expect(page.locator('[data-myt-search-avatar-host],[data-myt-search-avatar-link],[data-myt-search-avatar-overlay]')).to_have_count(0)
+    page.close()
+
+
 def main():
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -164,6 +188,7 @@ def main():
                 covers_and_sections(browser,width,dark)
         for width in [1440,390]:
             for native in [False,True]:avatar_navigation(browser,width,native)
+        for native in [False,True]:avatar_layout(browser,native)
         browser.close()
 
 

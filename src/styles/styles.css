@@ -1196,17 +1196,42 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     width: 100% !important;
     padding: 0 !important;
 }
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel] #avatar-section {
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel] :is(#avatar-section,[data-myt-search-avatar-host]) {
+    display: block !important;
+    position: relative !important;
+    inset: auto !important;
+    align-self: center;
     flex: 0 0 80px !important;
     width: 80px !important;
-    min-width: 0 !important;
+    height: 80px !important;
+    min-width: 80px !important;
+    max-width: 80px !important;
     margin: 0 16px 0 0 !important;
     padding: 0 !important;
+    box-sizing: border-box;
+    transform: none !important;
+    translate: none !important;
 }
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel] #avatar-section :is(yt-img-shadow, img) {
+/* Native avatar links/images can retain offsets for YouTube's wider column. */
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel] :is(#avatar-section,[data-myt-search-avatar-host]) :is(yt-img-shadow,a:not([data-myt-search-avatar-overlay]),img) {
+    display: block !important;
+    position: relative !important;
+    inset: auto !important;
+    flex: none !important;
     width: 80px !important;
     height: 80px !important;
+    min-width: 0 !important;
+    max-width: 80px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box;
+    transform: none !important;
+    translate: none !important;
     border-radius: 50%;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel] :is(#avatar-section,[data-myt-search-avatar-host]) img {
+    position: static !important;
+    object-fit: cover;
 }
 html.minimal-youtube [data-myt-search-avatar-host] {
     position: relative; height: 80px; cursor: pointer;
