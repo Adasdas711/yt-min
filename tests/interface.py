@@ -68,19 +68,24 @@ def startup(browser):
     page.close()
 
 
-def playlist(browser):
+def playlist(browser, label='Close playlist', known_id=True, wrapped=False):
     body = native_watch_fixture().replace('<div id="secondary-inner"></div>',
         '<div id="secondary-inner">' + playlist_panel_fixture() + '</div>')
     page = setup(browser, '/watch?v=native&list=fixture', body, watch_ui=False)
-    page.evaluate('''() => {
+    page.evaluate('''config => {
       const panel=document.querySelector('#playlist'),header=panel.querySelector('#header');
-      header.innerHTML='<span>Playlist</span><button id="expand-button" aria-label="Expand playlist" hidden>⌄</button><button id="close-button" aria-label="Close playlist">×</button><button id="shuffle" aria-label="Shuffle playlist">Shuffle</button>';
+      header.innerHTML='<span>Playlist</span><button id="expand-button" aria-label="Expand playlist" hidden>⌄</button><button data-native-close>×</button><button id="shuffle" aria-label="Shuffle playlist">Shuffle</button>';
       window.__expandCalls=0;window.__closeCalls=0;window.__shuffleCalls=0;
-      const expand=header.querySelector('#expand-button'),close=header.querySelector('#close-button');
+      const expand=header.querySelector('#expand-button'),close=header.querySelector('[data-native-close]');
+      if(config.known_id)close.id='close-button';
+      if(config.wrapped){
+        const wrapper=document.createElement('ytd-button-renderer');wrapper.setAttribute('aria-label',config.label);
+        close.replaceWith(wrapper);wrapper.innerHTML='<yt-button-shape></yt-button-shape>';wrapper.firstChild.append(close);
+      }else close.setAttribute('aria-label',config.label);
       expand.onclick=()=>{__expandCalls++;expand.hidden=true;close.hidden=false;panel.removeAttribute('collapsed');panel.querySelector('#items').hidden=false;};
       close.onclick=()=>{__closeCalls++;panel.setAttribute('collapsed','');expand.hidden=false;close.hidden=true;panel.querySelector('#items').hidden=true;};
       header.querySelector('#shuffle').onclick=()=>__shuffleCalls++;
-    }''')
+    }''', {'label':label,'known_id':known_id,'wrapped':wrapped})
     page.add_script_tag(path=str(ROOT/'src/content/watch.js'))
     page.evaluate("document.dispatchEvent(new Event('yt-navigate-finish'))")
     page.evaluate(VIDEO_STREAM)
@@ -88,7 +93,8 @@ def playlist(browser):
     # A stale hidden down-arrow must never collapse a fully expanded native list.
     assert page.evaluate('__expandCalls') == 0
     expect(page.locator('#playlist .myt-playlist-close')).to_be_visible()
-    expect(page.locator('#close-button')).to_have_css('visibility', 'hidden')
+    expect(page.locator('[data-native-close]')).to_have_css('visibility', 'hidden')
+    assert page.locator('[data-native-close],.myt-playlist-close').evaluate_all('''nodes=>nodes.filter(e=>getComputedStyle(e).visibility==='visible'&&e.getClientRects().length).length''') == 1
     page.locator('#shuffle').click()
     assert page.evaluate('__shuffleCalls') == 1
     for _ in range(3):
@@ -104,12 +110,12 @@ def playlist(browser):
     assert page.evaluate('document.querySelector("video")===__nativeVideo&&!__nativeVideo.paused')
     # Replacing native header controls should mask the new toggle before paint
     # and preserve the injected close action and the native shuffle action.
-    page.locator('#close-button').evaluate('e=>e.replaceWith(e.cloneNode(true))')
-    expect(page.locator('#close-button')).to_have_css('visibility', 'hidden')
+    page.locator('[data-native-close]').evaluate('e=>e.replaceWith(e.cloneNode(true))')
+    expect(page.locator('[data-native-close]')).to_have_css('visibility', 'hidden')
     assert_stable(page)
     page.evaluate('__setEnabled(false)')
     expect(page.locator('.myt-playlist-close,[data-myt-playlist-native-toggle],[data-myt-playlist-owned-header]')).to_have_count(0)
-    expect(page.locator('#close-button')).not_to_have_css('visibility', 'hidden')
+    expect(page.locator('[data-native-close]')).not_to_have_css('visibility', 'hidden')
     assert not page.locator('#playlist').evaluate('e=>e.style.transform||e.style.clipPath')
     page.evaluate('clearInterval(__frames);__stream.getTracks().forEach(t=>t.stop())')
     page.close()
@@ -167,8 +173,9 @@ def main():
         print('PASS own loading shell before storage and native metadata; eye icon; native restore', flush=True)
         native_language(browser)
         print('PASS native menus use English at startup; disabled mode and video/playlist/time parameters stay intact', flush=True)
-        playlist(browser)
-        print('PASS playlist opens directly into full list with close; hidden arrows are ignored', flush=True)
+        for label,known_id,wrapped in [('Close playlist',True,False),('Close',False,False),('Закрыть',False,True)]:
+            playlist(browser,label,known_id,wrapped)
+            print(f'PASS one playlist close control ({label}, wrapped={wrapped}); direct reopen and native restore', flush=True)
         scroll_profile(browser)
         browser.close()
 

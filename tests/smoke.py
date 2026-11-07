@@ -1438,7 +1438,7 @@ def check_collapsed_playlist(browser,theater=False,width=1440,state='collapsed')
     expect(page.locator('.sidecar')).to_be_hidden()
     expect(page.locator('main')).not_to_have_class('has-sidecar')
     opener=page.locator('.playlist-toggle')
-    expect(opener).to_be_visible();expect(opener).to_have_text('Open playlist')
+    expect(opener).to_be_visible();expect(opener).to_have_text('Playlist')
     expect(opener).to_have_attribute('aria-expanded','false')
     page.wait_for_function('''() => {
       const root=document.querySelector('#myt-watch').firstElementChild.shadowRoot,view=root.querySelector('.viewport'),info=root.querySelector('.details').getBoundingClientRect(),media=root.querySelector('.media').getBoundingClientRect();

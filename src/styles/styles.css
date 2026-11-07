@@ -1279,7 +1279,8 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] > #con
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="sidecar"] #items {
     flex: 1 1 0% !important; height: auto !important; min-height: 0 !important; max-height: none !important; overflow-y: auto !important;
 }
-html.minimal-youtube[data-myt-watch-ui] [data-myt-playlist-native-toggle] { visibility: hidden !important; pointer-events: none !important; }
+html.minimal-youtube[data-myt-watch-ui] [data-myt-playlist-native-toggle],
+html.minimal-youtube[data-myt-watch-ui] [data-myt-playlist-native-toggle] * { visibility: hidden !important; pointer-events: none !important; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-playlist-owned-header] { padding-right: 56px !important; }
 html.minimal-youtube[data-myt-watch-ui] .myt-playlist-close {
     position: absolute !important; right: 12px !important; top: 12px !important; z-index: 3 !important;
