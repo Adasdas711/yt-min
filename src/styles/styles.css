@@ -713,7 +713,7 @@ html.minimal-youtube:is(:is([data-myt-page="search"], [data-myt-previous-page="s
 /* Search: small native cards in three columns, without changing DOM order. */
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
     --myt-search-columns: 3;
-    --myt-search-channel-span: 3;
+    --myt-search-channel-span: 4;
     box-sizing: border-box;
     width: 100%;
     max-width: 1120px;
@@ -735,8 +735,8 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     min-width: 0;
 }
 
-/* JS marks safe single-video wrappers and nested shelf lists, without reparenting.
-   Unclassified playlist and continuation rows remain full-width. */
+/* Videos use one column; channels and playlist cards use two. Continuations
+   and native section wrappers remain full-width without reparenting nodes. */
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) {
     box-sizing: border-box;
     display: grid !important;
@@ -1022,7 +1022,7 @@ html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-sec
 @media (max-width: 1000px) {
     html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
         --myt-search-columns: 2;
-        --myt-search-channel-span: 2;
+        --myt-search-channel-span: 4;
     }
 
     html.minimal-youtube ytd-watch-flexy:not([theater]):not([fullscreen]) #columns {
@@ -1175,6 +1175,7 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel] {
     box-sizing: border-box;
     min-width: 0;
+    min-height: 128px;
 }
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel] :is(#content-section, #info-section) {
     display: flex;
@@ -1224,6 +1225,39 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-video-start] {
     grid-column: 1 / span 2 !important;
 }
+
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-playlist-cell] {
+    display: block; box-sizing: border-box; grid-column: span var(--myt-search-channel-span) !important;
+    align-self: stretch; width: 100% !important; min-width: 0 !important; max-width: none !important; margin: 0 !important;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-result-start] {
+    grid-column: 1 / span var(--myt-search-channel-span) !important;
+}
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-playlist] {
+    display: block !important; height: 100% !important; min-width: 0 !important;
+    margin: 0 !important; padding: 0 !important; background: transparent !important;
+}
+html.minimal-youtube [data-myt-search-playlist-source] {
+    position: absolute !important; width: 0 !important; height: 0 !important; min-width: 0 !important; min-height: 0 !important;
+    max-width: 0 !important; max-height: 0 !important; overflow: clip !important; visibility: hidden !important; pointer-events: none !important;
+}
+html.minimal-youtube [data-myt-search-playlist-source] * { visibility: hidden !important; pointer-events: none !important; }
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-search-sub-menu-renderer {
+    display: block; margin-bottom: 16px !important;
+}
+/* Avoid native collapse transitions getting stuck after repeated toggles. */
+html.minimal-youtube [data-myt-search-filters="open"] {
+    display: block !important; visibility: visible !important; height: auto !important; max-height: none !important;
+    min-height: 0 !important; overflow: visible !important; transition: none !important; animation: none !important;
+}
+html.minimal-youtube [data-myt-search-filters="closed"] { display: none !important; }
+/* Descriptions and transcript excerpts never belong in compact video cards. */
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-video] :is(
+    #description-text,#description,.description-text,.metadata-snippet-container,.metadata-snippet-text,
+    ytd-expandable-metadata-renderer,#expandable-metadata,yt-description-preview-view-model,
+    .yt-lockup-metadata-view-model__description,.yt-lockup-metadata-view-model-wiz__description,.ytLockupMetadataViewModelDescription,
+    .yt-content-metadata-view-model__description,.ytContentMetadataViewModelDescription
+) { display: none !important; }
 
 
 /* Own watch layout: only the Shadow DOM canvas paints the application. Native

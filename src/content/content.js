@@ -147,6 +147,7 @@
     const searchDecorations = new Set();
     const playlistLayoutNodes = new Map();
     let playlistView = null;
+    let searchView = null;
     // A shadow root isolates the home controls from document-wide CSS.
     const homeStyles = `:host {
     all: initial !important;
@@ -736,7 +737,7 @@
     }
 
     function syncSearch(scope = document) {
-        const attributes = ["data-myt-search-video", "data-myt-search-cell", "data-myt-search-grid", "data-myt-search-channel", "data-myt-search-channel-cell", "data-myt-search-video-start"];
+        const attributes = ["data-myt-search-video", "data-myt-search-cell", "data-myt-search-grid", "data-myt-search-channel", "data-myt-search-channel-cell", "data-myt-search-video-start", "data-myt-search-playlist", "data-myt-search-playlist-cell", "data-myt-search-result-start"];
         const active = enabled && (root.dataset.mytPage === "search" || root.dataset.mytPreviousPage === "search");
         for (const element of searchVideoCards) {
             if (!active || !element.isConnected || !element.closest("ytd-search")) {
@@ -744,12 +745,13 @@
                 searchVideoCards.delete(element);
             }
         }
-        if (!active) return;
+        if (!active) {searchView?.destroy();searchView=null;return;}
         const searches = new Set([
             ...(scope instanceof Element && scope.closest("ytd-search") ? [scope.closest("ytd-search")] : []),
             ...scope.querySelectorAll("ytd-search"),
         ]);
         const videoSelector = "ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer, yt-lockup-view-model";
+        const playlistSelector = globalThis.MinimalYouTubeSearch?.playlistSelector || "ytd-playlist-renderer,ytd-grid-playlist-renderer";
         const otherResults = "ytd-channel-renderer, ytd-playlist-renderer, ytd-grid-playlist-renderer, ytd-radio-renderer, ytd-movie-renderer";
         const shelves = "ytd-shelf-renderer, grid-shelf-view-model, ytd-rich-section-renderer, yt-horizontal-list-renderer";
         const listContainers = "ytd-item-section-renderer > #contents, ytd-shelf-renderer > #content, ytd-horizontal-card-list-renderer > #items, grid-shelf-view-model #items, yt-horizontal-list-renderer #items, ytd-rich-grid-renderer > #contents";
@@ -781,12 +783,15 @@
             const videos = [...search.querySelectorAll(videoSelector)].filter(isVideo).filter(card =>
                 !card.parentElement.closest(videoSelector) && !card.closest("[data-myt-hidden-section]"));
             const channels = [...search.querySelectorAll("ytd-channel-renderer")].filter(card => !card.closest("[data-myt-hidden-section]"));
-            const cells = [...videos, ...channels];
+            const playlists = [...search.querySelectorAll(playlistSelector)].filter(card => globalThis.MinimalYouTubeSearch?.isPlaylist(card) && !card.parentElement.closest(playlistSelector) && !card.closest("[data-myt-hidden-section],[data-myt-hidden]"));
+            const cells = [...videos, ...channels, ...playlists];
             const descendantCounts = new Map();
             for (const card of cells) {
                 if (channels.includes(card)) {
                     mark(card, "data-myt-search-channel");
                     mark(card, "data-myt-search-channel-cell");
+                } else if (playlists.includes(card)) {
+                    mark(card, "data-myt-search-playlist");mark(card,"data-myt-search-playlist-cell");
                 } else {
                     mark(card, "data-myt-search-video");
                     mark(card, "data-myt-search-cell");
@@ -813,6 +818,7 @@
                 const structuralList = parent.matches(`${listContainers}, yt-horizontal-list-renderer`);
                 const mixed = parent.matches(otherResults) || parent.querySelector(`${otherResults}, ${shelves}`);
                 if (!structuralList && count === 1 && parent.querySelector("ytd-channel-renderer") && !parent.querySelector(shelves)) mark(parent, "data-myt-search-channel-cell");
+                else if (!structuralList && count === 1 && playlists.some(card=>parent.contains(card)) && !parent.querySelector(shelves)) mark(parent,"data-myt-search-playlist-cell");
                 else if (structuralList || count > 1 || mixed) mark(parent, "data-myt-search-grid");
                 else if (count === 1) mark(parent, "data-myt-search-cell");
             }
@@ -823,8 +829,8 @@
             for (const grid of grids) {
                 const children = [...grid.children];
                 if (!children.some(child => wanted.get(child)?.has("data-myt-search-channel-cell"))) continue;
-                const firstVideo = children.find(child => wanted.get(child)?.has("data-myt-search-cell"));
-                if (firstVideo) mark(firstVideo, "data-myt-search-video-start");
+                const firstResult = children.find(child => wanted.get(child)?.has("data-myt-search-cell") || wanted.get(child)?.has("data-myt-search-playlist-cell"));
+                if (firstResult) mark(firstResult,wanted.get(firstResult)?.has("data-myt-search-playlist-cell")?"data-myt-search-result-start":"data-myt-search-video-start");
             }
             for (const element of searchVideoCards) {
                 if (!search.contains(element)) continue;
@@ -840,6 +846,7 @@
                 searchVideoCards.add(element);
             }
         }
+        if(globalThis.MinimalYouTubeSearch){searchView ||= new globalThis.MinimalYouTubeSearch();searchView.sync(document.querySelectorAll('ytd-search'));}
     }
 
     function syncChatFrames() {
@@ -963,8 +970,7 @@
     }
 
     function isShortsTab(tab) {
-        const title = tab.getAttribute("aria-label") || tab.textContent;
-        return /^(shorts|короткие видео|short videos)$/i.test(title.trim());
+        return [tab.getAttribute("aria-label"),tab.textContent].some(title=>/^(shorts|короткие видео|short videos)$/iu.test((title||'').trim()));
     }
 
     function hideShortsNode(node) {
@@ -1003,6 +1009,16 @@
         }
         for (const tab of select(tabSelector)) {
             if (isShortsTab(tab)) hide(tab);
+        }
+        // New search payloads can leave a section title behind after Shorts
+        // items were removed. Keep ordinary videos in mixed shelves visible.
+        for(const heading of select('yt-section-header-view-model,yt-section-header-renderer,ytd-shelf-renderer #title-container,grid-shelf-view-model #header,ytd-rich-section-renderer #header,h2,[role="heading"]')){
+            if(heading.closest('ytd-video-renderer,yt-lockup-view-model,ytd-channel-renderer,ytd-playlist-renderer'))continue;
+            const title=heading.querySelector('#title,h2,h3,.ytSectionHeaderViewModelTitle')||heading;
+            if(!isShortsTab(title))continue;
+            const shelf=heading.closest('ytd-shelf-renderer,grid-shelf-view-model,ytd-rich-section-renderer');
+            const regular=shelf&&[...shelf.querySelectorAll('a[href]')].some(a=>{if(shortsDestination(a.href)!==null||a.closest(nativeShorts))return false;try{return /\/(watch|playlist)$/.test(new URL(a.href,pageLocation()).pathname);}catch{return false;}});
+            hide(shelf&&!regular?shelf:heading);
         }
     }
 
@@ -1483,6 +1499,16 @@
             return true;
         });
         if (!relevant.length) { if (statsChanged) scheduleWatchStats();return; }
+        if(enabled&&root.dataset.mytPage==='search'){
+            const added=new Set();
+            for(const record of relevant){
+                for(const node of record.addedNodes||[])if(node instanceof Element)added.add(node);
+                const target=record.target instanceof Element?record.target:record.target.parentElement;
+                const heading=target?.closest('yt-section-header-view-model,yt-section-header-renderer,h2,[role="heading"]');
+                if(heading)added.add(heading);
+            }
+            for(const node of added)if(node.closest('ytd-search'))scanShorts(node);
+        }
         for (const record of relevant) {
             if (record.type === "attributes") {
                 if (commentsOpen && commentPanelStates.has(record.target) &&
@@ -1522,7 +1548,7 @@
             classObserver.observe(root, { attributes: true, attributeFilter: ["class"] });
             observer.observe(document.documentElement, {
                 subtree: true, childList: true, characterData: true,
-                attributes: true, attributeFilter: ["href", "aria-label", "aria-hidden", "visibility", "is-shorts", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "expanded", "is-expanded", "aria-pressed", "subscribed", "is-subscribed", "disabled", "aria-disabled", "aria-busy", "aria-valuetext", "data-value", "value", "content"],
+                attributes: true, attributeFilter: ["href", "aria-label", "aria-hidden", "visibility", "is-shorts", "is-playlist", "content-type", "data-content-type", "overlay-style", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "expanded", "is-expanded", "aria-pressed", "subscribed", "is-subscribed", "disabled", "aria-disabled", "aria-busy", "aria-valuetext", "data-value", "value", "content"],
             });
             updateRoute(true);
             syncBrand();

@@ -45,6 +45,9 @@
     function shortItem(item) {
         if (!item || typeof item !== "object") return false;
         if (Object.keys(item).some(key => shorts.has(key))) return true;
+        const header=item.sectionHeaderRenderer||item.sectionHeaderViewModel;
+        const headerTitle=header?.title?.simpleText||header?.title?.runs?.map(run=>run.text).join('')||header?.title?.content;
+        if(typeof headerTitle==='string'&&/^(shorts|короткие видео|short videos)$/iu.test(headerTitle.trim()))return true;
         if (item.richShelfRenderer?.isShorts === true) return true;
         if (item.richSectionRenderer) return shortItem(item.richSectionRenderer.content);
         if (item.richItemRenderer) return shortItem(item.richItemRenderer.content);

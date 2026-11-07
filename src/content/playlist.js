@@ -10,28 +10,38 @@
     const channel=node=>{const links=[...node.querySelectorAll('a[href]')].filter(a=>{try{return /^\/(?:@|channel\/|c\/|user\/)/.test(new URL(a.href).pathname);}catch{return false;}});return links.find(a=>a.textContent.trim())||links[0];};
     const label=node=>node.getAttribute('aria-label')||node.getAttribute('title')||node.closest('yt-icon-button[aria-label],ytd-button-renderer[aria-label],yt-button-view-model[aria-label]')?.getAttribute('aria-label')||clean(node);
     const shared=`:host{box-sizing:border-box;display:block;min-width:0;width:100%;color:var(--myt-ink,#f4f4f5);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}[hidden]{display:none!important}a{color:inherit;text-decoration:none}button{font:inherit;color:inherit;cursor:pointer}button:disabled{opacity:.5;cursor:default}a:focus-visible,button:focus-visible{outline:2px solid var(--myt-muted);outline-offset:3px}svg{width:20px;height:20px;flex:none}img{display:block}h1,h3,p{margin:0}.muted{color:var(--myt-muted,#92929d)}button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--myt-border);border-radius:999px;background:var(--myt-surface)}button:hover{background:var(--myt-border)}.cover{display:block;position:relative;aspect-ratio:16/9;overflow:hidden;background:var(--myt-soft);border-radius:12px}.cover img{width:100%;height:100%;object-fit:cover}.metadata{font-size:13px;line-height:1.5;color:var(--myt-muted);overflow-wrap:anywhere}`;
-    const summaryCSS=`${shared}.panel{padding:24px;min-height:calc(100dvh - 120px);background:var(--myt-soft,#24242a);border:1px solid var(--myt-border);border-radius:24px}.cover{max-width:360px;margin-bottom:20px;border-radius:16px}h1{font-size:26px;font-weight:700;line-height:1.2;letter-spacing:-.65px;overflow-wrap:anywhere}.owner{display:flex;align-items:center;gap:9px;margin:16px 0 10px;min-width:0}.owner img{width:28px;height:28px;border-radius:50%;object-fit:cover}.owner a{min-width:0;overflow-wrap:anywhere}.owner a:hover{text-decoration:underline}.stats{font-size:14px;line-height:1.6;color:var(--myt-muted)}.description{margin-top:18px;font:14px/1.65 "SFMono-Regular",Menlo,Consolas,monospace;color:var(--myt-muted);overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.actions button{min-height:40px;padding:9px 14px;font-weight:600}.actions .menu{width:40px;padding:0}@media(max-width:900px){.panel{min-height:0}}@media(min-width:601px) and (max-width:900px){.panel{display:grid;grid-template-columns:240px minmax(0,1fr);gap:0 24px}.cover{grid-column:1;grid-row:1/6;align-self:start;width:100%;margin:0}h1,.owner,.stats,.description,.actions{grid-column:2}}@media(max-width:600px){.panel{padding:20px}}`;
+    const summaryCSS=`${shared}.panel{padding:24px;min-height:calc(100dvh - 120px);background:var(--myt-soft,#24242a);border:1px solid var(--myt-border);border-radius:24px}.cover{max-width:360px;margin-bottom:20px;border-radius:16px}h1{font-size:26px;font-weight:700;line-height:1.2;letter-spacing:-.65px;overflow-wrap:anywhere}.owner{display:flex;align-items:center;gap:9px;margin:16px 0 10px;min-width:0}.owner img{width:28px;height:28px;border-radius:50%;object-fit:cover}.owner a{min-width:0;overflow-wrap:anywhere}.owner a:hover{text-decoration:underline}.stats{font-size:14px;line-height:1.6;color:var(--myt-muted)}.description{margin-top:18px;font:14px/1.65 "SFMono-Regular",Menlo,Consolas,monospace;color:var(--myt-muted);overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.actions button{min-height:40px;padding:9px 14px;font-weight:600}.actions .menu{width:40px;padding:0}.play-all{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:9px 14px;font-weight:600;border:1px solid var(--myt-border);border-radius:999px;background:var(--myt-surface)}.play-all:hover{background:var(--myt-border)}.share-sheet{position:fixed;inset:0;margin:auto;width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:24px;border:1px solid var(--myt-border);border-radius:24px;background:var(--myt-surface);color:var(--myt-ink)}.share-sheet::backdrop{background:#0008}.share-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}.share-head h2{margin:0;font-size:21px}.share-sheet button{min-height:40px;padding:8px 16px}.share-link{display:block;width:100%;margin:0 0 16px;padding:12px;border:1px solid var(--myt-border);border-radius:12px;background:var(--myt-soft);color:inherit;font:13px/1.5 monospace}.share-status{margin-top:12px;color:var(--myt-muted)}@media(max-width:900px){.panel{min-height:0}}@media(min-width:601px) and (max-width:900px){.panel{display:grid;grid-template-columns:240px minmax(0,1fr);gap:0 24px}.cover{grid-column:1;grid-row:1/6;align-self:start;width:100%;margin:0}h1,.owner,.stats,.description,.actions{grid-column:2}}@media(max-width:600px){.panel{padding:20px}}`;
     const rowCSS=`${shared}:host{display:grid;grid-template-columns:24px 168px minmax(0,1fr) 36px;align-items:center;gap:14px;padding:12px;border:1px solid var(--myt-border);border-radius:20px;background:var(--myt-surface,#19191d)}:host(:hover),:host(:focus-within){background:var(--myt-soft)}:host([data-current]){border-color:var(--myt-accent)}.index{font-size:13px;text-align:center;color:var(--myt-muted);font-variant-numeric:tabular-nums}h3{font-size:17px;font-weight:600;line-height:1.4}.title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}.metadata{margin-top:5px}.duration{position:absolute;right:5px;bottom:5px;padding:1px 5px;border-radius:5px;background:#000b;color:white;font-size:11px;font-variant-numeric:tabular-nums}.menu{width:36px;height:36px;padding:0;border:0;background:transparent;color:var(--myt-muted)}.meta{min-width:0}@media(max-width:600px){:host{grid-template-columns:112px minmax(0,1fr) 28px;gap:10px;padding:10px;border-radius:18px}.index{display:none}h3{font-size:15px}.cover{border-radius:10px}.menu{width:28px}}`;
     class Card {
         constructor(owner,summary=false){
             this.owner=owner;this.host=document.createElement('div');this.host.dataset.mytOwnedPlaylistCard=summary?'summary':'video';
             if(summary)this.host.id='myt-playlist-summary';
             this.shadow=this.host.attachShadow({mode:'open'});
-            this.shadow.innerHTML=summary?`<style>${summaryCSS}</style><section class="panel"><a class="cover" data-action="play"><img alt="" decoding="async"></a><h1></h1><div class="owner"><img alt="" decoding="async"><a data-action="channel"></a></div><p class="stats"></p><p class="description"></p><div class="actions"><button data-action="play">${icon('play')}<span>Play all</span></button><button data-action="shuffle">${icon('shuffle')}<span>Shuffle</span></button><button class="menu" data-action="share" aria-label="Share">${icon('share')}</button><button class="menu" data-action="menu" aria-label="Playlist actions">${icon('menu')}</button></div></section>`:`<style>${rowCSS}</style><span class="index"></span><a class="cover" data-action="play"><img alt="" loading="lazy" decoding="async"><span class="duration"></span></a><div class="meta"><h3><a class="title" data-action="play"></a></h3><p class="metadata"></p></div><button class="menu" data-action="menu" aria-label="Video actions">${icon('menu')}</button>`;
+            this.shadow.innerHTML=summary?`<style>${summaryCSS}</style><section class="panel"><a class="cover" data-action="play"><img alt="" decoding="async"></a><h1></h1><div class="owner"><img alt="" decoding="async"><a data-action="channel"></a></div><p class="stats"></p><p class="description"></p><div class="actions"><a class="play-all" data-action="play">${icon('play')}<span>Play all</span></a><button data-action="shuffle">${icon('shuffle')}<span>Shuffle</span></button><button class="menu" data-action="share" aria-label="Share">${icon('share')}</button><button class="menu" data-action="menu" aria-label="Playlist actions">${icon('menu')}</button></div></section><div class="share-sheet" popover="auto" role="dialog" aria-label="Share playlist"><div class="share-head"><h2>Share playlist</h2><button class="share-close" aria-label="Close share dialog">×</button></div><input class="share-link" aria-label="Playlist link" readonly><button class="share-copy">Copy link</button><p class="share-status" role="status"></p></div>`:`<style>${rowCSS}</style><span class="index"></span><a class="cover" data-action="play"><img alt="" loading="lazy" decoding="async"><span class="duration"></span></a><div class="meta"><h3><a class="title" data-action="play"></a></h3><p class="metadata"></p></div><button class="menu" data-action="menu" aria-label="Video actions">${icon('menu')}</button>`;
             this.summary=summary;this.q=s=>this.shadow.querySelector(s);
             this.shadow.addEventListener('click',event=>{
                 const control=event.target.closest('[data-action]');if(!control)return;
                 event.stopPropagation();
+                if(this.summary&&control.dataset.action==='share'){event.preventDefault();this.owner.share(this);return;}
+                if(this.summary&&control.dataset.action==='play'&&this.playHref)return;
                 if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
                 const source=this.actions?.[control.dataset.action];
                 if(source?.isConnected){event.preventDefault();this.owner.activate(source,control,['menu','share'].includes(control.dataset.action));}
             });
             this.q('.cover img').onerror=()=>{this.q('.cover img').hidden=true;};
+            if(summary){
+                this.q('.share-close').onclick=()=>this.q('.share-sheet').hidePopover();
+                this.q('.share-copy').onclick=async()=>{
+                    const field=this.q('.share-link');
+                    try{await navigator.clipboard.writeText(field.value);this.q('.share-status').textContent='Link copied';}
+                    catch{field.focus();field.select();this.q('.share-status').textContent='Select and copy the link.';}
+                };
+            }
         }
         text(selector,value){const node=this.q(selector);if(node.textContent!==value)node.textContent=value;}
         update(data){
-            this.actions=data.actions;
-            const signature=JSON.stringify([data.title,data.author,data.stats,data.image,data.avatar,data.description,data.index,data.duration,data.current,Object.entries(data.actions).map(([kind,node])=>[kind,!!node,node?.getAttribute('href'),!!node?.matches(':disabled,[aria-disabled="true"]')])]);
+            this.actions=data.actions;this.playHref=data.playHref||'';
+            const signature=JSON.stringify([data.playHref,data.title,data.author,data.stats,data.image,data.avatar,data.description,data.index,data.duration,data.current,Object.entries(data.actions).map(([kind,node])=>[kind,!!node,node?.getAttribute('href'),!!node?.matches(':disabled,[aria-disabled="true"]')])]);
             if(this.signature===signature)return;this.signature=signature;
             const img=this.q('.cover img');if(img.getAttribute('src')!==data.image){if(data.image)img.src=data.image;else img.removeAttribute('src');img.hidden=!data.image;}
             this.q('.cover').hidden=this.summary&&!data.image;
@@ -39,14 +49,15 @@
             if(this.summary){const owner=this.q('.owner a');if(owner.textContent!==data.author)owner.textContent=data.author;this.q('.owner').hidden=!data.author;}
             this.text(this.summary?'.stats':'.metadata',data.stats);this.q(this.summary?'.stats':'.metadata').hidden=!data.stats;
             for(const link of this.shadow.querySelectorAll('a[data-action]')){
-                const href=url(data.actions[link.dataset.action]?.href||'');
+                const href=this.summary&&link.dataset.action==='play'?this.playHref:url(data.actions[link.dataset.action]?.href||'');
                 if(href&&link.getAttribute('href')!==href)link.href=href;else if(!href)link.removeAttribute('href');
             }
             for(const button of this.shadow.querySelectorAll('button[data-action]')){
-                const source=data.actions[button.dataset.action];button.hidden=!source;
+                const source=data.actions[button.dataset.action];button.hidden=button.dataset.action==='share'?false:!source;
                 const disabled=Boolean(source?.matches(':disabled,[aria-disabled="true"]'));if(button.disabled!==disabled)button.disabled=disabled;
             }
             if(this.summary){
+                this.q('.play-all').hidden=!this.playHref;
                 this.text('.description',data.description);this.q('.description').hidden=!data.description;
                 const avatar=this.q('.owner img');if(data.avatar&&avatar.getAttribute('src')!==data.avatar)avatar.src=data.avatar;avatar.hidden=!data.avatar;
             }else{
@@ -71,7 +82,9 @@
             const controls=[...source.querySelectorAll('button,a[role="button"],yt-icon-button')].map(node=>node.querySelector('button')||node).filter(node=>!descriptionNode?.contains(node));
             const find=pattern=>controls.find(node=>pattern.test(label(node)));
             const play=find(/play all|watch all|воспроизвести|смотреть все/iu)||source.querySelector('a[href*="/watch?"]')||this.list.querySelector('a[href*="/watch?"]');
-            return {title,author,avatar:image([...source.querySelectorAll('a[href] img')].find(img=>img.closest('a').href===authorLink?.href)),image:image(thumbnail)||image(this.list.querySelector('img')),stats,description:clean(descriptionNode),actions:{play,channel:authorLink,shuffle:find(/shuffle|перемешать/iu),share:find(/share|поделиться/iu),menu:find(/actions|menu|действия|ещё|еще|^more$|^[⋯⋮…]$/iu)}};
+            let playHref=[...source.querySelectorAll('a[href*="/watch?"]'),...this.list.querySelectorAll('a[href*="/watch?"]')].map(anchor=>url(anchor.href)).find(href=>href&&new URL(href).searchParams.get('v'))||'';
+            if(playHref){const target=new URL(playHref),list=new URL(location.href).searchParams.get('list');if(list)target.searchParams.set('list',list);playHref=target.searchParams.get('v')?target.href:'';}
+            return {playHref,title,author,avatar:image([...source.querySelectorAll('a[href] img')].find(img=>img.closest('a').href===authorLink?.href)),image:image(thumbnail)||image(this.list.querySelector('img')),stats,description:clean(descriptionNode),actions:{play,channel:authorLink,shuffle:find(/shuffle|перемешать/iu),share:find(/share|поделиться/iu),menu:find(/actions|menu|действия|ещё|еще|^more$|^[⋯⋮…]$/iu)}};
         }
         readRow(row,index){
             const play=row.querySelector('a#video-title,a#video-title-link,h3 a[href],a[href*="/watch?"]'),authorLink=channel(row);
@@ -102,6 +115,12 @@
                 for(const part of row.children)if(part!==state.card.host&&!state.parts.has(part)){part.setAttribute('data-myt-playlist-native-row-part','');state.parts.add(part);}
                 state.card.update(this.readRow(row,index++));
             }
+        }
+        share(card){
+            this.stopMenu();this.restoreAnchors();
+            const target=new URL('/playlist',location.origin),list=new URL(location.href).searchParams.get('list');
+            if(list)target.searchParams.set('list',list);
+            card.q('.share-link').value=target.href;card.q('.share-status').textContent='';card.q('.share-sheet').showPopover();
         }
         activate(source,control,anchor){
             if(anchor&&source instanceof HTMLElement&&typeof source.showPopover==='function'){

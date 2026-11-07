@@ -96,6 +96,17 @@ async function main() {
     assert(!("richThumbnail" in items[0].videoRenderer));
     assert.equal(items[1].playlistRenderer.playlistId, "keep-search-playlist");
 
+    const headed = parse({contents:{twoColumnSearchResultsRenderer:{contents:[
+        {sectionHeaderRenderer:{title:{simpleText:'Shorts'}}},
+        {sectionHeaderViewModel:{title:{content:'Shorts'}}},
+        {sectionHeaderRenderer:{title:{runs:[{text:'Videos'}]}}},
+        {videoRenderer:{videoId:'keep-title',title:{simpleText:'Shorts'}}},
+    ]}}});
+    const headedItems=headed.contents.twoColumnSearchResultsRenderer.contents;
+    assert.equal(headedItems.length,2);
+    assert.equal(headedItems[0].sectionHeaderRenderer.title.runs[0].text,'Videos');
+    assert.equal(headedItems[1].videoRenderer.videoId,'keep-title');
+
     const next = await new Response({ onResponseReceivedActions: [
         { appendContinuationItemsAction: { targetId: "watch-next-feed", continuationItems: [{ compactVideoRenderer: {} }] } },
         { appendContinuationItemsAction: { targetId: "comments-section", continuationItems: [{ commentThreadRenderer: { text: "Keep comment" } }] } },

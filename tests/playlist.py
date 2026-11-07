@@ -51,8 +51,7 @@ def check(browser, legacy, width, dark):
         owned=row_node.locator('[data-myt-owned-playlist-card=video]')
         thumb=owned.locator('a.cover').bounding_box();title=owned.locator('.meta').bounding_box()
         assert thumb['x']+thumb['width']<=title['x'],(thumb,title)
-    summary.get_by_role('button',name='Play all',exact=True).click()
-    assert page.evaluate('__play')
+    expect(summary.get_by_role('link',name='Play all',exact=True)).to_have_attribute('href','https://www.youtube.com/watch?v=video0&list=PLfixture')
     summary.get_by_role('button',name='Shuffle',exact=True).click()
     assert page.evaluate('__shuffle')
     summary.get_by_role('button',name='Playlist actions').click()
@@ -110,8 +109,7 @@ def mixed_markup(browser, width=1440, modern_rows=False):
     previous=-1
     for card in cards.all():
         rect=card.bounding_box();assert rect['y']>previous;previous=rect['y']
-    summary.get_by_role('button',name='Play all',exact=True).click()
-    assert page.evaluate('__play')
+    expect(summary.get_by_role('link',name='Play all',exact=True)).to_have_attribute('href','https://www.youtube.com/watch?v=video0&list=PLfixture')
     cards.first.locator('a.title').click()
     assert 'v=video0' in page.evaluate('__visit')
     # Native menu commands use an invisible top-layer anchor at the owned button.
@@ -226,6 +224,30 @@ def menu_position(browser,width,dark):
     print(f'PASS playlist author removal and anchored native menus: width={width}, dark={dark}',flush=True)
 
 
+def playback_and_share(browser):
+    # The native action buttons can exist without working command handlers.
+    html=body().replace('onclick="window.__play=true"','').replace('<div id="action-buttons">','<a href="/watch?list=PLfixture">Play playlist</a><div id="action-buttons">')
+    page=setup(browser,'/playlist?list=PLfixture',html,native_dark=True)
+    summary=page.locator('#myt-playlist-summary')
+    page.evaluate('Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:async text=>{window.__copied=text;}}})')
+    summary.get_by_role('button',name='Share',exact=True).click()
+    dialog=summary.get_by_role('dialog',name='Share playlist')
+    expect(dialog).to_be_visible()
+    expect(dialog.get_by_role('textbox',name='Playlist link')).to_have_value('https://www.youtube.com/playlist?list=PLfixture')
+    dialog.get_by_role('button',name='Copy link').click()
+    page.wait_for_function('__copied==="https://www.youtube.com/playlist?list=PLfixture"')
+    expect(dialog.get_by_role('status')).to_have_text('Link copied')
+    dialog.get_by_role('button',name='Close share dialog').click()
+    expect(dialog).to_be_hidden()
+    summary.get_by_role('button',name='Share',exact=True).click()
+    expect(dialog).to_be_visible();page.keyboard.press('Escape');expect(dialog).to_be_hidden()
+    play=summary.get_by_role('link',name='Play all',exact=True)
+    expect(play).to_have_attribute('href','https://www.youtube.com/watch?v=video0&list=PLfixture')
+    play.click();page.wait_for_url('**/watch?v=video0&list=PLfixture')
+    page.close()
+    print('PASS playlist Play all navigates with list context and Share copies its URL without native command handlers',flush=True)
+
+
 def main():
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -241,6 +263,7 @@ def main():
         for width in [1440,390]:
             for dark in [True,False]:
                 menu_position(browser,width,dark)
+        playback_and_share(browser)
         empty=body().replace('<ytd-playlist-video-list-renderer>','<ytd-playlist-video-list-renderer hidden>')
         empty=empty.replace('</ytd-playlist-video-list-renderer>','</ytd-playlist-video-list-renderer><ytd-message-renderer id="empty-playlist">No videos yet</ytd-message-renderer>')
         page=setup(browser,'/playlist?list=empty',empty,native_dark=True)

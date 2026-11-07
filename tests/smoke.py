@@ -108,6 +108,7 @@ def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, nati
     if watch_ui:
         page.add_script_tag(path=str(ROOT / "src/content/watch.js"))
     page.add_script_tag(path=str(ROOT / "src/content/playlist.js"))
+    page.add_script_tag(path=str(ROOT / "src/content/search.js"))
     page.add_script_tag(path=str(ROOT / "src/content/content.js"))
     return page
 
@@ -158,7 +159,7 @@ def setup_at_document_start(browser, path, enabled=True, defer_settings=False):
     page = browser.new_page(viewport={"width": 1440, "height": 960})
     page.errors = []
     page.on("pageerror", lambda error: page.errors.append(str(error)))
-    code = (ROOT / "src/content/watch.js").read_text() + "\n" + (ROOT / "src/content/playlist.js").read_text() + "\n" + (ROOT / "src/content/content.js").read_text()
+    code = (ROOT / "src/content/watch.js").read_text() + "\n" + (ROOT / "src/content/playlist.js").read_text() + "\n" + (ROOT / "src/content/search.js").read_text() + "\n" + (ROOT / "src/content/content.js").read_text()
     initial = json.dumps({"enabled": enabled})
     script = f"({MOCK})({initial});\n"
     if defer_settings:
@@ -561,11 +562,7 @@ def check_search_channels_and_row_gaps(browser, width):
     fixture += '</div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>'
     page = setup(browser,'/results?search_query=channels',fixture,width=width)
     a,b,c = [page.locator('#channel-'+str(i)).bounding_box() for i in range(3)]
-    if width > 600:
-        assert abs(a['y']-b['y'])<1 and b['x']>a['x']+a['width'], (a,b)
-        assert abs(c['y']-a['y']-a['height']-16)<1, (a,c)
-    else:
-        assert b['y']>=a['y']+a['height']+15, (a,b)
+    assert abs(a['x']-b['x'])<1 and b['y']>=a['y']+a['height']+15,(a,b)
     video_columns = 3 if width > 1000 else 2 if width > 600 else 1
     first = page.locator('#video-0').bounding_box()
     next_row = page.locator('#video-'+str(video_columns)).bounding_box()
@@ -642,7 +639,7 @@ def check_channel_first_within_sections(browser):
     v1=page.locator('#video-order-1').bounding_box();v2=page.locator('#video-order-2').bounding_box()
     last=page.locator('#channel-order-3').bounding_box()
     assert first['y']<c1['y'], (first,c1)
-    assert abs(c1['y']-c2['y'])<1, (c1,c2)
+    assert c2['y']>=c1['y']+c1['height']+15, (c1,c2)
     assert v1['y']>=max(c1['y']+c1['height'],c2['y']+c2['height'])+15, (c1,c2,v1)
     assert abs(v1['y']-v2['y'])<1, (v1,v2)
     assert last['y']>v1['y']+v1['height'], (last,v1)
@@ -3056,13 +3053,14 @@ def main():
 
         channel_bounds = page.locator('#channel-result').bounding_box()
         row_width = page.locator('ytd-item-section-renderer > #contents').bounding_box()['width']
-        assert abs(channel_bounds['width'] - (row_width - 24)/2) < 1
-        for selector in ["#playlist-result", "#continuation"]:
+        assert abs(channel_bounds['width'] - (left['width']*2+24)) < 1
+        for selector in ["#continuation"]:
             expect(page.locator(selector)).to_be_visible()
             bounds = page.locator(selector).bounding_box()
             assert bounds["width"] > left["width"] * 2.9, (selector, bounds, left)
         expect(page.locator("#channel-result a")).to_have_attribute("href", "/@channel")
-        expect(page.locator("#playlist-result a")).to_have_attribute("href", "/playlist?list=fixture")
+        expect(page.locator("#playlist-result [data-myt-search-playlist-card] a.title")).to_have_attribute("href", "https://www.youtube.com/playlist?list=fixture")
+        assert abs(page.locator("#playlist-result").bounding_box()["width"]-(left["width"]*2+24))<2
         expect(page.locator("#modern-video[data-myt-search-video]")).to_have_count(1)
         modern_bounds = page.locator("#modern-video").bounding_box()
         assert abs(modern_bounds["width"] - left["width"]) < 2, (modern_bounds, left)
@@ -3070,7 +3068,7 @@ def main():
         expect(page.locator("#result-5 #description-text")).to_be_hidden()
         dynamic = page.locator("#result-5").bounding_box()
         assert abs(dynamic["width"] - left["width"]) < 2, (dynamic, left)
-        ok("mixed search channels use half rows, playlists/continuation retain full width and dynamic/modern video cards use the grid")
+        ok("mixed search channels/playlists use two video columns; continuations retain full width and dynamic video cards use the grid")
         page.close()
 
         def modern_result(identifier, href, avatar=False, playlist=False):
@@ -3101,16 +3099,16 @@ def main():
         shelf_row = [page.locator(f'#result-{number}').bounding_box() for number in [21,22,23]]
         assert max(box['y'] for box in shelf_row) - min(box['y'] for box in shelf_row) < 2, shelf_row
         assert page.locator('#real-playlist[data-myt-search-video]').count() == 0
-        assert abs(page.locator('#real-playlist').bounding_box()['width'] - row_width) < 2
+        assert abs(page.locator('#real-playlist').bounding_box()['width'] - (expected_width*2+24)) < 2
         assert abs(page.locator('#new-continuation').bounding_box()['width'] - row_width) < 2
-        ok('list-context, avatar-first, wrapped and shelved videos stay in three columns while real playlists keep full width')
+        ok('list-context, avatar-first, wrapped and shelved videos stay in three columns while real playlists span two video columns')
 
         page.locator('ytd-item-section-renderer > #contents').evaluate("(element, card) => element.insertAdjacentHTML('beforeend', '<div id=late-wrapper style=width:1100px>' + card + '</div>')", modern_result('late-video', '/watch?v=late&list=PLcontext'))
         expect(page.locator('#late-wrapper[data-myt-search-cell]')).to_have_count(1)
         assert abs(page.locator('#late-video').bounding_box()['width'] - expected_width) < 2
         page.locator('#avatar-first').evaluate("element => { element.setAttribute('content-type','playlist'); element.querySelector('h3 a').href = '/playlist?list=recycled'; }")
         expect(page.locator('#avatar-first[data-myt-search-video]')).to_have_count(0)
-        assert abs(page.locator('#avatar-first').bounding_box()['width'] - row_width) < 2
+        assert abs(page.locator('#avatar-first').bounding_box()['width'] - (expected_width*2+24)) < 2
         page.evaluate('__setEnabled(false)')
         assert page.locator('[data-myt-search-video], [data-myt-search-cell], [data-myt-search-grid]').count() == 0
         assert page.locator('#single-wrapper').get_attribute('style') == 'width:1100px'
