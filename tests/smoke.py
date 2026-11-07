@@ -911,7 +911,8 @@ def check_native_watch(browser, theater=False, width=1440):
     assert page.locator('video').evaluate('v=>v.paused') is True
     page.locator('#native-play').click()
     page.wait_for_function('document.querySelector("video").currentTime>.2')
-    expect(page.locator('.owner-name')).to_have_text('REVOLT3.33M subscribers')
+    expect(page.locator('.owner-name')).to_have_text('REVOLT')
+    expect(page.locator('.owner small')).to_have_text('3.33M subscribers')
     expect(page.locator('.owner img')).to_be_visible()
     page.wait_for_function("document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.owner img').naturalWidth===48")
     assert 'invalid-badge' not in page.locator('.owner img').get_attribute('src')
@@ -1417,7 +1418,9 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
         open_watch_item(page,'Comments')
         expect(page.locator('#reply-draft')).to_have_value('Keep this native reply')
         open_watch_item(page,'Comments')
-        page.locator('.owner button').click()
+        subscription=page.locator('.channel-subscribe')
+        box=subscription.bounding_box()
+        subscription.click(position={'x':box['width']-9,'y':box['height']-9})
         assert page.evaluate('window.__subscribe') is True
         expect(page.locator('.actions > button').filter(has_text='Share')).to_have_count(0)
         expect(page.locator('.more-popup')).to_be_hidden()
@@ -1506,6 +1509,121 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
     expect(page.locator('#myt-watch,[data-myt-watch-island]')).to_have_count(0)
     page.close()
 
+
+
+def check_subscription_card(browser, dark, width, modern=False):
+    avatar='data:image/svg+xml;base64,'+base64.b64encode(b'<svg xmlns="http://www.w3.org/2000/svg" width="46" height="46"><rect width="46" height="46" rx="23" fill="#ef493c"/></svg>').decode()
+    renderer='yt-subscribe-button-view-model' if modern else 'ytd-subscribe-button-renderer'
+    state=' aria-pressed="true"' if modern else ''
+    owner=f'''<div id="owner"><a id="avatar" href="/@revolt"><img src="{avatar}"></a><ytd-channel-name><a href="/@revolt">REVOLT</a></ytd-channel-name><span id="subscriber-count">3.33M subscribers</span><{renderer} id="subscribe-button"><button id="native-subscribe"{state}>{'Subscribed' if modern else 'Subscribe'}</button></{renderer}></div>'''
+    body=watch_details_fixture().replace('<div id="description" class=',owner+'<div id="description" class=',1)+'<ytd-popup-container></ytd-popup-container>'
+    page=setup(browser,'/watch?v=details',body,native_dark=dark,width=width,language='ru')
+    page.evaluate('''() => {
+      window.__subscribeCalls=0;window.__channelVisits=0;
+      for(const a of document.querySelectorAll('#owner a'))a.onclick=e=>{e.preventDefault();window.__channelVisits++;};
+      window.__setSubscribed=value=>{
+        const source=document.querySelector('#native-subscribe');
+        if(source.hasAttribute('aria-pressed'))source.setAttribute('aria-pressed',String(value));
+        else source.parentElement.toggleAttribute('subscribed',value);
+        source.textContent=value?'Subscribed':'Subscribe';
+      };
+      document.querySelector('#native-subscribe').onclick=()=>{
+        window.__subscribeCalls++;
+        const source=document.querySelector('#native-subscribe'),popups=document.querySelector('ytd-popup-container');
+        const subscribed=source.getAttribute('aria-pressed')==='true'||source.parentElement.hasAttribute('subscribed');
+        if(window.__signInRequired){popups.innerHTML='<div role="dialog" id="sign-in-dialog">Sign in to subscribe<button id="confirm-button" onclick="window.__wrongConfirm=true">Sign in</button></div>';return;}
+        if(subscribed&&window.__useUnsubMenu){
+          setTimeout(()=>{
+            popups.innerHTML='<ytd-menu-service-item-renderer role="menuitem">Unsubscribe</ytd-menu-service-item-renderer>';
+            popups.firstElementChild.onclick=()=>{
+              window.__unsubscribeMenu=true;
+              popups.innerHTML='<yt-confirm-dialog-renderer role="dialog"><div id="confirm-button"><button>Unsubscribe</button></div></yt-confirm-dialog-renderer>';
+              popups.querySelector('button').onclick=()=>{window.__unsubscribeConfirm=true;window.__setSubscribed(false);popups.replaceChildren();};
+            };
+          },0);
+        }else window.__setSubscribed(!subscribed);
+      };
+    }''')
+    card=page.locator('.channel-card');button=page.locator('.channel-subscribe')
+
+    def click_background():
+        box=button.bounding_box()
+        button.click(position={'x':box['width']-9,'y':box['height']-9})
+
+    expect(button).to_have_attribute('aria-pressed',str(modern).lower())
+    expect(card.locator('.stats')).to_have_text('906,359 views · Mar 8, 2025')
+    expect(page.locator('#watch-chapters h2')).to_have_count(0)
+    expect(page.locator('#watch-chapters')).to_have_attribute('aria-label','Эпизоды')
+    assert card.evaluate('e=>getComputedStyle(e).backgroundColor')!=page.locator('.viewport').evaluate('e=>getComputedStyle(e).backgroundColor')
+    page.evaluate('__setSubscribed(false)')
+    expect(button).to_have_attribute('aria-pressed','false')
+    card.scroll_into_view_if_needed()
+    page.mouse.move(0,0)
+    original_color=card.evaluate('e=>getComputedStyle(e).backgroundColor')
+    box=card.bounding_box()
+    card.click(position={'x':box['width']-9,'y':box['height']-9})
+    expect(button).to_have_attribute('aria-pressed','true')
+    expect(button).to_be_enabled()
+    page.mouse.move(0,0)
+    assert card.evaluate('e=>getComputedStyle(e).backgroundColor')!=original_color
+    assert page.evaluate('__subscribeCalls')==1
+    for selector in ['.owner-name','.owner img']:
+        page.locator(selector).click()
+    assert page.evaluate('__channelVisits')==2 and page.evaluate('__subscribeCalls')==1
+    button.focus();button.press('Enter')
+    expect(button).to_have_attribute('aria-pressed','false')
+    expect(button).to_be_focused()
+    page.mouse.move(0,0)
+    assert card.evaluate('e=>getComputedStyle(e).backgroundColor')==original_color
+    if not dark and width==390:card.screenshot(path='/tmp/yt-min-channel-card-light.png')
+    button.press('Space')
+    expect(button).to_have_attribute('aria-pressed','true')
+    if dark and width==1440:card.screenshot(path='/tmp/yt-min-channel-card-subscribed.png')
+    page.evaluate('window.__useUnsubMenu=true')
+    click_background()
+    expect(button).to_have_attribute('aria-pressed','false')
+    assert page.evaluate('__unsubscribeMenu&&__unsubscribeConfirm')
+    assert page.evaluate('__subscribeCalls')==4
+    # An attribute-only native update must also change the card.
+    if modern:page.locator('#native-subscribe').evaluate('e=>e.setAttribute("aria-pressed","true")')
+    else:page.locator('#subscribe-button').evaluate('e=>e.setAttribute("subscribed","")')
+    expect(button).to_have_attribute('aria-pressed','true')
+    page.evaluate('__setSubscribed(false);window.__signInRequired=true')
+    expect(button).to_have_attribute('aria-pressed','false')
+    page.clock.install()
+    click_background()
+    expect(button).to_have_attribute('aria-busy','true')
+    expect(card).to_have_attribute('data-subscribed','false')
+    expect(page.locator('#sign-in-dialog')).to_be_visible()
+    assert page.evaluate('!window.__wrongConfirm')
+    page.clock.fast_forward(6100)
+    expect(button).to_have_attribute('aria-busy','false')
+    expect(button).to_have_attribute('aria-pressed','false')
+    page.locator('#native-subscribe').evaluate('e=>e.disabled=true')
+    expect(button).to_be_disabled()
+    assert page.locator('.viewport').evaluate('e=>e.scrollWidth<=e.clientWidth')
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('#myt-watch')).to_have_count(0)
+    page.close()
+
+
+def check_chapter_sources(browser):
+    page=setup(browser,'/watch?v=details',watch_details_fixture())
+    page.locator('ytd-watch-flexy').evaluate('''e=>{
+      const copies=document.createElement('div');copies.id='chapter-copies';
+      for(const [time,title,video] of [['2:40:00','Outro','details'],['0:00','Duplicate introduction','details'],['2:45','Duplicate story','details'],['4:00','Next chapter','details'],['0:05','Different video','old-video']])copies.insertAdjacentHTML('beforeend',`<ytd-macro-markers-list-item-renderer><a href="/watch?v=${video}"><span id=time>${time}</span><h3 id=title>${title}</h3></a></ytd-macro-markers-list-item-renderer>`);
+      e.prepend(copies);
+    }''')
+    expect(page.locator('.chapter')).to_have_count(4)
+    assert page.locator('.chapter').evaluate_all('nodes=>nodes.map(e=>e.dataset.seconds)')==['0','165','240','9600']
+    expect(page.locator('.chapter-title').first).to_have_text('Introduction')
+    expect(page.locator('.chapter-title').last).to_have_text('Outro')
+    page.locator('video').evaluate('e=>{e.currentTime=9600;e.dispatchEvent(new Event("timeupdate"));}')
+    expect(page.locator('.chapter[aria-current=true]')).to_have_attribute('data-seconds','9600')
+    page.locator('#chapter-copies').evaluate('e=>e.append(e.firstElementChild.cloneNode(true))')
+    expect(page.locator('.chapter')).to_have_count(4)
+    assert page.locator('.chapter').evaluate_all('nodes=>nodes.map(e=>e.dataset.seconds)')==['0','165','240','9600']
+    page.close()
 
 
 def check_chapter_follow(browser, width):
@@ -2127,6 +2245,12 @@ def main():
         ok('only visible enabled native ad skip controls are clicked, with consecutive-ad/off support and unchanged media volume/rate/identity')
         check_native_home_fallback(browser)
         ok('native and SPA home stay usable when local extension files are unavailable; settings and search still work without a blind redirect')
+        check_chapter_sources(browser)
+        ok('description and engagement-panel chapters are deduplicated by time, sorted and restricted to the current video')
+        for dark in [False,True]:
+            for width in [1440,390]:
+                check_subscription_card(browser,dark,width,modern=dark)
+                ok(f'channel card at {width}px (dark={dark}) groups metadata, toggles actual native subscriptions and preserves channel links, keyboard use, confirmation and signed-out state')
         for width in [1440,390]:
             check_chapter_follow(browser,width)
             ok(f'chapter rail at {width}px follows playback and forward/backward seeks without moving the page or resetting manual browsing on every clock tick')
