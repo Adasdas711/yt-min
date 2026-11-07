@@ -1336,7 +1336,7 @@ def check_playlist_layout(browser, theater=False, width=1440):
     media,details,playlist,header=[bounds[key] for key in ['media','details','playlist','header']]
     if width>900:
         assert abs(playlist['right']-bounds['width'])<1,bounds
-        assert abs(details['x']+details['width']/2-playlist['x']/2)<1,bounds
+        assert abs(details['x']+details['width']/2-(playlist['x']/2 if theater else bounds['width']/2))<1,bounds
         if theater:
             assert media['x']==0 and media['width']==bounds['width'],bounds
             assert abs(media['y']-header['bottom'])<1,bounds
@@ -1406,9 +1406,82 @@ def check_playlist_layout(browser, theater=False, width=1440):
     expect(page.locator('.sidecar')).to_be_hidden()
     expect(page.locator('main')).not_to_have_class('has-sidecar')
     expect(page.locator('#playlist')).to_be_hidden()
+    # Legacy hidden panels may have no native expand control in their header.
+    page.locator('.playlist-toggle').click()
+    expect(page.locator('.sidecar')).to_be_visible()
+    assert page.evaluate('document.querySelector("video")===__nativeVideo&&!document.querySelector("video").paused')
     page.evaluate('__setEnabled(false)')
     expect(page.locator('[data-myt-watch-island]')).to_have_count(0)
     assert page.locator('#playlist').evaluate("e=>!e.hasAttribute('popover')&&e.parentElement.id==='secondary-inner'")
+    page.evaluate('clearInterval(__frames);__stream.getTracks().forEach(track=>track.stop())')
+    page.close()
+
+
+def check_collapsed_playlist(browser,theater=False,width=1440,state='collapsed'):
+    body=native_watch_fixture(theater).replace('<div id="secondary-inner"></div>','<div id="secondary-inner">'+playlist_panel_fixture()+'</div>')
+    page=setup(browser,'/watch?v=native&list=fixture',body,native_dark=True,width=width,language='ru')
+    page.evaluate(VIDEO_STREAM)
+    page.evaluate('''state=>{
+      const panel=document.querySelector('#playlist'),items=panel.querySelector('#items'),button=panel.querySelector('#header button');
+      window.__originalPlaylist=panel;window.__playlistToggleCalls=0;window.__playlistState=state;
+      button.id='expand-collapse-button';button.setAttribute('aria-label','Hide playlist');
+      button.onclick=()=>{
+        window.__playlistToggleCalls++;
+        const collapsed=state==='collapsed'?panel.hasAttribute('collapsed'):state==='class'?panel.classList.contains('is-collapsed'):panel.hidden;
+        if(state==='collapsed'){panel.toggleAttribute('collapsed',!collapsed);items.hidden=!collapsed;}
+        else if(state==='class'){panel.classList.toggle('is-collapsed',!collapsed);items.style.display=collapsed?'block':'none';}
+        else panel.hidden=!collapsed;
+        button.setAttribute('aria-label',collapsed?'Hide playlist':'Open playlist');
+      };
+    }''',state)
+    expect(page.locator('.sidecar')).to_be_visible()
+    expect(page.locator('.playlist-toggle')).to_be_hidden()
+    page.locator('#playlist #header button').click()
+    expect(page.locator('.sidecar')).to_be_hidden()
+    expect(page.locator('main')).not_to_have_class('has-sidecar')
+    opener=page.locator('.playlist-toggle')
+    expect(opener).to_be_visible();expect(opener).to_have_text('Открыть плейлист')
+    expect(opener).to_have_attribute('aria-expanded','false')
+    page.wait_for_function('''() => {
+      const root=document.querySelector('#myt-watch').firstElementChild.shadowRoot,view=root.querySelector('.viewport'),info=root.querySelector('.details').getBoundingClientRect(),media=root.querySelector('.media').getBoundingClientRect();
+      return Math.abs(info.left*2+info.width-view.clientWidth)<1&&Math.abs(media.left*2+media.width-view.clientWidth)<1;
+    }''')
+    # Collapsed playlists keep the same compact action location in both modes.
+    page.locator('ytd-watch-flexy').evaluate('e=>e.toggleAttribute("theater")')
+    expect(opener).to_be_visible();expect(page.locator('.sidecar')).to_be_hidden()
+    page.wait_for_function('''() => {
+      const root=document.querySelector('#myt-watch').firstElementChild.shadowRoot,b=root.querySelector('.details').getBoundingClientRect();return Math.abs(b.left*2+b.width-root.querySelector('.viewport').clientWidth)<1;
+    }''')
+    opener.scroll_into_view_if_needed()
+    actions=page.locator('.actions').bounding_box();info=page.locator('.details').bounding_box();box=opener.bounding_box()
+    assert box['x']>=info['x'] and box['x']+box['width']<=info['x']+info['width']+1,(box,info)
+    assert abs(box['y']-actions['y'])<1,(box,actions)
+    if width>900:
+        more=page.locator('.more-toggle').bounding_box()
+        assert box['x']+box['width']<=more['x']+1,(box,more)
+        page.locator('.meta-row').screenshot(path='/tmp/yt-min-collapsed-playlist-action.png')
+    assert_stable(page)
+    opener.click()
+    expect(page.locator('.sidecar')).to_be_visible();expect(opener).to_be_hidden()
+    assert page.evaluate('__playlistToggleCalls')==2
+    assert page.evaluate('document.querySelector("#playlist")===__originalPlaylist&&document.querySelector("video")===__nativeVideo&&document.querySelector("video").parentElement===__nativeVideoParent&&!document.querySelector("video").paused')
+    # Reopening again continues using the same native state and media.
+    page.locator('.viewport').evaluate('''e=>{const panel=e.getRootNode().querySelector('.sidecar');e.scrollTop+=panel.getBoundingClientRect().top-100;}''')
+    page.wait_for_function('''() => Math.abs(document.querySelector('#playlist').getBoundingClientRect().y-document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.sidecar').getBoundingClientRect().y)<1''')
+    page.locator('#playlist #header button').click()
+    expect(opener).to_be_visible();expect(page.locator('.sidecar')).to_be_hidden()
+    opener.focus();opener.press('Enter')
+    expect(page.locator('.sidecar')).to_be_visible()
+    assert page.evaluate('__playlistToggleCalls')==4
+    page.locator('.viewport').evaluate('''e=>{const panel=e.getRootNode().querySelector('.sidecar');e.scrollTop+=panel.getBoundingClientRect().top-100;}''')
+    page.wait_for_function('''() => Math.abs(document.querySelector('#playlist').getBoundingClientRect().y-document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.sidecar').getBoundingClientRect().y)<1''')
+    page.locator('#playlist #header button').click()
+    expect(opener).to_be_visible()
+    navigate_spa(page,'/watch?v=other-video')
+    expect(opener).to_be_hidden()
+    expect(page.locator('.sidecar')).to_be_hidden()
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('#myt-watch')).to_have_count(0)
     page.evaluate('clearInterval(__frames);__stream.getTracks().forEach(track=>track.stop())')
     page.close()
 
@@ -2618,6 +2691,12 @@ def main():
         for width,height in [(1440,480),(390,360)]:
             check_theater_edges(browser,width,height)
             ok(f'theater at {width}px is edge-to-edge at native aspect ratio, with no top gap, rounded corners or playlist side gutter')
+        for state in ['collapsed','class','hidden']:
+            for theater in [False,True]:
+                check_collapsed_playlist(browser,theater,1440,state)
+                ok(f'collapsed playlist ({state}, theater={theater}) restores centered layout and reopens through its native control from the action row')
+        check_collapsed_playlist(browser,False,390)
+        ok('collapsed playlist action remains usable on a narrow viewport')
         for width in [1440,390]:
             check_description_link_styles(browser,width)
             ok(f'description links at {width}px use bold text and a decorative chain symbol, keep native navigation/timestamps and have no copy buttons')
