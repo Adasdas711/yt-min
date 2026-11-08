@@ -90,6 +90,7 @@ MOCK = """(initial) => {
 def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, native_dark=False, language="en", watch_ui=True, prune_data=False, runtime_id=None):
     page = browser.new_page(viewport={"width": width, "height": 960}, reduced_motion="reduce")
     if prune_data:
+        page.add_init_script(path=str(ROOT / "src/content/search-data.js"))
         page.add_init_script(path=str(ROOT / "src/content/data-pruning.js"))
     page.route("https://www.youtube.com/**", lambda route: route.fulfill(
         status=200, content_type="text/html", body=document(body)))
@@ -108,6 +109,7 @@ def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, nati
     if watch_ui:
         page.add_script_tag(path=str(ROOT / "src/content/watch.js"))
     page.add_script_tag(path=str(ROOT / "src/content/playlist.js"))
+    page.add_script_tag(path=str(ROOT / "src/content/search-data.js"))
     page.add_script_tag(path=str(ROOT / "src/content/search.js"))
     page.add_script_tag(path=str(ROOT / "src/content/content.js"))
     return page
@@ -397,7 +399,7 @@ def check_navigation_style_retention(browser):
       document.dispatchEvent(new Event('yt-navigate-finish'));
     }""")
     expect(page.locator('html')).not_to_have_attribute('data-myt-previous-page')
-    expect(page.locator('ytd-search [data-myt-search-video]')).to_have_count(1)
+    expect(page.locator('#myt-search .media[data-kind="video"]')).to_have_count(1)
     page.evaluate("document.dispatchEvent(new CustomEvent('yt-navigate-start',{detail:{url:'/@creator'}})); document.dispatchEvent(new Event('yt-navigate-cancel'))")
     expect(page.locator('html')).to_have_attribute('data-myt-page','search')
     expect(page.locator('html')).not_to_have_attribute('data-myt-previous-page')
@@ -604,7 +606,8 @@ def check_full_width_background_scroll(browser):
         <div id="independent-scroll" style="width:240px;height:120px;overflow:auto"><div style="height:1000px">Nested scrolling</div></div>
       </div><div id="empty-left" style="position:fixed;left:0;top:80px;width:200px;height:80vh"></div><div id="empty-right" style="position:fixed;right:0;top:80px;width:200px;height:80vh"></div>
       </ytd-search></ytd-page-manager></ytd-app>'''
-    page=setup(browser,'/results?search_query=scroll',fixture,width=2016)
+    fixture=fixture.replace('ytd-search','ytd-browse').replace('<ytd-browse style=','<ytd-browse page-subtype="channels" style=')
+    page=setup(browser,'/@creator/videos',fixture,width=2016)
     page.evaluate("document.documentElement.style.overflow='hidden'; for (const id of ['empty-left','empty-right']) document.getElementById(id).addEventListener('wheel',event=>event.preventDefault(),{passive:false})")
     for x in [26,1990]:
         page.evaluate('window.scrollTo(0,0)')
@@ -3024,172 +3027,10 @@ def main():
         ok("390px watch page stacks playlist below responsive native player without overflow")
         page.close()
 
-        def result_card(number):
-            return f'''<ytd-video-renderer id="result-{number}"><div id="dismissible">
-              <ytd-thumbnail id="thumbnail"><a href="/watch?v=result{number}" aria-label="Preview {number}"><div style="aspect-ratio:16/9;background:#333"></div></a><ytd-thumbnail-overlay-time-status-renderer>10:00</ytd-thumbnail-overlay-time-status-renderer></ytd-thumbnail>
-              <div id="details" class="text-wrapper"><div id="meta"><h3><a id="video-title" href="/watch?v=result{number}">Video title {number}</a></h3>
-              <div id="metadata-line">100 views · yesterday</div></div>
-              <div id="channel-info"><ytd-channel-name><a href="/@creator{number}">Channel {number}</a></ytd-channel-name></div>
-              <div id="description-text">Long video description</div><div class="metadata-snippet-container">Snippet</div>
-              <ytd-badge-supported-renderer>Badge</ytd-badge-supported-renderer></div></div></ytd-video-renderer>'''
-
-        search_header = watch.split('<ytd-page-manager')[0]
-        modern = '''<yt-lockup-view-model id="modern-video"><div class="ytLockupViewModelHost"><a href="/watch?v=modern"><div style="aspect-ratio:16/9;background:#333">Modern preview</div></a>
-          <div class="ytLockupMetadataViewModelHost"><h3><a href="/watch?v=modern">Modern video</a></h3><a href="/@modern">Modern channel</a></div></div></yt-lockup-view-model>'''
-        search = search_header + '''<ytd-page-manager class="ytd-app"><ytd-search><div id="container">
-          <ytd-section-list-renderer><div id="contents"><ytd-item-section-renderer><div id="contents">''' + result_card(1) + result_card(2) + result_card(3) + '''
-          <ytd-channel-renderer id="channel-result"><a href="/@channel">Channel result</a></ytd-channel-renderer>
-          <ytd-playlist-renderer id="playlist-result"><a href="/playlist?list=fixture">Playlist result</a></ytd-playlist-renderer>
-          ''' + modern + result_card(4) + '''<ytd-continuation-item-renderer id="continuation">Load more</ytd-continuation-item-renderer>
-          </div></ytd-item-section-renderer></div></ytd-section-list-renderer>
-          </div></ytd-search></ytd-page-manager></ytd-app>'''
-        page = setup(browser, "/results?search_query=fixture", search)
-        expect(page.locator("html")).to_have_attribute("data-myt-page", "search")
-        left = page.locator("#result-1").bounding_box()
-        right = page.locator("#result-2").bounding_box()
-        assert (round(left["x"]),round(left["y"])) != (round(right["x"]),round(right["y"])), (left,right)
-        assert abs(left["width"] - right["width"]) < 2, (left, right)
-        third = page.locator("#result-3").bounding_box()
-        assert (round(third["x"]),round(third["y"])) not in {(round(left["x"]),round(left["y"])),(round(right["x"]),round(right["y"]))}, (left,right,third)
-        assert abs(third["width"] - left["width"]) < 2
-        for selector in ["#result-1 #thumbnail", "#result-1 #video-title", "#result-1 ytd-channel-name"]:
-            expect(page.locator(selector)).to_be_visible()
-        for selector in ["#result-1 #metadata-line", "#result-1 #description-text", "#result-1 .metadata-snippet-container", "#result-1 ytd-badge-supported-renderer"]:
-            expect(page.locator(selector)).to_be_hidden()
-        thumbnail = page.locator("#result-1 #thumbnail").bounding_box()
-        title = page.locator("#result-1 #video-title").bounding_box()
-        assert title["y"] >= thumbnail["y"] + thumbnail["height"], (thumbnail, title)
-        for selector in ["#logo", "#search"]:
-            expect(page.locator(selector)).to_be_visible()
-        for selector in ["#create", "#avatar-btn", "#voice-search-button"]:
-            expect(page.locator(selector)).to_be_hidden()
-        centered_header(page)
-        ok("desktop search uses three equal preview-top cards with title/channel and a centered logo/search header")
-
-        channel_bounds = page.locator('#channel-result').bounding_box()
-        row_width = page.locator('[data-myt-search-flow]').first.bounding_box()['width']
-        assert abs(channel_bounds['width'] - (left['width']*1.5+12)) < 1
-        for selector in ["#continuation"]:
-            expect(page.locator(selector)).to_be_visible()
-            bounds = page.locator(selector).bounding_box()
-            assert bounds["width"] > left["width"] * 2.9, (selector, bounds, left)
-        expect(page.locator("#channel-result > a")).to_have_attribute("href", "/@channel")
-        expect(page.locator("#channel-result [data-myt-search-channel-card] .name")).to_have_attribute("href", "https://www.youtube.com/@channel")
-        expect(page.locator("#playlist-result [data-myt-search-playlist-card] a.title")).to_have_attribute("href", "https://www.youtube.com/playlist?list=fixture")
-        assert abs(page.locator("#playlist-result").bounding_box()["width"]-(left["width"]*2+24))<2
-        expect(page.locator("#modern-video[data-myt-search-video]")).to_have_count(1)
-        modern_bounds = page.locator("#modern-video").bounding_box()
-        assert abs(modern_bounds["width"] - left["width"]) < 2, (modern_bounds, left)
-        page.locator("ytd-item-section-renderer > #contents").evaluate("(element, card) => element.insertAdjacentHTML('beforeend', card)", result_card(5))
-        expect(page.locator("#result-5 #description-text")).to_be_hidden()
-        dynamic = page.locator("#result-5").bounding_box()
-        assert abs(dynamic["width"] - left["width"]) < 2, (dynamic, left)
-        ok("mixed search channels/playlists use two video columns; continuations retain full width and dynamic video cards use the grid")
-        page.close()
-
-        def modern_result(identifier, href, avatar=False, playlist=False):
-            identity = 'content-type="playlist"' if playlist else ''
-            avatar_link = '<a id="avatar" href="/@creator">Avatar</a>' if avatar else ''
-            return f'''<yt-lockup-view-model id="{identifier}" {identity}><div class="ytLockupViewModelHost">
-              {avatar_link}<a class="ytLockupViewModelContentImage" href="{href}"><div style="aspect-ratio:16/9;background:#333">Preview</div></a>
-              <div class="ytLockupMetadataViewModelHost"><h3><a href="{href}">Video {identifier}</a></h3><a href="/@creator">Channel</a></div>
-              </div></yt-lockup-view-model>'''
-
-        regressions = (modern_result('list-video', '/watch?v=ordinary&list=PLcontext') +
-            modern_result('avatar-first', '/watch?v=avatar', avatar=True) +
-            '<div id="single-wrapper" style="width:1100px">' + modern_result('wrapped-video', '/watch?v=wrapped') + '</div>' +
-            '<ytd-shelf-renderer id="video-shelf"><div id="content"><div id="shelf-items">' +
-            result_card(21) + result_card(22) + result_card(23) + '</div></div></ytd-shelf-renderer>' +
-            modern_result('real-playlist', '/watch?v=first&list=PLcollection', playlist=True) +
-            '<ytd-continuation-item-renderer id="new-continuation">Load more</ytd-continuation-item-renderer>')
-        regression_search = search_header + '<ytd-page-manager class="ytd-app"><ytd-search><div id="container"><ytd-section-list-renderer><div id="contents"><ytd-item-section-renderer><div id="contents">' + regressions + '</div></ytd-item-section-renderer></div></ytd-section-list-renderer></div></ytd-search></ytd-page-manager></ytd-app>'
-        page = setup(browser, '/results?search_query=regression', regression_search)
-        row_width = page.locator('[data-myt-search-flow]').first.bounding_box()['width']
-        expected_width = (row_width - 48) / 3
-        for selector in ['#list-video', '#avatar-first', '#wrapped-video', '#single-wrapper', '#result-21', '#result-22', '#result-23']:
-            expect(page.locator(selector + '[data-myt-search-cell]')).to_have_count(1)
-            box = page.locator(selector).bounding_box()
-            assert abs(box['width'] - expected_width) < 2, (selector, box, expected_width)
-        first_row = [page.locator(selector).bounding_box() for selector in ['#list-video', '#avatar-first', '#single-wrapper']]
-        assert max(box['y'] for box in first_row) - min(box['y'] for box in first_row) < 2, first_row
-        shelf_row = [page.locator(f'#result-{number}').bounding_box() for number in [21,22,23]]
-        assert max(box['y'] for box in shelf_row) - min(box['y'] for box in shelf_row) < 2, shelf_row
-        assert page.locator('#real-playlist[data-myt-search-video]').count() == 0
-        assert abs(page.locator('#real-playlist').bounding_box()['width'] - (expected_width*2+24)) < 2
-        assert abs(page.locator('#new-continuation').bounding_box()['width'] - row_width) < 2
-        ok('list-context, avatar-first, wrapped and shelved videos stay in three columns while real playlists span two video columns')
-
-        page.locator('ytd-item-section-renderer > #contents').evaluate("(element, card) => element.insertAdjacentHTML('beforeend', '<div id=late-wrapper style=width:1100px>' + card + '</div>')", modern_result('late-video', '/watch?v=late&list=PLcontext'))
-        expect(page.locator('#late-wrapper[data-myt-search-cell]')).to_have_count(1)
-        assert abs(page.locator('#late-video').bounding_box()['width'] - expected_width) < 2
-        page.locator('#avatar-first').evaluate("element => { element.setAttribute('content-type','playlist'); element.querySelector('h3 a').href = '/playlist?list=recycled'; }")
-        expect(page.locator('#avatar-first[data-myt-search-video]')).to_have_count(0)
-        assert abs(page.locator('#avatar-first').bounding_box()['width'] - (expected_width*2+24)) < 2
-        page.evaluate('__setEnabled(false)')
-        assert page.locator('[data-myt-search-video], [data-myt-search-cell], [data-myt-search-grid]').count() == 0
-        assert page.locator('#single-wrapper').get_attribute('style') == 'width:1100px'
-        ok('dynamic search wrappers get compact cells, recycled playlists restore width and disabling removes all layout markers')
-        page.close()
-
-        for title, renderer in [('Новые видео на канале MrBeast', 'ytd-shelf-renderer'), ('Latest from MrBeast', 'grid-shelf-view-model')]:
-            check_latest_search_shelf(browser, title, renderer)
-            ok(f'{renderer} hides the entire latest-uploads shelf, handles dynamic/reused shelves, preserves channel/ordinary results and restores on disable or route change')
-
-        page = setup(browser, "/results?search_query=fixture", search, width=900)
-        first = page.locator("#result-1").bounding_box()
-        second = page.locator("#result-2").bounding_box()
-        third = page.locator("#result-3").bounding_box()
-        assert abs(first["y"] - second["y"]) < 2 and second["x"] > first["x"] + first["width"]
-        assert third["y"] >= first["y"] + first["height"] and abs(third["x"] - first["x"]) < 2, (first, second, third)
-        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
-        ok("900px search reduces the video grid to two columns without overflow")
-        page.close()
-
-        page = setup(browser, "/results?search_query=fixture", search, width=390)
-        first = page.locator("#result-1").bounding_box()
-        second = page.locator("#result-2").bounding_box()
-        assert abs(first["x"] - second["x"]) < 2 and second["y"] >= first["y"] + first["height"], (first, second)
-        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), "Search results overflow mobile width"
-        expect(page.locator("#result-1 #video-title")).to_be_visible()
-        expect(page.locator("#result-1 ytd-channel-name")).to_be_visible()
-        ok("390px search stacks video cards in one column without overflow")
-        page.close()
-
-        for dark in [True, False]:
-            page = setup(browser, '/results?search_query=surfaces', search, native_dark=dark)
-            page.emulate_media(reduced_motion='reduce')
-            for selector in ['#result-1', '#modern-video']:
-                assert_card_surface(page, selector)
-            assert_card_surface(page, '#channel-result .channel-card', channel=True)
-            for selector in ['#playlist-result', '#continuation']:
-                assert page.locator(selector).evaluate("element => getComputedStyle(element).backgroundColor") == 'rgba(0, 0, 0, 0)', selector
-            page.set_viewport_size({'width':390, 'height':960})
-            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-            expect(page.locator('#result-1 #video-title')).to_be_visible()
-            page.evaluate('__setEnabled(false)')
-            assert page.locator('#result-1').evaluate("element => getComputedStyle(element).backgroundColor") == 'rgba(0, 0, 0, 0)'
-            ok(f"{'dark' if dark else 'light'} search video cards have gray rounded surfaces that brighten on hover/focus without painting playlists or breaking mobile width")
-            page.close()
-
-            channel_cards = '''<ytd-app><ytd-page-manager class="ytd-app"><ytd-browse page-subtype="channels"><div id="contents">
-              <ytd-rich-grid-renderer style="display:grid;grid-template-columns:repeat(var(--ytd-rich-grid-items-per-row),minmax(0,1fr));gap:28px">
-                <ytd-rich-item-renderer id="rich-surface"><yt-lockup-view-model id="nested-lockup"><a href="/watch?v=rich"><div style="height:120px">Preview</div></a><h3><a href="/watch?v=rich">Rich video</a></h3></yt-lockup-view-model></ytd-rich-item-renderer>
-              </ytd-rich-grid-renderer>
-              <ytd-grid-renderer style="display:block"><div id="items"><ytd-grid-video-renderer id="grid-surface" style="display:block"><a href="/watch?v=grid"><div style="height:120px">Preview</div></a><h3><a href="/watch?v=grid">Grid video</a></h3></ytd-grid-video-renderer></div></ytd-grid-renderer>
-              <div style="width:380px;max-width:100%"><yt-lockup-view-model id="standalone-surface"><a href="/watch?v=standalone"><div style="height:120px">Preview</div></a><h3><a href="/watch?v=standalone">Standalone video</a></h3></yt-lockup-view-model></div>
-              <ytd-rich-item-renderer id="channel-playlist"><yt-collection-thumbnail-view-model>Playlist cover</yt-collection-thumbnail-view-model><a href="/watch?v=first&list=PLfixture">Playlist</a></ytd-rich-item-renderer>
-            </div></ytd-browse></ytd-page-manager></ytd-app>'''
-            page = setup(browser, '/@creator/videos', channel_cards, native_dark=dark)
-            page.emulate_media(reduced_motion='reduce')
-            for selector in ['#rich-surface', '#grid-surface', '#standalone-surface']:
-                assert_card_surface(page, selector)
-            assert page.locator('#nested-lockup').evaluate("element => getComputedStyle(element).backgroundColor") == 'rgba(0, 0, 0, 0)'
-            assert page.locator('#nested-lockup').evaluate("element => parseFloat(getComputedStyle(element).paddingLeft)") == 0
-            assert page.locator('#channel-playlist').evaluate("element => getComputedStyle(element).backgroundColor") == 'rgba(0, 0, 0, 0)'
-            page.set_viewport_size({'width':390, 'height':960})
-            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-            ok(f"{'dark' if dark else 'light'} channel rich/grid/modern video cards brighten on hover/focus with one padded surface and no mobile overflow")
-            page.close()
+        from search import check as check_owned_search
+        for width in [1440,900,390]:
+            check_owned_search(browser,width,True)
+            ok(f'owned search at {width}px extracts minimal cards, puts channels first and preserves ordered rows, filters and pagination')
 
         for width in [1440, 390]:
             check_home_settings(browser,width)
@@ -3197,9 +3038,6 @@ def main():
         check_settings_failures(browser)
         ok('settings show cookie permission failures and restore theme after failed storage writes')
 
-        for width in [1440, 900, 390]:
-            check_search_channels_and_row_gaps(browser,width)
-            ok(f'search at {width}px keeps wide channel cards, fills video slots and preserves native channel controls')
         for width in [1440,390]:
             check_header_alignment_and_anonymous_icons(browser,width)
             ok(f'header at {width}px aligns logo/field/text centers and hides unnamed focus magnifiers while preserving keyboard/clear/Enter')
@@ -3209,13 +3047,6 @@ def main():
 
         check_full_width_background_scroll(browser)
         ok('left and right empty areas inside a full-width renderer scroll the document even when native wheel is blocked; nested scrolling and disabled mode stay native')
-
-        check_channel_first_within_sections(browser)
-        ok('mixed result blocks keep channels prominent and fill remaining grid slots without moving native nodes')
-
-        for dark in [False,True]:
-            check_native_hover_surface(browser,dark)
-            ok(f'{"dark" if dark else "light"} video/channel surfaces remain opaque during native preview hover and keyboard focus, restoring native styles on disable')
 
         for dark in [False,True]:
             check_channel_hover_surface(browser,dark)

@@ -46,8 +46,8 @@ def fixture(layout):
 
 def check_geometry(page):
     metrics = page.evaluate('''() => {
-      const shadow=document.querySelector('[data-myt-search-channel-card]').shadowRoot;
-      const rect=selector=>{const b=(selector==='ytd-channel-renderer'?document.querySelector(selector):shadow.querySelector(selector)).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height,right:b.right,bottom:b.bottom};};
+      const shadow=document.querySelector('#myt-search').shadowRoot.querySelector('[data-myt-search-channel-card]').shadowRoot;
+      const rect=selector=>{const b=shadow.querySelector(selector==='ytd-channel-renderer'?'.surface':selector).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height,right:b.right,bottom:b.bottom};};
       return {card:rect('ytd-channel-renderer'),avatar:rect('.avatar img'),title:rect('.name'),stats:rect('.metadata'),button:rect('.subscribe'),bio:!!shadow.querySelector('.description'),overflow:document.documentElement.scrollWidth>innerWidth};
     }''')
     avatar, button, card = (metrics[key] for key in ['avatar', 'button', 'card'])
@@ -81,8 +81,8 @@ def check(browser, layout, dark):
             page.screenshot(path=f'/tmp/yt-min-channel-overlap-before-{layout}-{width}.png')
             raise
         # The native card still occupies 1.5 ordinary video columns on desktop.
-        regular = page.locator('#video-1').bounding_box()
-        expected = regular['width'] * 1.5 + 12 if width > 1000 else regular['width'] * 2 + 24 if width > 600 else regular['width']
+        regular = page.locator('#myt-search').bounding_box()
+        expected = (regular['width']-20)/2 if width > 700 else regular['width']
         assert abs(metrics['card']['width'] - expected) < 1, metrics
         avatar = page.locator('[data-myt-search-channel-card] .avatar img')
         assert avatar.evaluate('''image=>{

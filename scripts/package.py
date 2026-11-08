@@ -11,7 +11,7 @@ files += sorted((ROOT / 'src').rglob('*'))
 files += [ROOT / path for path in manifest['icons'].values()]
 files = sorted({path for path in files if path.is_file()})
 for content_script in manifest['content_scripts']:
-    for path in content_script['js'] + content_script['css']:
+    for path in content_script.get('js', []) + content_script.get('css', []):
         assert ROOT / path in files, f'Missing content script: {path}'
 assert ROOT / manifest['action']['default_popup'] in files, 'Missing popup'
 assert ROOT / manifest['background']['service_worker'] in files, 'Missing background worker'

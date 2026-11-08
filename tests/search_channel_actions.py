@@ -9,7 +9,7 @@ def restamps(browser):
     page=setup(browser,'/results?search_query=mrbeast',fixture('nested'),native_dark=True)
     card=page.locator('[data-myt-search-channel-card]');control=card.locator('.subscribe')
     page.evaluate('''()=>{
-      window.__ownButton=document.querySelector('[data-myt-search-channel-card]').shadowRoot.querySelector('.subscribe');
+      window.__ownButton=document.querySelector('#myt-search').shadowRoot.querySelector('[data-myt-search-channel-card]').shadowRoot.querySelector('.subscribe');
       const native=document.querySelector('#native-subscribe');native.style.borderColor='pink';
       window.__originalStyle=native.getAttribute('style');
       native.onclick=()=>{
@@ -31,7 +31,7 @@ def restamps(browser):
         page.locator('ytd-channel-renderer').evaluate('(node,html)=>node.innerHTML=html',html)
         expect(card.locator('.name')).to_have_text(f'UpdatedCreator{index}')
         expect(card.locator('.metadata')).to_contain_text('600M subscribers')
-        assert page.evaluate('document.querySelector("[data-myt-search-channel-card]").shadowRoot.querySelector(".subscribe")===__ownButton')
+        assert page.evaluate('document.querySelector("#myt-search").shadowRoot.querySelector("[data-myt-search-channel-card]").shadowRoot.querySelector(".subscribe")===__ownButton')
         check_geometry(page)
     control.click(position={'x':12,'y':12});expect(control).to_have_attribute('aria-pressed','true')
     assert page.evaluate('__subscribed===1')
@@ -58,7 +58,7 @@ def cached_photo(browser,width):
     ]}}}''',photo)
     card=page.locator('[data-myt-search-channel-card]');image=card.locator('.avatar img')
     expect(image).to_have_attribute('src',photo);expect(image).to_be_visible()
-    page.wait_for_function('document.querySelector("[data-myt-search-channel-card]").shadowRoot.querySelector("img").naturalWidth===160')
+    page.wait_for_function('document.querySelector("#myt-search").shadowRoot.querySelector("[data-myt-search-channel-card]").shadowRoot.querySelector("img").naturalWidth===160')
     expect(card.locator('.avatar')).to_have_attribute('href','https://www.youtube.com/@MrBeast')
     expect(card.locator('.name')).to_have_attribute('href','https://www.youtube.com/@MrBeast')
     expect(card.locator('.description')).to_have_count(0)

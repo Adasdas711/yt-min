@@ -12,6 +12,13 @@
     },
     "content_scripts": [
         {
+            "js": ["src/content/search-data.js"],
+            "world": "MAIN",
+            "run_at": "document_start",
+            "matches": ["https://*.youtube.com/*"],
+            "exclude_matches": ["https://music.youtube.com/*"]
+        },
+        {
             "css": [
                 "src/styles/styles.css"
             ],
@@ -19,6 +26,7 @@
                 "src/content/ads.js",
                 "src/content/watch.js",
                 "src/content/playlist.js",
+                "src/content/search-data.js",
                 "src/content/search.js",
                 "src/content/content.js"
             ],

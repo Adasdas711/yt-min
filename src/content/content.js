@@ -144,7 +144,6 @@
     let commentsOpen = false;
     let commentsButton = null;
     const voteElements = new Set();
-    const searchVideoCards = new Set();
     const hiddenSections = new Set();
     let watchView = null;
     let watchBootSource = null;
@@ -672,8 +671,7 @@
                         const heading = shelf.querySelector("#title-container, #header, :scope > #title, :scope > h2, yt-section-header-view-model, .ytShelfHeaderLayoutTitle");
                         const titleNode = heading?.querySelector("#title, h2, h3, .ytSectionHeaderViewModelTitle") || heading;
                         const title = titleNode?.textContent.replace(/\s+/g, " ").trim() || "";
-                        const match = page === "search" ?
-                            /^(?:новые видео на канале|последние видео (?:на канале|от)|latest(?: videos)? from|new videos from)\s+/iu :
+                        const match = page === "search" ? /$a/ :
                             /^(?:new uploads|новые (?:видео|загрузки)|последние (?:видео|загрузки))(?=$|\s)/iu;
                         if (match.test(title)) wanted.add(shelf);
                     }
@@ -692,110 +690,9 @@
         }
     }
 
-    function syncSearch(scope = document) {
-        const attributes = ["data-myt-search-video", "data-myt-search-cell", "data-myt-search-grid", "data-myt-search-channel", "data-myt-search-channel-cell", "data-myt-search-video-start", "data-myt-search-playlist", "data-myt-search-playlist-cell", "data-myt-search-result-start"];
-        const active = enabled && (root.dataset.mytPage === "search" || root.dataset.mytPreviousPage === "search");
-        for (const element of searchVideoCards) {
-            if (!active || !element.isConnected || !element.closest("ytd-search")) {
-                for (const name of attributes) element.removeAttribute(name);
-                searchVideoCards.delete(element);
-            }
-        }
-        if (!active) {searchView?.destroy();searchView=null;return;}
-        const searches = new Set([
-            ...(scope instanceof Element && scope.closest("ytd-search") ? [scope.closest("ytd-search")] : []),
-            ...scope.querySelectorAll("ytd-search"),
-        ]);
-        const videoSelector = "ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer, yt-lockup-view-model";
-        const playlistSelector = globalThis.MinimalYouTubeSearch?.playlistSelector || "ytd-playlist-renderer,ytd-grid-playlist-renderer";
-        const otherResults = "ytd-channel-renderer, ytd-playlist-renderer, ytd-grid-playlist-renderer, ytd-radio-renderer, ytd-movie-renderer";
-        const shelves = "ytd-shelf-renderer, grid-shelf-view-model, ytd-rich-section-renderer, yt-horizontal-list-renderer";
-        const listContainers = "ytd-item-section-renderer > #contents, ytd-shelf-renderer > #content, ytd-horizontal-card-list-renderer > #items, grid-shelf-view-model #items, yt-horizontal-list-renderer #items, ytd-rich-grid-renderer > #contents";
-        const urlOf = anchor => {
-            try { return anchor && new URL(anchor.href, pageLocation()); }
-            catch { return null; }
-        };
-        const isVideoURL = url => url && url.protocol === "https:" &&
-            (url.hostname === "youtube.com" || url.hostname.endsWith(".youtube.com")) &&
-            url.pathname === "/watch" && Boolean(url.searchParams.get("v"));
-        const isVideo = card => {
-            if (card.closest(nativeShorts) || card.closest(otherResults) || card.matches("[is-playlist], [content-type='playlist'], [data-content-type='playlist']") ||
-                card.querySelector("yt-collection-thumbnail-view-model, yt-collections-stack, yt-collection-thumbnail-overlay-view-model, ytd-thumbnail-overlay-side-panel-renderer, .ytCollectionThumbnailViewModelHost")) return false;
-            // A channel avatar can precede the main thumbnail in current lockups.
-            // The title or thumbnail identifies the result; incidental links do not.
-            const title = card.querySelector("a#video-title[href], a#video-title-link[href], h3 a[href], a.yt-lockup-metadata-view-model__title[href], a.yt-lockup-metadata-view-model-wiz__title[href], a.ytLockupMetadataViewModelTitle[href]");
-            const thumbnail = card.querySelector("ytd-thumbnail a[href], a#thumbnail[href], .yt-lockup-view-model__content-image a[href], .yt-lockup-view-model-wiz__content-image a[href], .ytLockupViewModelContentImage a[href], a:has(yt-thumbnail-view-model)[href]");
-            const main = title || thumbnail;
-            if (main) return isVideoURL(urlOf(main));
-            return [...card.querySelectorAll("a[href]")].some(anchor =>
-                !anchor.closest("ytd-channel-name, #channel-info, #avatar, .yt-lockup-metadata-view-model__image, .yt-lockup-metadata-view-model-wiz__image, .ytLockupMetadataViewModelImage") && isVideoURL(urlOf(anchor)));
-        };
-        for (const search of searches) {
-            const wanted = new Map();
-            const mark = (element, name) => {
-                if (!wanted.has(element)) wanted.set(element, new Set());
-                wanted.get(element).add(name);
-            };
-            const videos = [...search.querySelectorAll(videoSelector)].filter(isVideo).filter(card =>
-                !card.parentElement.closest(videoSelector) && !card.closest("[data-myt-hidden-section]"));
-            const channels = [...search.querySelectorAll("ytd-channel-renderer")].filter(card => !card.closest("[data-myt-hidden-section]"));
-            const playlists = [...search.querySelectorAll(playlistSelector)].filter(card => globalThis.MinimalYouTubeSearch?.isPlaylist(card) && !card.parentElement.closest(playlistSelector) && !card.closest("[data-myt-hidden-section],[data-myt-hidden]"));
-            const cells = [...videos, ...channels, ...playlists];
-            const channelSet=new Set(channels),playlistSet=new Set(playlists),descendantKind=new Map();
-            const descendantCounts = new Map();
-            for (const card of cells) {
-                const kind=channelSet.has(card)?'channel':playlistSet.has(card)?'playlist':'video';
-                if (kind==='channel') {
-                    mark(card, "data-myt-search-channel");
-                    mark(card, "data-myt-search-channel-cell");
-                } else if (kind==='playlist') {
-                    mark(card, "data-myt-search-playlist");mark(card,"data-myt-search-playlist-cell");
-                } else {
-                    mark(card, "data-myt-search-video");
-                    mark(card, "data-myt-search-cell");
-                }
-                for (let parent = card.parentElement; parent && parent !== search; parent = parent.parentElement) {
-                    if(!descendantCounts.has(parent))descendantKind.set(parent,kind);
-                    descendantCounts.set(parent, (descendantCounts.get(parent) || 0) + 1);
-                }
-            }
-            for (const container of search.querySelectorAll(listContainers)) {
-                if (descendantCounts.has(container)) mark(container, "data-myt-search-grid");
-            }
-            const wrappers = new Set();
-            for (const card of cells) {
-                // Keep native nodes in place. A single-video wrapper is a cell;
-                // a wrapper containing several videos gets its own nested grid.
-                for (let parent = card.parentElement; parent && parent !== search; parent = parent.parentElement) {
-                    if (parent.matches("ytd-item-section-renderer > #contents")) break;
-                    if (parent.matches(`${videoSelector}, ${otherResults}, ytd-shelf-renderer, grid-shelf-view-model, ytd-rich-section-renderer, ytd-item-section-renderer, ytd-section-list-renderer`)) continue;
-                    wrappers.add(parent);
-                }
-            }
-            for (const parent of wrappers) {
-                const count = descendantCounts.get(parent);
-                const structuralList = parent.matches(`${listContainers}, yt-horizontal-list-renderer`);
-                if(structuralList||count>1){mark(parent,'data-myt-search-grid');continue;}
-                const mixed = parent.matches(otherResults) || parent.querySelector(`${otherResults}, ${shelves}`);
-                if (count === 1 && descendantKind.get(parent)==='channel' && !parent.querySelector(shelves)) mark(parent, "data-myt-search-channel-cell");
-                else if (count === 1 && descendantKind.get(parent)==='playlist' && !parent.querySelector(shelves)) mark(parent,"data-myt-search-playlist-cell");
-                else if (mixed) mark(parent, "data-myt-search-grid");
-                else if (count === 1) mark(parent, "data-myt-search-cell");
-            }
-            for (const element of searchVideoCards) {
-                if (!search.contains(element)) continue;
-                for (const name of attributes) {
-                    if (!wanted.get(element)?.has(name)) element.removeAttribute(name);
-                }
-                if (!wanted.has(element)) searchVideoCards.delete(element);
-            }
-            for (const [element, names] of wanted) {
-                for (const name of names) {
-                    if (!element.hasAttribute(name)) element.setAttribute(name, "");
-                }
-                searchVideoCards.add(element);
-            }
-        }
+    function syncSearch() {
+        const active=enabled&&(root.dataset.mytPage==='search'||root.dataset.mytPreviousPage==='search');
+        if(!active){searchView?.destroy();searchView=null;return;}
         if(globalThis.MinimalYouTubeSearch){searchView ||= new globalThis.MinimalYouTubeSearch();searchView.sync(document.querySelectorAll('ytd-search'));}
     }
 
@@ -1417,12 +1314,13 @@
             if (record.type === "attributes" && record.attributeName === "title" && !target.closest(filterScope)) return false;
             if (target.closest("title")) { cleanTitle(); return false; }
             if (stableHome) return record.target === root && record.attributeName === "dark";
-            if (target.closest("#myt-watch, #myt-home, #myt-playlist-summary, [data-myt-search-channel-card]")) return false;
+            if (target.closest("#myt-watch, #myt-home, #myt-search, #myt-playlist-summary, [data-myt-search-channel-card]")) return false;
             if(record.type==='childList'){
                 const changes=[...record.addedNodes,...record.removedNodes];
                 if(changes.length&&changes.every(node=>node instanceof Element&&node.matches('#myt-watch,#myt-home,#myt-playlist-summary,[data-myt-search-playlist-card],[data-myt-search-channel-card],.myt-masthead-brand'))&&(!changes.some(node=>node.matches('.myt-masthead-brand'))||target.querySelectorAll(':scope > .myt-masthead-brand').length<=1))return false;
             }
             if(stableSearch){
+                if(target.closest('ytd-search'))return false;
                 const channel=target.closest('[data-myt-search-channel]');
                 if(channel&&searchView.channels.has(channel)&&target!==channel)return false;
                 const filterChange=target.closest(filterScope)||record.type==='childList'&&[...record.addedNodes].some(node=>node instanceof Element&&(node.matches(filterScope)||node.querySelector(filterScope)));
@@ -1628,9 +1526,9 @@
                 (element === document.scrollingElement && !/clip/.test(overflow));
         };
         const page = root.dataset.mytPage;
-        if (page === "playlist" && playlistLayoutNodes.size && canScroll(document.scrollingElement)) {
-            // This layout scrolls the document. Do not search thousands of
-            // playlist descendants to rediscover its scrollport on every tick.
+        if ((page === "playlist" && playlistLayoutNodes.size || page === "search" && root.hasAttribute('data-myt-search-ui')) && canScroll(document.scrollingElement)) {
+            // Owned layouts scroll the document. Avoid searching all native
+            // source descendants to rediscover that scrollport on each tick.
             for (let node = target; node && node !== document.body && node !== root; node = node.parentElement) if (canScroll(node)) return;
             const unit = event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? innerHeight : event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 20 : 1;
             document.scrollingElement.scrollBy({ top: event.deltaY * unit, behavior: "instant" });

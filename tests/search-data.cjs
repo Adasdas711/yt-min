@@ -1,0 +1,13 @@
+"use strict";
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const context=vm.createContext({URL});vm.runInContext(fs.readFileSync('src/content/search-data.js','utf8'),context);
+const model=context.MinimalYouTubeSearchData,plain=value=>JSON.parse(JSON.stringify(value));
+const channel={channelId:'UCX6OQ3DkcsbYNE6H8uQQuVA',title:{simpleText:'MrBeast'},navigationEndpoint:{browseEndpoint:{canonicalBaseUrl:'/@MrBeast'}},avatar:{decoratedAvatarViewModel:{avatar:{avatarViewModel:{image:{sources:[{url:'https://yt3.googleusercontent.com/small',width:88},{url:'https://yt3.googleusercontent.com/large',width:176}]}}}}},descriptionSnippet:{simpleText:'Never copy this'},trackingParams:'Never copy this either'};
+const result=plain(model.record(channel,'channel'));
+assert.equal(result.image,'https://yt3.googleusercontent.com/large');assert.equal(result.href,'https://www.youtube.com/@MrBeast');assert.equal(result.title,'MrBeast');assert(!JSON.stringify(result).includes('Never copy'));
+const modern={lockupViewModel:{contentId:'abcdefghijk',contentType:'LOCKUP_CONTENT_TYPE_VIDEO',contentImage:{thumbnailViewModel:{image:{sources:[{url:'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg',width:480}]}}},metadata:{lockupMetadataViewModel:{title:{content:'Пользовательский заголовок'},metadata:{contentMetadataViewModel:{metadataRows:[{metadataParts:[{text:{content:'User channel',commandRuns:[{onTap:{innertubeCommand:{browseEndpoint:{canonicalBaseUrl:'/@creator'}}}}]}}]}]}}}}}};
+const video=plain(model.record(modern));assert.equal(video.title,'Пользовательский заголовок');assert.equal(video.kind,'video');assert.equal(video.href,'https://www.youtube.com/watch?v=abcdefghijk');assert.deepEqual(video.channel,{name:'User channel',href:'https://www.youtube.com/@creator'});
+const snapshot=model.collect({contents:[{channelRenderer:channel},modern,{searchFilterRenderer:{label:{simpleText:'Плейлист'},navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/results?search_query=x&sp=EgIQAw%3D%3D'}}}}}]});
+assert(snapshot.records.some(item=>item.kind==='channel'));assert.equal(snapshot.filters[0].label,'Плейлист');assert(snapshot.filters[0].href.includes('sp='));
+assert.equal(model.youtube('https://example.com/watch?v=x'),'');assert.equal(model.url('javascript:alert(1)'),'');assert.equal(model.channelURL('/watch?v=abcdefghijk'),'');
+console.log('PASS legacy and modern public search records, nested avatars, channel endpoints, native filters and unchanged user text');

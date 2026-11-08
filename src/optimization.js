@@ -75,7 +75,7 @@
                 id: scriptId,
                 matches: ["https://*.youtube.com/*"],
                 excludeMatches: ["https://music.youtube.com/*"],
-                js: ["src/content/data-pruning.js"],
+                js: ["src/content/search-data.js", "src/content/data-pruning.js"],
                 runAt: "document_start",
                 world: "MAIN",
                 allFrames: false,

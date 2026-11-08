@@ -711,7 +711,7 @@ html.minimal-youtube:is(:is([data-myt-page="search"], [data-myt-previous-page="s
 }
 
 /* Search: small native cards in three columns, without changing DOM order. */
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
     --myt-search-columns: 3;
     --myt-search-channel-span: 3;
     --myt-search-playlist-span: 4;
@@ -722,7 +722,7 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     padding: 28px 24px 48px;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search > #container {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search > #container {
     box-sizing: border-box;
     width: 100%;
     max-width: none;
@@ -730,15 +730,15 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     padding: 0;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-section-list-renderer,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-item-section-renderer {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-section-list-renderer,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-item-section-renderer {
     width: 100%;
     min-width: 0;
 }
 
 /* Videos use one column; channels and playlist cards use two. Continuations
    and native section wrappers remain full-width without reparenting nodes. */
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) {
     box-sizing: border-box;
     display: grid !important;
     grid-template-columns: repeat(calc(var(--myt-search-columns) * 2), minmax(0, 1fr));
@@ -752,15 +752,15 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     margin-inline: 0 !important;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) > * {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) > * {
     grid-column: 1 / -1;
     min-width: 0;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-cell],
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) > [data-myt-search-cell],
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) > :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer, yt-lockup-view-model[data-myt-search-video]),
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) > yt-lockup-view-model:has(:is(a#video-title, a#video-title-link, h3 a, .yt-lockup-view-model__content-image a, .yt-lockup-view-model-wiz__content-image a, .ytLockupViewModelContentImage a):is([href^="/watch?"], [href^="https://www.youtube.com/watch?"])):not([is-playlist]):not([content-type="playlist"]):not([data-content-type="playlist"]):not(:has(yt-collection-thumbnail-view-model, yt-collections-stack, yt-collection-thumbnail-overlay-view-model, ytd-thumbnail-overlay-side-panel-renderer, a[href^="/playlist?"])) {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-cell],
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) > [data-myt-search-cell],
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) > :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer, yt-lockup-view-model[data-myt-search-video]),
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) > yt-lockup-view-model:has(:is(a#video-title, a#video-title-link, h3 a, .yt-lockup-view-model__content-image a, .yt-lockup-view-model-wiz__content-image a, .ytLockupViewModelContentImage a):is([href^="/watch?"], [href^="https://www.youtube.com/watch?"])):not([is-playlist]):not([content-type="playlist"]):not([data-content-type="playlist"]):not(:has(yt-collection-thumbnail-view-model, yt-collections-stack, yt-collection-thumbnail-overlay-view-model, ytd-thumbnail-overlay-side-panel-renderer, a[href^="/playlist?"])) {
     box-sizing: border-box;
     display: block;
     grid-column: span 2;
@@ -771,12 +771,12 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
 }
 
 /* Intermediate native wrappers can carry fixed list widths of their own. */
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-cell]:not([data-myt-search-grid]) {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-cell]:not([data-myt-search-grid]) {
     display: block !important;
     padding-inline: 0;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #dismissible {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #dismissible {
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -784,7 +784,7 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     min-width: 0;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-thumbnail {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-thumbnail {
     flex: none;
     width: 100% !important;
     min-width: 0 !important;
@@ -795,12 +795,12 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     border-radius: 12px;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-thumbnail > a {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-thumbnail > a {
     width: 100%;
     height: 100%;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) :is(.text-wrapper, #details, #meta) {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) :is(.text-wrapper, #details, #meta) {
     box-sizing: border-box;
     flex: none;
     width: 100%;
@@ -810,7 +810,7 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     padding: 0;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #video-title {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #video-title {
     display: -webkit-box;
     overflow: hidden;
     -webkit-box-orient: vertical;
@@ -823,41 +823,41 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     line-height: 1.4;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #channel-info {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #channel-info {
     gap: 0;
     margin: 6px 0 0;
     padding: 0;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-channel-name {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-channel-name {
     color: var(--yt-spec-text-secondary, var(--myt-muted));
     font-size: 13px;
     line-height: 1.5;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer):has(#channel-info ytd-channel-name) ytd-video-meta-block,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #metadata-line,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #description-text,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) .metadata-snippet-container,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #channel-info yt-img-shadow,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #channel-info > a:has(yt-img-shadow),
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-badge-supported-renderer,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) .badge,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-menu-renderer,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-thumbnail #overlays,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-thumbnail-overlay-time-status-renderer,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-thumbnail-overlay-now-playing-renderer,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-thumbnail-overlay-bottom-panel-renderer,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-expandable-metadata-renderer,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #expandable-metadata,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) .metadata-snippet-text,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) yt-icon#inline-title-icon {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer):has(#channel-info ytd-channel-name) ytd-video-meta-block,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #metadata-line,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #description-text,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) .metadata-snippet-container,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #channel-info yt-img-shadow,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #channel-info > a:has(yt-img-shadow),
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-badge-supported-renderer,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) .badge,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-menu-renderer,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-thumbnail #overlays,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-thumbnail-overlay-time-status-renderer,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-thumbnail-overlay-now-playing-renderer,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-thumbnail-overlay-bottom-panel-renderer,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) ytd-expandable-metadata-renderer,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) #expandable-metadata,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) .metadata-snippet-text,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer) yt-icon#inline-title-icon {
     display: none !important;
 }
 
 /* The main thumbnail/title URL also provides a first-paint layout fallback. */
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search yt-lockup-view-model:has(:is(a#video-title, a#video-title-link, h3 a, .yt-lockup-view-model__content-image a, .yt-lockup-view-model-wiz__content-image a, .ytLockupViewModelContentImage a):is([href^="/watch?"], [href^="https://www.youtube.com/watch?"])):not(:has(yt-collection-thumbnail-view-model, yt-collections-stack, yt-collection-thumbnail-overlay-view-model, ytd-thumbnail-overlay-side-panel-renderer, a[href^="/playlist?"])),
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search yt-lockup-view-model:has(:is(a#video-title, a#video-title-link, h3 a, .yt-lockup-view-model__content-image a, .yt-lockup-view-model-wiz__content-image a, .ytLockupViewModelContentImage a):is([href^="/watch?"], [href^="https://www.youtube.com/watch?"])):not(:has(yt-collection-thumbnail-view-model, yt-collections-stack, yt-collection-thumbnail-overlay-view-model, ytd-thumbnail-overlay-side-panel-renderer, a[href^="/playlist?"])) > div {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search yt-lockup-view-model:has(:is(a#video-title, a#video-title-link, h3 a, .yt-lockup-view-model__content-image a, .yt-lockup-view-model-wiz__content-image a, .ytLockupViewModelContentImage a):is([href^="/watch?"], [href^="https://www.youtube.com/watch?"])):not(:has(yt-collection-thumbnail-view-model, yt-collections-stack, yt-collection-thumbnail-overlay-view-model, ytd-thumbnail-overlay-side-panel-renderer, a[href^="/playlist?"])),
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search yt-lockup-view-model:has(:is(a#video-title, a#video-title-link, h3 a, .yt-lockup-view-model__content-image a, .yt-lockup-view-model-wiz__content-image a, .ytLockupViewModelContentImage a):is([href^="/watch?"], [href^="https://www.youtube.com/watch?"])):not(:has(yt-collection-thumbnail-view-model, yt-collections-stack, yt-collection-thumbnail-overlay-view-model, ytd-thumbnail-overlay-side-panel-renderer, a[href^="/playlist?"])) > div {
     display: flex;
     flex-direction: column;
     width: 100%;
@@ -866,9 +866,9 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
 }
 
 /* Current YouTube lockups: change only positively identified /watch video cards. */
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video],
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] > :is(.yt-lockup-view-model, .yt-lockup-view-model-wiz, .ytLockupViewModelHost),
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] > div {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video],
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] > :is(.yt-lockup-view-model, .yt-lockup-view-model-wiz, .ytLockupViewModelHost),
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] > div {
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -877,7 +877,7 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     max-width: none;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(.yt-lockup-view-model__content-image, .yt-lockup-view-model-wiz__content-image, .ytLockupViewModelContentImage) {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(.yt-lockup-view-model__content-image, .yt-lockup-view-model-wiz__content-image, .ytLockupViewModelContentImage) {
     flex: none;
     width: 100% !important;
     max-width: none !important;
@@ -886,14 +886,14 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     border-radius: 12px;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(.yt-lockup-view-model__metadata, .yt-lockup-view-model-wiz__metadata, .ytLockupViewModelMetadata) {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(.yt-lockup-view-model__metadata, .yt-lockup-view-model-wiz__metadata, .ytLockupViewModelMetadata) {
     flex: none;
     width: 100%;
     min-width: 0;
     margin: 0;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(h3, .yt-lockup-metadata-view-model__title, .yt-lockup-metadata-view-model-wiz__title, .ytLockupMetadataViewModelTitle) {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(h3, .yt-lockup-metadata-view-model__title, .yt-lockup-metadata-view-model-wiz__title, .ytLockupMetadataViewModelTitle) {
     display: -webkit-box;
     overflow: hidden;
     -webkit-box-orient: vertical;
@@ -905,21 +905,21 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
     line-height: 1.4;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(.yt-content-metadata-view-model__metadata-row, .yt-content-metadata-view-model-wiz__metadata-row, .ytContentMetadataViewModelMetadataRow):first-child {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(.yt-content-metadata-view-model__metadata-row, .yt-content-metadata-view-model-wiz__metadata-row, .ytContentMetadataViewModelMetadataRow):first-child {
     margin-top: 5px;
     font-size: 13px;
     line-height: 1.5;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(.yt-content-metadata-view-model__metadata-row, .yt-content-metadata-view-model-wiz__metadata-row, .ytContentMetadataViewModelMetadataRow):not(:first-child),
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(.yt-lockup-metadata-view-model__image, .yt-lockup-metadata-view-model-wiz__image, .ytLockupMetadataViewModelImage),
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(.yt-lockup-metadata-view-model__menu-button, .yt-lockup-metadata-view-model-wiz__menu-button, .ytLockupMetadataViewModelMenuButton),
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(.yt-thumbnail-view-model__overlays, .yt-thumbnail-view-model-wiz__overlays, .ytThumbnailViewModelOverlays),
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] yt-thumbnail-overlay-badge-view-model,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] yt-thumbnail-bottom-overlay-view-model,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] yt-badge-shape,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] yt-description-preview-view-model,
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] yt-video-attribute-view-model {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(.yt-content-metadata-view-model__metadata-row, .yt-content-metadata-view-model-wiz__metadata-row, .ytContentMetadataViewModelMetadataRow):not(:first-child),
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(.yt-lockup-metadata-view-model__image, .yt-lockup-metadata-view-model-wiz__image, .ytLockupMetadataViewModelImage),
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(.yt-lockup-metadata-view-model__menu-button, .yt-lockup-metadata-view-model-wiz__menu-button, .ytLockupMetadataViewModelMenuButton),
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] :is(.yt-thumbnail-view-model__overlays, .yt-thumbnail-view-model-wiz__overlays, .ytThumbnailViewModelOverlays),
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] yt-thumbnail-overlay-badge-view-model,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] yt-thumbnail-bottom-overlay-view-model,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] yt-badge-shape,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] yt-description-preview-view-model,
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) yt-lockup-view-model[data-myt-search-video] yt-video-attribute-view-model {
     display: none !important;
 }
 
@@ -935,8 +935,8 @@ html.minimal-youtube[dark]:is(:is([data-myt-page="search"], [data-myt-previous-p
     --myt-card-hover-bg: #25252b;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer, yt-lockup-view-model)[data-myt-search-video][data-myt-search-cell],
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-channel-renderer[data-myt-search-channel],
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer, yt-lockup-view-model)[data-myt-search-video][data-myt-search-cell],
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-channel-renderer[data-myt-search-channel],
 html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-browse :is(
     ytd-rich-item-renderer:has(a[href*="/watch?"], ytd-rich-grid-media, ytd-video-renderer, ytd-grid-video-renderer):not(:has(ytd-rich-grid-playlist-renderer, yt-collection-thumbnail-view-model, yt-collections-stack, [content-type="playlist"], [is-playlist])),
     ytd-grid-video-renderer:not(ytd-rich-item-renderer *),
@@ -951,7 +951,7 @@ html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="chan
     transition: background-color var(--myt-card-transition-duration) ease;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is([data-myt-search-video], [data-myt-search-channel]):is(:hover, :focus-within),
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is([data-myt-search-video], [data-myt-search-channel]):is(:hover, :focus-within),
 html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-browse :is(ytd-rich-item-renderer, ytd-grid-video-renderer, yt-lockup-view-model):is(:hover, :focus-within) {
     --myt-card-bg: var(--myt-card-hover-bg);
 }
@@ -1030,7 +1030,7 @@ html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-sec
 }
 
 @media (max-width: 1000px) {
-    html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
+    html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
         --myt-search-columns: 2;
         --myt-search-channel-span: 4;
         --myt-search-playlist-span: 4;
@@ -1057,17 +1057,17 @@ html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-sec
         font-size: 20px;
     }
 
-    html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
+    html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
         padding: 20px 16px 32px;
     }
 
-    html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
+    html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search {
         --myt-search-columns: 1;
         --myt-search-channel-span: 2;
         --myt-search-playlist-span: 2;
     }
 
-    html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) {
+    html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]) {
         gap: 16px 24px;
     }
 
@@ -1169,15 +1169,15 @@ html.minimal-youtube ytd-masthead :is(#search-input, .ytSearchboxComponentInputB
 }
 
 /* Adjacent native result sections need the same spacing as rows within a grid. */
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-section-list-renderer > #contents {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-section-list-renderer > #contents {
     display: flex !important;
     flex-direction: column;
     gap: 16px;
 }
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-item-section-renderer {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-item-section-renderer {
     margin-block: 0 !important;
 }
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel-cell] {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel-cell] {
     grid-column: span var(--myt-search-channel-span) !important;
     width: 100% !important;
     min-width: 0 !important;
@@ -1185,7 +1185,7 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
 }
 /* Channel contents are rendered in a shadow root. Native rows remain in place
    for YouTube state/actions, but cannot contribute layout or paint. */
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-channel-renderer[data-myt-search-channel] {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-channel-renderer[data-myt-search-channel] {
     display: block !important;
     position: relative !important;
     box-sizing: border-box;
@@ -1226,40 +1226,40 @@ html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="chan
 }
 
 /* Reorder within each native result block; separate sections retain their order. */
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]):has(> [data-myt-search-channel-cell]):has([data-myt-search-video]) > [data-myt-search-channel-cell] {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer > #contents, [data-myt-search-grid]):has(> [data-myt-search-channel-cell]):has([data-myt-search-video]) > [data-myt-search-channel-cell] {
     order: -1;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-video-start] {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-video-start] {
     grid-column: 1 / span 2 !important;
 }
 
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-playlist-cell] {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-playlist-cell] {
     display: block; box-sizing: border-box; grid-column: span var(--myt-search-playlist-span) !important;
     align-self: stretch; width: 100% !important; min-width: 0 !important; max-width: none !important; margin: 0 !important;
 }
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-result-start] {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-result-start] {
     grid-column: 1 / span var(--myt-search-playlist-span) !important;
 }
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-playlist] {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-playlist] {
     display: block !important; height: 100% !important; min-width: 0 !important;
     margin: 0 !important; padding: 0 !important; background: transparent !important;
 }
 /* Ordinary native result sections share a grid. Their nodes and continuation
    controllers keep their original parents; only layout wrappers are flattened. */
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-section-list-renderer > #contents,[data-myt-search-flow])[data-myt-search-flow] {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-section-list-renderer > #contents,[data-myt-search-flow])[data-myt-search-flow] {
     display: grid !important; grid-template-columns: repeat(calc(var(--myt-search-columns) * 2),minmax(0,1fr));
     grid-auto-flow: row dense; align-items: start; gap: 16px 24px;
     justify-content: stretch !important; justify-items: stretch !important;
     box-sizing: border-box; width: 100% !important; max-width: none !important; margin-inline: 0 !important; padding-inline: 0 !important;
 }
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer,ytd-item-section-renderer > #contents,[data-myt-search-grid],ytd-shelf-renderer,grid-shelf-view-model,ytd-rich-section-renderer,[data-myt-search-flat])[data-myt-search-flat] {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is(ytd-item-section-renderer,ytd-item-section-renderer > #contents,[data-myt-search-grid],ytd-shelf-renderer,grid-shelf-view-model,ytd-rich-section-renderer,[data-myt-search-flat])[data-myt-search-flat] {
     display: contents !important;
 }
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-flow] > :not([data-myt-search-cell],[data-myt-search-playlist-cell],[data-myt-search-channel-cell]) {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-flow] > :not([data-myt-search-cell],[data-myt-search-playlist-cell],[data-myt-search-channel-cell]) {
     grid-column: 1 / -1;
 }
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-special] {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-special] {
     display: block !important; grid-column: 1 / -1 !important; box-sizing: border-box;
     width: 100% !important; min-width: 0 !important; margin: 0 !important; padding: 20px !important;
     border: 1px solid var(--myt-border); border-radius: 24px;
@@ -1285,21 +1285,21 @@ html.minimal-youtube [data-myt-search-heading-text] :is(span,a,yt-formatted-stri
     overflow-wrap: anywhere;
 }
 /* Native carousel offsets must never center or shift a partial search row. */
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is([data-myt-search-cell],[data-myt-search-channel-cell],[data-myt-search-playlist-cell]) {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is([data-myt-search-cell],[data-myt-search-channel-cell],[data-myt-search-playlist-cell]) {
     justify-self: stretch !important; translate: none !important; transform: none !important; float: none !important;
 }
 html.minimal-youtube [data-myt-search-special] > #contents > [data-myt-search-special-heading] { margin-bottom: 0 !important; }
 html.minimal-youtube [data-myt-search-balanced="2"] { --myt-search-columns: 2; }
 @media(max-width:600px) {
     html.minimal-youtube [data-myt-search-balanced="2"] { --myt-search-columns: 1; }
-    html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-special] { padding: 14px !important; border-radius: 20px; }
+    html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-special] { padding: 14px !important; border-radius: 20px; }
 }
 html.minimal-youtube [data-myt-search-playlist-source] {
     position: absolute !important; width: 0 !important; height: 0 !important; min-width: 0 !important; min-height: 0 !important;
     max-width: 0 !important; max-height: 0 !important; overflow: clip !important; visibility: hidden !important; pointer-events: none !important;
 }
 html.minimal-youtube [data-myt-search-playlist-source] * { visibility: hidden !important; pointer-events: none !important; }
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-search-sub-menu-renderer {
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-search-sub-menu-renderer {
     display: block; margin-bottom: 16px !important;
 }
 /* Avoid native collapse transitions getting stuck after repeated toggles. */
@@ -1309,13 +1309,36 @@ html.minimal-youtube [data-myt-search-filters="open"] {
 }
 html.minimal-youtube [data-myt-search-filters="closed"] { display: none !important; }
 /* Descriptions and transcript excerpts never belong in compact video cards. */
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-video] :is(
+html.minimal-youtube:not([data-myt-search-ui]):is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-video] :is(
     #description-text,#description,.description-text,.metadata-snippet-container,.metadata-snippet-text,
     ytd-expandable-metadata-renderer,#expandable-metadata,yt-description-preview-view-model,
     .yt-lockup-metadata-view-model__description,.yt-lockup-metadata-view-model-wiz__description,.ytLockupMetadataViewModelDescription,
     .yt-content-metadata-view-model__description,.ytContentMetadataViewModelDescription
 ) { display: none !important; }
 
+
+/* Search owns its complete visible stream. Native controllers and their
+   continuation paths retain their parents; only pagination has layout below it. */
+html.minimal-youtube[data-myt-search-ui] ytd-search {
+    display:block !important;position:relative !important;box-sizing:border-box !important;
+    width:100% !important;max-width:1280px !important;margin:0 auto !important;padding:28px 24px 48px !important;
+}
+html.minimal-youtube[data-myt-search-ui] #myt-search { margin:0 !important;padding:0 !important; }
+html.minimal-youtube[data-myt-search-ui] ytd-page-manager { margin-left:0 !important;margin-right:0 !important;width:100% !important;min-width:0 !important; }
+html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-native-root],
+html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-continuation-path] > :not([data-myt-search-continuation-path]) {
+    position:absolute !important;inset:0 auto auto 0 !important;width:0 !important;height:0 !important;
+    min-width:0 !important;min-height:0 !important;margin:0 !important;padding:0 !important;
+    overflow:hidden !important;visibility:hidden !important;opacity:0 !important;pointer-events:none !important;contain:strict !important;
+}
+html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-continuation-path] {
+    display:contents !important;position:static !important;width:auto !important;height:auto !important;
+    visibility:visible !important;opacity:1 !important;overflow:visible !important;contain:none !important;
+}
+html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-renderer[data-myt-search-continuation-path] {
+    display:block !important;height:2px !important;min-height:2px !important;pointer-events:none !important;
+}
+@media(max-width:600px){html.minimal-youtube[data-myt-search-ui] ytd-search{padding:20px 16px 40px !important;}}
 
 /* Own watch layout: only the Shadow DOM canvas paints the application. Native
    islands keep their original DOM parents and event handlers. */

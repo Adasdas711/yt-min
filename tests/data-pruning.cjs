@@ -197,7 +197,7 @@ async function main() {
     context.location.pathname = "/results";
     assert.equal(parse({ contents: { twoColumnSearchResultsRenderer: { contents: [
         { shelfRenderer: { title: { simpleText: "Latest from creator" } } },
-    ] } } }).contents.twoColumnSearchResultsRenderer.contents.length, 0);
+    ] } } }).contents.twoColumnSearchResultsRenderer.contents.length, 1);
 
     command(false);
     assert(!attributes.has('data-myt-search-channels'));
