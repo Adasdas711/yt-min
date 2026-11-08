@@ -3,7 +3,8 @@
     'use strict';
     const channelPath=/^\/(?:@|channel\/|c\/|user\/)/;
     const text=node=>node?.textContent.replace(/\s+/g,' ').trim()||'';
-    const filterScopeSelector='ytd-search-sub-menu-renderer,ytd-search-filter-dialog-renderer,yt-search-filter-dialog-view-model,ytd-search-filter-group-renderer,yt-chip-cloud-chip-renderer';
+    const nativeToolbarSelector='ytd-search-sub-menu-renderer,yt-search-sub-menu-view-model,yt-search-header-view-model,ytd-search-header-renderer';
+    const filterScopeSelector=nativeToolbarSelector+',ytd-search-filter-dialog-renderer,yt-search-filter-dialog-view-model,ytd-search-filter-group-renderer,yt-chip-cloud-chip-renderer';
     // SPA responses can retain the profile language even when the page uses
     // hl=en. Only translate native filter UI, never result titles or queries.
     const filterCopy=new Map([
@@ -150,23 +151,21 @@
     // does not list the newer optional MAIN data adapter yet.
     const youtubeURL=value=>{const url=safeURL(value);return url?.protocol==='https:'&&/(^|\.)youtube\.com$/.test(url.hostname)?url.href:'';};
     const channelURL=value=>{const href=youtubeURL(value);return href&&channelPath.test(new URL(href).pathname)?href:'';};
-    const filterViews=new Set(),channelCards=new Set();
-    function routeSearchInput(event){
-        const path=event.composedPath(),keyboard=event.type==='keydown'||event.type==='keyup';
-        if(keyboard&&!['Enter',' ','Escape','Tab'].includes(event.key))return;
-        // Leave activation to the browser: real links and popovertarget buttons
-        // also work without a synthetic click on a hidden YouTube controller.
-        for(const view of filterViews){
-            if(!view.host.isConnected)continue;
-            const panel=view.q('.filter-panel');
-            if((keyboard&&event.key==='Escape'&&panel.matches(':popover-open'))||path.some(item=>item===view.q('.filters-toggle')||item===panel)){
-                if(event.type==='click'&&panel.matches(':popover-open')&&path.some(item=>item instanceof HTMLAnchorElement&&panel.contains(item)))panel.hidePopover();
-                event.stopImmediatePropagation();return;
+    const channelCards=new Set();
+    function routeChannelInput(event){
+        if((event.type==='keydown'||event.type==='keyup')&&!['Enter',' ','Tab'].includes(event.key))return;
+        const path=event.composedPath();
+        for(const card of channelCards){
+            const link=card.q('.channel-link');
+            if(!card.host.isConnected||!path.includes(link))continue;
+            event.stopImmediatePropagation();
+            if(event.type==='click'&&!event.button&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&channelURL(link.href)){
+                event.preventDefault();location.assign(link.href);
             }
+            return;
         }
-        for(const card of channelCards)if(card.host.isConnected&&path.includes(card.q('.channel-link'))){event.stopImmediatePropagation();return;}
     }
-    for(const type of ['pointerdown','mousedown','touchstart','click','auxclick','keydown','keyup'])window.addEventListener(type,routeSearchInput,{capture:true,passive:true});
+    for(const type of ['pointerdown','mousedown','touchstart','click','auxclick','keydown','keyup'])window.addEventListener(type,routeChannelInput,{capture:true,passive:type!=='click'});
     const headingCopy=new Map([
         ['Watch again',['Посмотреть еще раз','Посмотреть ещё раз','Посмотреть снова','Смотреть ещё раз','Erneut ansehen']],
         ['For you',['Для вас','Für dich','Für Sie']],['Previously watched',['Вы уже смотрели','Bereits angesehen']],
@@ -175,12 +174,8 @@
     const heading=value=>headingCopy.get(value.trim().toLocaleLowerCase())||value.replace(/^(?:Новые видео на канале|Последние видео (?:на канале|от)|Neueste Videos von)\s+/iu,'Latest from ');
     const node=(tag,className,value)=>{const result=document.createElement(tag);if(className)result.className=className;if(value)result.textContent=value;return result;};
     const styles=`
-      :host{all:initial!important;display:block!important;width:90%!important;margin-inline:auto!important;min-width:0!important;box-sizing:border-box!important;font:16px/1.45 Arial,sans-serif!important;color:var(--myt-ink)!important;position:relative!important}
+      :host{all:initial!important;display:block!important;width:81%!important;margin-inline:auto!important;min-width:0!important;box-sizing:border-box!important;font:16px/1.45 Arial,sans-serif!important;color:var(--myt-ink)!important;position:relative!important}
       *{box-sizing:border-box}[hidden]{display:none!important}a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}a:focus-visible,button:focus-visible{outline:2px solid var(--myt-muted);outline-offset:3px}
-      .toolbar{display:flex;align-items:center;justify-content:space-between;padding:0 0 16px;margin-bottom:24px;border-bottom:1px solid var(--myt-border)}
-      .filters-toggle,.close-filters{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:9px 14px;border:0;border-radius:12px;background:transparent;color:inherit;font-weight:600}
-      .filters-toggle:hover,.close-filters:hover{background:var(--myt-soft)}.filters-toggle svg{width:24px;height:24px}.filter-panel{position:fixed;inset:auto;left:var(--filter-left,16px);top:var(--filter-top,100px);width:var(--filter-width,calc(100vw - 32px));max-height:calc(100dvh - var(--filter-top,100px) - 16px);overflow:auto;overscroll-behavior:contain;padding:20px;margin:0;border:1px solid var(--myt-border);border-radius:18px;background:var(--myt-surface);color:inherit;box-shadow:0 16px 60px #0005}.filter-panel::backdrop{background:#0003}.filter-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.filter-head h2{margin:0;font-size:20px}
-      .filter-groups{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:20px}.filter-group h3{margin:0 0 12px;font-size:16px}.filter-group a{display:block;padding:8px 0;color:var(--myt-muted);font-size:14px}.filter-group a:is(:hover,:focus-visible),.filter-group a[aria-current=true]{color:var(--myt-ink);text-decoration:underline}
       .channels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:24px}
       .stream,.group-stream{display:flex;flex-direction:column;gap:20px}.row{display:grid;gap:20px;align-items:stretch;min-width:0}
       .media{display:flex;flex-direction:column;gap:14px;min-width:0;height:100%;padding:12px 12px 18px;border-radius:18px;background:var(--myt-surface);transition:background .12s}
@@ -189,7 +184,7 @@
       .media-channel{display:block;overflow-wrap:anywhere;color:var(--myt-muted);font-size:18px;font-weight:500;line-height:1.4}.media-channel:is(:hover,:focus-visible){color:var(--myt-ink)}
       .media.playlist{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:center;gap:20px;padding-bottom:12px}.media.playlist .cover{width:100%}.playlist-badge{position:absolute;right:8px;bottom:8px;padding:4px 8px;border-radius:6px;background:#000b;color:#fff;font-size:13px}
       .group{min-width:0;padding:20px;border-radius:22px;background:var(--myt-soft)}.group h2{margin:0 0 18px;padding-inline-end:.2em;overflow:visible;overflow-wrap:anywhere;font:italic 900 40px/1.05 "MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:-.025em}
-      .empty{padding:32px 0;color:var(--myt-muted)}@media(max-width:700px){.filter-groups{grid-template-columns:repeat(2,minmax(0,1fr))}.channels{grid-template-columns:1fr}.media-title{font-size:18px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}}
+      .empty{padding:32px 0;color:var(--myt-muted)}@media(max-width:700px){.channels{grid-template-columns:1fr}.media-title{font-size:18px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}}
     `;
     class MediaCard{
         constructor(source,kind){
@@ -217,75 +212,47 @@
         }
         destroy(){this.host.remove();}
     }
-    const filterGroups=[
-        ['Upload date',[['Last hour',1,1],['Today',1,2],['This week',1,3],['This month',1,4],['This year',1,5]]],
-        ['Type',[['Video',2,1],['Channel',2,2],['Playlist',2,3],['Movie',2,4]]],
-        ['Duration',[['Under 4 minutes',3,1],['4–20 minutes',3,2],['Over 20 minutes',3,3]]],
-        ['Features',[['Live',8,1],['HD',4,1],['Subtitles/CC',5,1],['Creative Commons',6,1]]],
-        ['Sort by',[['Relevance',0,0],['Upload date',0,2],['View count',0,3],['Rating',0,1]]],
-    ];
-    function filterURL(field,value){
-        // YouTube's public search-parameter protobuf: preserve existing fields
-        // when adding a filter rather than resetting another selected group.
-        const current=new URL(location.href),parts=[];let bytes=[];
-        try{bytes=[...atob(decodeURIComponent(current.searchParams.get('sp')||''))].map(char=>char.charCodeAt(0));}catch{}
-        const parse=input=>{
-            const result=[];let i=0;const integer=()=>{let value=0,shift=0;while(i<input.length&&shift<35){const byte=input[i++];value|=(byte&127)<<shift;if(!(byte&128))return value;shift+=7;}throw Error('Invalid search parameter');};
-            while(i<input.length){const start=i,tag=integer();if((tag&7)===0){const number=integer();result.push({field:tag>>3,wire:0,number,raw:input.slice(start,i)});}else if((tag&7)===2){const size=integer(),data=input.slice(i,i+size);i+=size;if(i>input.length)throw Error('Invalid search parameter');result.push({field:tag>>3,wire:2,data,raw:input.slice(start,i)});}else throw Error('Unknown search parameter');}return result;
-        };
-        let root=[];try{if(bytes.length<1024)root=parse(bytes);}catch{}
-        if(field===0){for(const part of root)if(part.field!==1)parts.push(...part.raw);if(value)parts.unshift(8,value);}
-        else{
-            let filters=[];try{filters=parse(root.find(part=>part.field===2&&part.wire===2)?.data||[]);}catch{}
-            const inner=filters.filter(part=>part.field!==field).flatMap(part=>part.raw);inner.push(field<<3,value);
-            for(const part of root)if(part.field!==2)parts.push(...part.raw);parts.push(18,inner.length,...inner);
-        }
-        if(parts.length)current.searchParams.set('sp',btoa(String.fromCharCode(...parts)));else current.searchParams.delete('sp');
-        return current.href;
-    }
     // Install native-page isolation with the renderer itself. Updating the
     // renderer cannot leave an older CSS asset painting a second search UI.
-    const nativeStyles=`/* Search owns its complete visible stream. Native controllers and their
-   continuation paths retain their parents; only pagination has layout below it. */
+    const nativeStyles=`/* Search owns result cards. Native filter controls and pagination keep
+   their original DOM parents, handlers and browser input. */
 html.minimal-youtube[data-myt-search-ui],html.minimal-youtube[data-myt-search-ui] body {
     height:auto !important;max-height:none !important;overflow-y:auto !important;overflow-x:hidden !important;
 }
 html.minimal-youtube[data-myt-search-ui] ytd-search {
-    display:block !important;position:relative !important;box-sizing:border-box !important;
+    display:flex !important;flex-direction:column !important;position:relative !important;box-sizing:border-box !important;
     width:100% !important;max-width:1280px !important;margin:0 auto !important;padding:28px 24px 48px !important;
 }
-html.minimal-youtube[data-myt-search-ui] #myt-search { width:90% !important;margin:0 auto !important;padding:0 !important; }
+html.minimal-youtube[data-myt-search-ui] #myt-search { order:0 !important;flex:none !important;width:81% !important;margin:0 auto !important;padding:0 !important; }
 html.minimal-youtube[data-myt-search-ui] ytd-page-manager { margin-left:0 !important;margin-right:0 !important;width:100% !important;min-width:0 !important;height:auto !important;max-height:none !important;overflow:visible !important; }
-html.minimal-youtube[data-myt-search-ui] ytd-search > :not(#myt-search):not([data-myt-search-continuation-path]),
-html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-native-root]:not([data-myt-search-continuation-path]),
-html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-continuation-path] > :not([data-myt-search-continuation-path]) {
+html.minimal-youtube[data-myt-search-ui] ytd-search > :not(#myt-search):not([data-myt-search-layout-path]),
+html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-native-root]:not([data-myt-search-layout-path]),
+html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-layout-path]:not([data-myt-search-native-ui]) > :not([data-myt-search-layout-path]) {
     display:block !important;position:absolute !important;inset:0 auto auto 0 !important;width:0 !important;height:0 !important;
     min-width:0 !important;min-height:0 !important;margin:0 !important;padding:0 !important;
     overflow:hidden !important;visibility:hidden !important;opacity:0 !important;pointer-events:none !important;contain:strict !important;
 }
-html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-continuation-path] {
+html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-layout-path]:not([data-myt-search-native-ui]) {
     display:contents !important;position:static !important;width:auto !important;height:auto !important;
     visibility:visible !important;opacity:1 !important;overflow:visible !important;contain:none !important;
 }
-html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-renderer[data-myt-search-continuation-path] {
-    display:block !important;height:2px !important;min-height:2px !important;pointer-events:none !important;
+html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) {
+    display:block !important;order:1 !important;height:2px !important;min-height:2px !important;pointer-events:none !important;
+}
+html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
+    display:block !important;order:-1 !important;position:relative !important;inset:auto !important;
+    box-sizing:border-box !important;flex:none !important;width:81% !important;max-width:none !important;height:auto !important;
+    margin:0 auto 24px !important;padding:0 0 16px !important;border-bottom:1px solid var(--myt-border) !important;
+    visibility:visible !important;opacity:1 !important;pointer-events:auto !important;overflow:visible !important;contain:none !important;
 }
 @media(max-width:600px){html.minimal-youtube[data-myt-search-ui] ytd-search{padding:20px 16px 40px !important;}}`;
     class Search{
         constructor(){
             this.nativeStyle=node('style');this.nativeStyle.id='myt-search-native-style';this.nativeStyle.textContent=nativeStyles;document.documentElement.append(this.nativeStyle);
-            this.cards=new Map();this.channels=new Map();this.groups=new Map();this.sources=new Map();this.sequence=0;this.nativeNodes=new Set();this.open=false;
+            this.cards=new Map();this.channels=new Map();this.groups=new Map();this.sources=new Map();this.sequence=0;this.nativeNodes=new Set();this.filterText=new Map();this.filterAttributes=new Map();
             this.host=node('div');this.host.id='myt-search';this.host.lang='en';this.shadow=this.host.attachShadow({mode:'open'});
-            this.shadow.innerHTML='<style>'+styles+'</style><div class="toolbar"><button type="button" class="filters-toggle" popovertarget="search-filters" popovertargetaction="toggle" aria-expanded="false" aria-controls="search-filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 18h18"/><circle cx="8" cy="6" r="3" fill="var(--myt-bg)"/><circle cx="16" cy="18" r="3" fill="var(--myt-bg)"/></svg>Filters</button></div><section id="search-filters" class="filter-panel" popover="auto" aria-label="Search filters"><div class="filter-head"><h2>Search filters</h2><button type="button" class="close-filters" popovertarget="search-filters" popovertargetaction="hide">Close</button></div><div class="filter-groups"></div></section><div class="channels" aria-label="Channels"></div><div class="stream"></div><p class="empty" hidden>No results found.</p>';
+            this.shadow.innerHTML='<style>'+styles+'</style><div class="channels" aria-label="Channels"></div><div class="stream"></div><p class="empty" hidden>No results found.</p>';
             this.q=selector=>this.shadow.querySelector(selector);
-            filterViews.add(this);
-            this.moveFilters=()=>this.positionFilters();
-            this.q('.filter-panel').addEventListener('beforetoggle',event=>{
-                this.open=event.newState==='open';this.q('.filters-toggle').setAttribute('aria-expanded',String(this.open));
-                if(this.open){this.renderFilters();this.positionFilters();window.addEventListener('resize',this.moveFilters);document.addEventListener('scroll',this.moveFilters,{capture:true,passive:true});}
-                else{window.removeEventListener('resize',this.moveFilters);document.removeEventListener('scroll',this.moveFilters,true);}
-            });
-            this.renderFilters();
             this.resize=new ResizeObserver(()=>this.layout());this.resize.observe(this.host);
             this.observer=new MutationObserver(records=>{
                 if(records.every(record=>record.type==='attributes'&&record.attributeName?.startsWith('data-myt-search-')))return;
@@ -310,28 +277,22 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
             this.pendingCards ||=new Set();this.pendingCards.add(source);if(this.cardFrame)return;
             this.cardFrame=requestAnimationFrame(()=>{this.cardFrame=0;for(const source of this.pendingCards){const card=this.cards.get(source);if(card&&source.isConnected){if(Search.isPlaylist(source)!==(card.host.dataset.kind==='playlist')){this.queue();continue;}const data=this.read(source,card.host.dataset.kind,card.record);if(data)card.update(data);else this.queue();}}this.pendingCards.clear();});
         }
-        positionFilters(){
-            if(!this.open)return;
-            const rect=this.q('.toolbar').getBoundingClientRect(),panel=this.q('.filter-panel'),width=Math.min(rect.width,innerWidth-32);
-            const left=Math.max(16,Math.min(rect.left,innerWidth-width-16)),top=Math.max(16,Math.min(rect.bottom+12,innerHeight-240));
-            for(const [name,value]of Object.entries({left,top,width}))panel.style.setProperty('--filter-'+name,value+'px');
-        }
-        renderFilters(){
-            const available=new Map();
-            for(const option of this.snapshot?.filters||[]){const label=englishFilter(String(option.label||''))||String(option.label||'');if(youtubeURL(option.href))available.set(label,{href:option.href});}
-            for(const option of document.querySelectorAll('ytd-search-filter-renderer a[href],ytd-search-filter-group-renderer a[href]')){
-                const label=englishFilter(text(option))||text(option),href=youtubeURL(option.href);if(href)available.set(label,{href});
-            }
-            const signature=JSON.stringify([location.href,[...available].map(([key,item])=>[key,item.href])]);if(signature===this.filterSignature)return;this.filterSignature=signature;
-            const container=this.q('.filter-groups');container.replaceChildren();
-            for(const [title,options]of filterGroups){
-                const group=node('div','filter-group');group.append(node('h3','',title));
-                for(const [label,field,value]of options){
-                    const item=available.get(label),link=node('a','',label);link.href=item?.href||filterURL(field,value);
-                    link.setAttribute('aria-current',String(new URL(link.href).searchParams.get('sp')===new URL(location.href).searchParams.get('sp')));
-                    group.append(link);
+        translateFilters(){
+            for(const [node,state]of this.filterText)if(!node.isConnected){if(node.data===state.applied)node.data=state.original;this.filterText.delete(node);}
+            for(const [node,attributes]of this.filterAttributes)if(!node.isConnected){for(const [name,state]of attributes)if(node.getAttribute(name)===state.applied)node.setAttribute(name,state.original);this.filterAttributes.delete(node);}
+            for(const scope of document.querySelectorAll(filterScopeSelector)){
+                if(scope.closest('ytd-search')&&scope.closest('ytd-search')!==this.search)continue;
+                if(scope.parentElement?.closest(filterScopeSelector))continue;
+                const walker=document.createTreeWalker(scope,NodeFilter.SHOW_TEXT);let item;
+                while(item=walker.nextNode()){
+                    const current=item.data,translated=englishFilter(current);if(!translated||translated===current.trim())continue;
+                    this.filterText.set(item,{original:current,applied:translated});item.data=translated;
                 }
-                container.append(group);
+                for(const node of [scope,...scope.querySelectorAll('[aria-label],[title]')])for(const name of ['aria-label','title']){
+                    const current=node.getAttribute(name);if(!current)continue;const translated=englishFilter(current);if(!translated||translated===current.trim())continue;
+                    if(!this.filterAttributes.has(node))this.filterAttributes.set(node,new Map());
+                    this.filterAttributes.get(node).set(name,{original:current,applied:translated});node.setAttribute(name,translated);
+                }
             }
         }
         read(source,kind,record){
@@ -352,6 +313,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
             document.documentElement.setAttribute('data-myt-search-ui','');
             const candidates=[...searches],selectionNodes=new Set();
             for(const item of candidates)for(let parent=item;parent&&parent!==document.body;parent=parent.parentElement)selectionNodes.add(parent);
+            for(const item of candidates)for(const toolbar of item.querySelectorAll(nativeToolbarSelector))selectionNodes.add(toolbar);
             if(selectionNodes.size!==this.selectionNodes.size||[...selectionNodes].some(item=>!this.selectionNodes.has(item))){
                 this.selectionObserver.disconnect();this.selectionNodes=selectionNodes;
                 for(const item of selectionNodes)this.selectionObserver.observe(item,{attributes:true,attributeFilter:['hidden','aria-hidden','class','style']});
@@ -403,18 +365,30 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
             const channelContainer=this.q('.channels');let index=0;
             for(const source of sources){const card=this.channels.get(source);if(card){if(channelContainer.children[index]!==card.host)channelContainer.insertBefore(card.host,channelContainer.children[index]||null);index++;}}
             this.q('.channels').hidden=!this.channels.size;this.q('.empty').hidden=Boolean(this.channels.size||stream.length);
-            this.prepareNative(search);this.layout();if(this.open)this.renderFilters();
+            this.prepareNative(search);this.translateFilters();this.layout();
         }
         prepareNative(search){
             // Keep native controllers in place. Only continuation paths contribute
             // height after our rendered results, so native pagination still sees
             // its sentinel at the actual end of the stream.
             for(const child of search.children)if(child!==this.host){child.setAttribute('data-myt-search-native-root','');this.nativeNodes.add(child);}
-            const paths=new Set();
-            for(const continuation of search.querySelectorAll('ytd-continuation-item-renderer'))for(let parent=continuation;parent&&parent!==search;parent=parent.parentElement)paths.add(parent);
-            for(const source of this.nativeNodes)if(source.hasAttribute('data-myt-search-continuation-path')&&!paths.has(source))source.removeAttribute('data-myt-search-continuation-path');
-            for(const path of paths){path.setAttribute('data-myt-search-continuation-path','');this.nativeNodes.add(path);}
+            // Reveal the original toolbar in place. Browser-trusted input and
+            // YouTube's delegated handlers keep their original DOM event path.
+            const available=node=>{for(let parent=node;parent&&parent!==search;parent=parent.parentElement)if(parent.hasAttribute('hidden')||parent.style.display==='none')return false;return true;};
+            const paths=new Set(),toolbar=[...search.querySelectorAll(nativeToolbarSelector)].find(available)||[...search.querySelectorAll('button,[role="button"],tp-yt-paper-button')].slice(0,200).find(node=>available(node)&&/^(?:filters|filter|фильтры)$/iu.test(node.getAttribute('aria-label')||text(node)));
+            const nativeUI=new Set(toolbar?[toolbar]:[]);
+            for(const panel of search.querySelectorAll('ytd-search-filter-dialog-renderer,yt-search-filter-dialog-view-model'))if(!toolbar?.contains(panel))nativeUI.add(panel.closest('dialog,tp-yt-paper-dialog,tp-yt-iron-dropdown,[role="dialog"]')||panel);
+            for(const endpoint of [...search.querySelectorAll('ytd-continuation-item-renderer'),...nativeUI])for(let parent=endpoint;parent&&parent!==search;parent=parent.parentElement)paths.add(parent);
+            for(const source of this.nativeNodes){
+                if(source.hasAttribute('data-myt-search-layout-path')&&!paths.has(source))source.removeAttribute('data-myt-search-layout-path');
+                if(source.hasAttribute('data-myt-search-toolbar')&&source!==toolbar)source.removeAttribute('data-myt-search-toolbar');
+                if(source.hasAttribute('data-myt-search-native-ui')&&!nativeUI.has(source))source.removeAttribute('data-myt-search-native-ui');
+            }
+            for(const path of paths){path.setAttribute('data-myt-search-layout-path','');this.nativeNodes.add(path);}
+            for(const element of nativeUI)element.setAttribute('data-myt-search-native-ui','');
+            if(toolbar)toolbar.setAttribute('data-myt-search-toolbar','');
         }
+
         layout(){
             if(!this.host.isConnected||!this.stream)return;
             const style=getComputedStyle(this.search),width=this.search.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),columns=width<560?1:width<900?2:3;
@@ -438,8 +412,9 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
             flush(false);container.replaceChildren(...content);
         }
         destroy(){
-            filterViews.delete(this);window.removeEventListener('resize',this.moveFilters);document.removeEventListener('scroll',this.moveFilters,true);
-            if(this.q('.filter-panel').matches(':popover-open'))this.q('.filter-panel').hidePopover();
+            for(const [node,state]of this.filterText)if(node.data===state.applied)node.data=state.original;
+            for(const [node,attributes]of this.filterAttributes)for(const [name,state]of attributes)if(node.getAttribute(name)===state.applied)node.setAttribute(name,state.original);
+            this.filterText.clear();this.filterAttributes.clear();
             this.nativeStyle.remove();
             this.selectionObserver.disconnect();this.selectionNodes.clear();
             document.documentElement.removeAttribute('data-myt-search-ui');
@@ -448,7 +423,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
             document.removeEventListener('yt-page-data-updated',this.changed);document.removeEventListener('yt-rendererstamper-finished',this.changed);
             for(const card of [...this.cards.values(),...this.channels.values()])card.destroy();
             for(const source of this.sources.keys()){source.removeAttribute('data-myt-search-source-key');source.removeAttribute('data-myt-search-source-kind');}
-            for(const native of this.nativeNodes){native.removeAttribute('data-myt-search-native-root');native.removeAttribute('data-myt-search-continuation-path');}
+            for(const native of this.nativeNodes){native.removeAttribute('data-myt-search-native-root');native.removeAttribute('data-myt-search-layout-path');native.removeAttribute('data-myt-search-toolbar');native.removeAttribute('data-myt-search-native-ui');}
             this.host.remove();this.cards.clear();this.channels.clear();this.sources.clear();
         }
     }

@@ -2,6 +2,7 @@
 import base64
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
+from native_search_filters import filters,NATIVE_STYLE
 from smoke import setup, MASTHEAD, ROOT, assert_stable
 from playlist import cover
 
@@ -21,7 +22,8 @@ def channel(i):
 
 
 def fixture():
-    return '<style>.native-offset{position:relative;left:180px;margin-left:200px;width:1400px}ytd-video-renderer{height:500px!important}#native-comment{display:block!important}</style><ytd-app>'+MASTHEAD+'''<ytd-page-manager><ytd-search><ytd-search-sub-menu-renderer><button aria-label="Фильтры">Фильтры</button></ytd-search-sub-menu-renderer><ytd-section-list-renderer><div id="contents" class="native-results"><ytd-item-section-renderer><div id="contents">'''+video(1)+channel(1)+playlist(1)+'''</div></ytd-item-section-renderer><div class="native-offset">'''+video(2)+playlist(2,True)+'''</div><ytd-shelf-renderer id="for-you"><div id="title-container"><h2>Для вас</h2><button>Ещё</button></div><div id="content">'''+video(3)+video(4)+'''</div></ytd-shelf-renderer>'''+video(5).replace('Regular video 5','Посмотреть ещё раз — пользовательский заголовок')+'''<ytd-shelf-renderer id="watch-again"><div id="title-container"><h2>Посмотреть ещё раз</h2></div><div id="content">'''+''.join(video(i) for i in range(6,10))+'''</div></ytd-shelf-renderer>'''+channel(2)+'''<ytd-continuation-item-renderer id="continuation"></ytd-continuation-item-renderer></div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>'''
+    toolbar,_=filters()
+    return NATIVE_STYLE+'<style>.native-offset{position:relative;left:180px;margin-left:200px;width:1400px}ytd-video-renderer{height:500px!important}#native-comment{display:block!important}</style><ytd-app>'+MASTHEAD+'''<ytd-page-manager><ytd-search>'''+toolbar+'''<ytd-section-list-renderer><div id="contents" class="native-results"><ytd-item-section-renderer><div id="contents">'''+video(1)+channel(1)+playlist(1)+'''</div></ytd-item-section-renderer><div class="native-offset">'''+video(2)+playlist(2,True)+'''</div><ytd-shelf-renderer id="for-you"><div id="title-container"><h2>Для вас</h2><button>Ещё</button></div><div id="content">'''+video(3)+video(4)+'''</div></ytd-shelf-renderer>'''+video(5).replace('Regular video 5','Посмотреть ещё раз — пользовательский заголовок')+'''<ytd-shelf-renderer id="watch-again"><div id="title-container"><h2>Посмотреть ещё раз</h2></div><div id="content">'''+''.join(video(i) for i in range(6,10))+'''</div></ytd-shelf-renderer>'''+channel(2)+'''<ytd-continuation-item-renderer id="continuation"></ytd-continuation-item-renderer></div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>'''
 
 
 def geometry(page):
@@ -66,14 +68,14 @@ def check(browser,width,dark,prune=True):
     for index,count in enumerate([256,64]):sources.nth(index).evaluate('(node,count)=>node.insertAdjacentHTML("beforeend",`<span id="video-count-text">${count} videos</span>`)',count)
     expect(root.locator('.playlist-badge')).to_have_text(['256 videos','64 videos'])
     dimensions=page.evaluate('''()=>{const search=document.querySelector('#myt-search').parentElement,s=getComputedStyle(search),box=search.getBoundingClientRect(),result=document.querySelector('#myt-search').getBoundingClientRect();return{before:search.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight),after:result.width,offset:result.x+result.width/2-box.x-box.width/2};}''')
-    assert abs(dimensions['after']-dimensions['before']*.9)<.05,dimensions
+    assert abs(dimensions['after']-dimensions['before']*.9*.9)<.05,dimensions
     assert abs(dimensions['offset'])<1,dimensions
     if width>=900:
         columns=3 if dimensions['before']>=900 else 2
-        old_card=(dimensions['before']-20*(columns-1))/columns*2+20
-        old_cover=(old_card-44)*1.15/2.15
+        old_card=(dimensions['before']*.9-20*(columns-1))/columns*2+20
+        old_cover=(old_card-44)*2/3
         cover_box=root.locator('.media.playlist .cover').first.bounding_box()
-        assert cover_box['width']>old_cover*1.08,(cover_box,old_cover)
+        assert abs(cover_box['width']/old_cover-.9)<.025,(cover_box,old_cover)
         assert abs(cover_box['height']-cover_box['width']*9/16)<1,cover_box
     count_source=sources.first.locator('#video-count-text')
     count_source.evaluate('node=>node.firstChild.data="257 videos"')
@@ -107,13 +109,14 @@ def check(browser,width,dark,prune=True):
     if width>=1000:
         cards=root.locator('.stream > .row').first.locator('.media');a,b=cards.nth(0).bounding_box(),cards.nth(1).bounding_box()
         assert abs(b['width']-(a['width']*2+20))<1,(a,b)
+    native_button=page.locator('#native-filters-toggle');panel=page.locator('#native-filters')
     for _ in range(3):
-        root.locator('.filters-toggle').click();expect(root.locator('.filter-panel')).to_be_visible()
-        expect(root.locator('.filter-group')).to_have_count(5)
-        expect(root.locator('.filter-group a')).to_have_count(20)
-        root.locator('.close-filters').click();expect(root.locator('.filter-panel')).to_be_hidden()
-    root.locator('.filters-toggle').press('Enter');expect(root.locator('.filter-panel')).to_be_visible()
-    root.locator('.filters-toggle').press('Escape');expect(root.locator('.filter-panel')).to_be_hidden()
+        native_button.click();expect(panel).to_be_visible()
+        expect(page.locator('ytd-search-filter-group-renderer')).to_have_count(5)
+        assert page.evaluate('__filterButtonTrusted')
+        page.locator('#native-filters-close').click();expect(panel).to_be_hidden()
+    native_button.press('Enter');expect(panel).to_be_visible()
+    page.locator('#native-filters-close').click();expect(panel).to_be_hidden()
     root.locator('.media-title').first.click();assert page.evaluate('__videoClicked')
     page.evaluate('''navigation.addEventListener('navigate',event=>{if(new URL(event.destination.url).pathname==='/@creator1'){event.preventDefault();window.__channelDestination=event.destination.url;}})''')
     images.first.click();assert page.evaluate('__channelDestination')=='https://www.youtube.com/@creator1'

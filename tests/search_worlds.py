@@ -3,24 +3,17 @@ import json
 from playwright.sync_api import sync_playwright,expect
 from smoke import ROOT,MOCK,document,MASTHEAD
 from search import video,playlist
+from native_search_filters import filters,NATIVE_STYLE
 
 
 def check(browser,prune,adapter=True):
     page=browser.new_page(viewport={'width':1440,'height':960},reduced_motion='reduce',has_touch=True)
-    body='<ytd-app>'+MASTHEAD+'<ytd-search><ytd-section-list-renderer><ytd-channel-renderer id="channel"><a href="/@creator" onclick="event.preventDefault();window.__channelVisits=(window.__channelVisits||0)+1"><h3>Creator</h3></a><ytd-subscribe-button-renderer><button>Subscribe</button></ytd-subscribe-button-renderer></ytd-channel-renderer>'+video(1)+'</ytd-section-list-renderer></ytd-search></ytd-app>'
+    toolbar,_=filters()
+    body=NATIVE_STYLE+'<ytd-app>'+MASTHEAD+'<ytd-search>'+toolbar+'<ytd-section-list-renderer><ytd-channel-renderer id="channel"><a href="/@creator" onclick="event.preventDefault();window.__channelVisits=(window.__channelVisits||0)+1"><h3>Creator</h3></a><ytd-subscribe-button-renderer><button>Subscribe</button></ytd-subscribe-button-renderer></ytd-channel-renderer>'+video(1)+'</ytd-section-list-renderer></ytd-search></ytd-app>'
     body=body.replace('<ytd-search>','<div id="cached-pane" style="display:none"><ytd-search id="cached-search">Stale SPA page</ytd-search></div><section id="active-pane"><ytd-search>',1).replace('</ytd-search></ytd-app>','</ytd-search></section></ytd-app>')
     page.route('https://www.youtube.com/**',lambda route:route.fulfill(content_type='text/html',body=document(body)))
     page.route('https://yt3.googleusercontent.com/**',lambda route:route.fulfill(content_type='image/svg+xml',body='<svg xmlns="http://www.w3.org/2000/svg" width="176" height="176"><circle cx="88" cy="88" r="88" fill="#00bcd4"/></svg>'))
     page.goto('https://www.youtube.com/results?search_query=worlds')
-    page.evaluate('''()=>{
-      window.__blockedFilterEvents=0;
-      for(const type of ['pointerdown','mousedown','click','keydown'])document.addEventListener(type,event=>{
-        if(type==='keydown'&&!['Enter',' ','Escape'].includes(event.key))return;
-        if(event.composedPath().some(node=>node instanceof Element&&(node.matches('.filters-toggle,.close-filters')||node.closest('.filter-panel')))){
-          __blockedFilterEvents++;event.preventDefault();event.stopImmediatePropagation();
-        }
-      },true);
-    }''')
     page.add_style_tag(path=str(ROOT/'src/styles/styles.css'))
     page.add_script_tag(path=str(ROOT/'src/content/search-data.js'))
     if prune:page.add_script_tag(path=str(ROOT/'src/content/data-pruning.js'))
@@ -63,7 +56,7 @@ def check(browser,prune,adapter=True):
     # Native roots mount after the first frame, without any extension markers.
     # Their contents must not paint before the queued extraction pass either.
     modern='<yt-lockup-view-model><a class="ytLockupViewModelContentImage" href="/watch?v=abcdefghijk"><img src="'+video(2).split('src="',1)[1].split('"',1)[0]+'"></a><h3 class="ytLockupMetadataViewModelTitle"><a href="/watch?v=abcdefghijk">Modern nested video title</a></h3><a href="/@creator">Creator</a></yt-lockup-view-model>'
-    late='<section id="late-native"><button>Фильтры</button><ytd-shelf-renderer><div id="title-container"><h2>Новые видео на канале Creator</h2></div>'+modern+playlist(3,True)+video(4)+'</ytd-shelf-renderer></section>'
+    late='<section id="late-native"><ytd-shelf-renderer><div id="title-container"><h2>Новые видео на канале Creator</h2></div>'+modern+playlist(3,True)+video(4)+'</ytd-shelf-renderer></section>'
     hidden_before_update=page.evaluate('''html=>{
       document.querySelector('#active-pane ytd-search').insertAdjacentHTML('beforeend',html);
       document.querySelector('#late-native yt-lockup-view-model[content-type="playlist"]').data={contentId:'PL3',contentType:'LOCKUP_CONTENT_TYPE_PLAYLIST',contentImage:{collectionThumbnailViewModel:{primaryThumbnail:{thumbnailViewModel:{overlays:[{thumbnailBottomOverlayViewModel:{badges:[{thumbnailBadgeViewModel:{text:'72 videos'}}]}}]}}}}};
@@ -76,15 +69,20 @@ def check(browser,prune,adapter=True):
     expect(root.locator('.group h2')).to_have_text('Latest from Creator')
     expect(root.locator('.media-title',has_text='Modern nested video title')).to_have_count(1)
     expect(root.locator('.media-channel',has_text='Creator')).to_have_count(4)
-    root.locator('.filters-toggle').click();expect(root.locator('.filter-panel')).to_be_visible()
-    page.screenshot(path=f'/workspace/yt-min-qa/search-filters-open-{prune}-{adapter}.png',full_page=True)
-    expect(root.locator('.filter-group a',has_text='Video').first).to_have_attribute('href','https://www.youtube.com/results?search_query=worlds&sp=active')
-    root.locator('.close-filters').click()
-    root.locator('.filters-toggle').focus();root.locator('.filters-toggle').press('Space');expect(root.locator('.filter-panel')).to_be_visible()
-    page.keyboard.press('Escape');expect(root.locator('.filter-panel')).to_be_hidden()
-    root.locator('.filters-toggle').tap();expect(root.locator('.filter-panel')).to_be_visible()
-    root.locator('.close-filters').tap();expect(root.locator('.filter-panel')).to_be_hidden()
-    assert page.evaluate('__blockedFilterEvents')==0
+    native_button=page.locator('#native-filters-toggle');panel=page.locator('#native-filters')
+    native_button.click();expect(panel).to_be_visible();assert page.evaluate('__filterButtonTrusted')
+    page.screenshot(path=f'/workspace/yt-min-qa/search-original-filters-{prune}-{adapter}.png',full_page=True)
+    page.locator('#native-filters-close').click()
+    native_button.focus();native_button.press('Space');expect(panel).to_be_visible()
+    panel.locator('a',has_text='Video').first.click();expect(panel).to_be_hidden();assert page.evaluate('__filterOptionTrusted')
+    native_button.tap();expect(panel).to_be_visible()
+    page.locator('#native-filters-close').tap();expect(panel).to_be_hidden()
+    page.locator('#native-toolbar').evaluate('node=>node.remove()')
+    expect(page.locator('[data-myt-search-toolbar]')).to_have_count(0)
+    page.locator('#active-pane ytd-search').evaluate('(node,html)=>node.insertAdjacentHTML("afterbegin",html)',toolbar)
+    expect(native_button).to_have_text('Filters')
+    native_button.click();expect(panel).to_be_visible();assert page.evaluate('__filterButtonTrusted')
+    page.locator('#native-filters-close').click()
     if not adapter:
         evaluate((ROOT/'src/content/search-data.js').read_text())
         evaluate('document.dispatchEvent(new Event("yt-page-data-updated"))')
@@ -97,7 +95,9 @@ def check(browser,prune,adapter=True):
     expect(page.locator('#active-pane #myt-search')).to_be_visible()
     expect(root.locator('.media')).to_have_count(4)
     page.evaluate('''navigation.addEventListener('navigate',event=>{if(new URL(event.destination.url).pathname==='/@creator'){event.preventDefault();window.__channelDestination=event.destination.url;}})''')
+    page.evaluate('''navigation.addEventListener('navigate',event=>{if(event.sourceElement){event.preventDefault();window.__nativeLinkCancelled=true;}})''')
     image.click();assert page.evaluate('__channelDestination')=='https://www.youtube.com/@creator'
+    assert page.evaluate('!window.__nativeLinkCancelled')
     evaluate('__setEnabled(false)');expect(page.locator('#myt-search')).to_have_count(0)
     evaluate('__setEnabled(true)');expect(image).to_have_attribute('src','https://yt3.googleusercontent.com/main-only-avatar')
     expect(root.locator('.media')).to_have_count(4)

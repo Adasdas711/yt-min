@@ -45,7 +45,7 @@ def full_card(browser,width,dark):
       window.__destinations=[];window.__subscribeCalls=0;window.__nativeLinkCalls=0;window.__blockedChannelEvents=0;
       for(const button of document.querySelectorAll('ytd-channel-renderer button'))button.onclick=()=>window.__subscribeCalls++;
       for(const link of document.querySelectorAll('ytd-channel-renderer a'))link.onclick=event=>{event.preventDefault();window.__nativeLinkCalls++;};
-      window.__recordChannelNavigation=event=>{if(new URL(event.destination.url).pathname.startsWith('/@')){event.preventDefault();window.__destinations.push(event.destination.url);}};
+      window.__recordChannelNavigation=event=>{if(event.sourceElement){event.preventDefault();window.__blockedOwnedAnchor=true;return;}if(new URL(event.destination.url).pathname.startsWith('/@')){event.preventDefault();window.__destinations.push(event.destination.url);}};
       navigation.addEventListener('navigate',window.__recordChannelNavigation);
       for(const type of ['pointerdown','mousedown','click','keydown'])document.addEventListener(type,event=>{
         if(event.composedPath().some(node=>node instanceof Element&&node.matches('.channel-link'))){window.__blockedChannelEvents++;event.preventDefault();event.stopImmediatePropagation();}
@@ -62,12 +62,12 @@ def full_card(browser,width,dark):
     for x,y in [(12,12),(box['width']-12,12),(12,box['height']-12),(box['width']-12,box['height']-12),(box['width']-24,box['height']/2)]:
         link.click(position={'x':x,'y':y})
         assert page.evaluate('__destinations.at(-1)')=='https://www.youtube.com/@MrBeast'
-    page.locator('.filters-toggle').focus();page.keyboard.press('Tab');expect(link).to_be_focused()
+    page.locator('ytd-masthead input').focus();page.keyboard.press('Tab');expect(link).to_be_focused()
     page.keyboard.press('Enter')
     assert page.evaluate('__destinations.length')==10
     page.keyboard.press('Tab');expect(cards.nth(1).locator('.channel-link')).to_be_focused()
     page.keyboard.press('Enter');assert page.evaluate('__destinations.at(-1)')=='https://www.youtube.com/@creator2'
-    assert page.evaluate('__subscribeCalls===0&&__nativeLinkCalls===0&&__blockedChannelEvents===0')
+    assert page.evaluate('__subscribeCalls===0&&__nativeLinkCalls===0&&__blockedChannelEvents===0&&!window.__blockedOwnedAnchor')
     # Browser-created tabs exercise the real anchor's modified and middle clicks.
     page.evaluate("navigation.removeEventListener('navigate',window.__recordChannelNavigation)")
     page.context.route('https://www.youtube.com/@MrBeast',lambda route:route.fulfill(content_type='text/html',body='<title>Channel</title>Channel'))
