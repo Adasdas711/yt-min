@@ -212,7 +212,10 @@
 
     const sourceSelector='ytd-video-renderer,ytd-grid-video-renderer,ytd-compact-video-renderer,ytd-playlist-renderer,ytd-grid-playlist-renderer,ytd-radio-renderer,ytd-channel-renderer,yt-lockup-view-model';
     const shelfSelector='ytd-shelf-renderer,grid-shelf-view-model,ytd-rich-section-renderer';
-    const dataModel=globalThis.MinimalYouTubeSearchData;
+    // Rendering must also work with an already loaded extension manifest which
+    // does not list the newer optional MAIN data adapter yet.
+    const youtubeURL=value=>{const url=safeURL(value);return url?.protocol==='https:'&&/(^|\.)youtube\.com$/.test(url.hostname)?url.href:'';};
+    const channelURL=value=>{const href=youtubeURL(value);return href&&channelPath.test(new URL(href).pathname)?href:'';};
     const headingCopy=new Map([
         ['Watch again',['Посмотреть еще раз','Посмотреть ещё раз','Посмотреть снова','Смотреть ещё раз','Erneut ansehen']],
         ['For you',['Для вас','Für dich','Für Sie']],['Previously watched',['Вы уже смотрели','Bereits angesehen']],
@@ -288,8 +291,37 @@
         if(parts.length)current.searchParams.set('sp',btoa(String.fromCharCode(...parts)));else current.searchParams.delete('sp');
         return current.href;
     }
+    // Install native-page isolation with the renderer itself. Updating the
+    // renderer cannot leave an older CSS asset painting a second search UI.
+    const nativeStyles=`/* Search owns its complete visible stream. Native controllers and their
+   continuation paths retain their parents; only pagination has layout below it. */
+html.minimal-youtube[data-myt-search-ui],html.minimal-youtube[data-myt-search-ui] body {
+    height:auto !important;max-height:none !important;overflow-y:auto !important;overflow-x:hidden !important;
+}
+html.minimal-youtube[data-myt-search-ui] ytd-search {
+    display:block !important;position:relative !important;box-sizing:border-box !important;
+    width:100% !important;max-width:1280px !important;margin:0 auto !important;padding:28px 24px 48px !important;
+}
+html.minimal-youtube[data-myt-search-ui] #myt-search { margin:0 !important;padding:0 !important; }
+html.minimal-youtube[data-myt-search-ui] ytd-page-manager { margin-left:0 !important;margin-right:0 !important;width:100% !important;min-width:0 !important;height:auto !important;max-height:none !important;overflow:visible !important; }
+html.minimal-youtube[data-myt-search-ui] ytd-search > :not(#myt-search):not([data-myt-search-continuation-path]),
+html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-native-root]:not([data-myt-search-continuation-path]),
+html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-continuation-path] > :not([data-myt-search-continuation-path]) {
+    display:block !important;position:absolute !important;inset:0 auto auto 0 !important;width:0 !important;height:0 !important;
+    min-width:0 !important;min-height:0 !important;margin:0 !important;padding:0 !important;
+    overflow:hidden !important;visibility:hidden !important;opacity:0 !important;pointer-events:none !important;contain:strict !important;
+}
+html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-continuation-path] {
+    display:contents !important;position:static !important;width:auto !important;height:auto !important;
+    visibility:visible !important;opacity:1 !important;overflow:visible !important;contain:none !important;
+}
+html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-renderer[data-myt-search-continuation-path] {
+    display:block !important;height:2px !important;min-height:2px !important;pointer-events:none !important;
+}
+@media(max-width:600px){html.minimal-youtube[data-myt-search-ui] ytd-search{padding:20px 16px 40px !important;}}`;
     class Search{
         constructor(){
+            this.nativeStyle=node('style');this.nativeStyle.id='myt-search-native-style';this.nativeStyle.textContent=nativeStyles;document.documentElement.append(this.nativeStyle);
             this.cards=new Map();this.channels=new Map();this.groups=new Map();this.sources=new Map();this.sequence=0;this.nativeNodes=new Set();this.open=false;
             this.host=node('div');this.host.id='myt-search';this.host.lang='en';this.shadow=this.host.attachShadow({mode:'open'});
             this.shadow.innerHTML='<style>'+styles+'</style><div class="toolbar"><button class="filters-toggle" aria-expanded="false" aria-controls="search-filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 18h18"/><circle cx="8" cy="6" r="3" fill="var(--myt-bg)"/><circle cx="16" cy="18" r="3" fill="var(--myt-bg)"/></svg>Filters</button></div><section id="search-filters" class="filter-panel" aria-label="Search filters" hidden><div class="filter-head"><h2>Search filters</h2><button class="close-filters">Close</button></div><div class="filter-groups"></div></section><div class="channels" aria-label="Channels"></div><div class="stream"></div><p class="empty" hidden>No results found.</p>';
@@ -310,10 +342,11 @@
                 }
                 if(rebuild)this.queue();
             });
+            this.selectionNodes=new Set();this.selectionObserver=new MutationObserver(()=>this.queue());
             this.changed=()=>this.queue();document.addEventListener('yt-page-data-updated',this.changed);document.addEventListener('yt-rendererstamper-finished',this.changed);
         }
         static isPlaylist(card){return card.matches('ytd-playlist-renderer,ytd-grid-playlist-renderer,ytd-radio-renderer,[is-playlist],[content-type="playlist"],[data-content-type="playlist"]')||!!card.querySelector('yt-collection-thumbnail-view-model,yt-collections-stack,ytd-thumbnail-overlay-side-panel-renderer')||safeURL(card.querySelector(titleSelector)?.href)?.pathname==='/playlist';}
-        queue(){if(this.frame)return;this.frame=requestAnimationFrame(()=>{this.frame=0;if(this.search?.isConnected)this.sync([this.search]);});}
+        queue(){if(this.frame)return;this.frame=requestAnimationFrame(()=>{this.frame=0;const searches=document.querySelectorAll('ytd-search');if(searches.length)this.sync(searches);});}
         queueCard(source){
             if(!this.cards.has(source)){this.queue();return;}
             this.pendingCards ||=new Set();this.pendingCards.add(source);if(this.cardFrame)return;
@@ -322,7 +355,7 @@
         toggleFilters(open,focus=false){this.open=open;this.q('.filter-panel').hidden=!open;this.q('.filters-toggle').setAttribute('aria-expanded',String(open));if(open)this.renderFilters();if(focus)this.q('.filters-toggle').focus();}
         renderFilters(){
             const available=new Map();
-            for(const option of this.snapshot?.filters||[]){const label=englishFilter(option.label)||option.label;if(dataModel.youtube(option.href))available.set(label,{href:option.href});}
+            for(const option of this.snapshot?.filters||[]){const label=englishFilter(option.label)||option.label;if(youtubeURL(option.href))available.set(label,{href:option.href});}
             for(const option of document.querySelectorAll('ytd-search-filter-renderer a[href],ytd-search-filter-group-renderer a[href]')){
                 const label=englishFilter(text(option))||text(option);available.set(label,{href:option.href,source:option});
             }
@@ -341,18 +374,27 @@
         }
         read(source,kind,record){
             const anchors=[...source.querySelectorAll('a[href]')];
-            const main=source.querySelector(titleSelector)||anchors.find(link=>{const url=safeURL(link.href);return kind==='video'?url?.pathname==='/watch':url?.pathname==='/playlist'||url?.searchParams.has('list');});
-            const owner=source.querySelector('ytd-channel-name a[href],#channel-info a[href],.ytLockupMetadataViewModelMetadata a[href],a[href^="/@"]')||anchors.find(link=>dataModel.channelURL(link.href));
-            const href=dataModel.youtube(main?.href||record?.href);
+            const title=source.querySelector(titleSelector);
+            const main=(title?.matches('a[href]')?title:title?.closest('a[href]')||title?.querySelector('a[href]'))||anchors.find(link=>{const url=safeURL(link.href);return kind==='video'?url?.pathname==='/watch':url?.pathname==='/playlist'||url?.searchParams.has('list');});
+            const owner=source.querySelector('ytd-channel-name a[href],#channel-info a[href],.ytLockupMetadataViewModelMetadata a[href],a[href^="/@"]')||anchors.find(link=>channelURL(link.href));
+            const href=youtubeURL(main?.href||record?.href);
             if(!href||kind==='video'&&(new URL(href).pathname!=='/watch'||!new URL(href).searchParams.has('v')))return null;
             let image=coverImage(source)||record?.image;
             const parsed=new URL(href);if(!image&&parsed.searchParams.get('v')?.match(/^[-\w]{11}$/))image='https://i.ytimg.com/vi/'+parsed.searchParams.get('v')+'/hqdefault.jpg';
-            return {kind,href,title:text(main)||record?.title||'Video',image,channel:{name:text(owner)||record?.channel?.name||'',href:dataModel.channelURL(owner?.href||record?.channel?.href)}};
+            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,channel:{name:text(owner)||record?.channel?.name||'',href:channelURL(owner?.href||record?.channel?.href)}};
         }
         sync(searches){
+            if(!this.nativeStyle.isConnected)document.documentElement.append(this.nativeStyle);
             document.documentElement.setAttribute('data-myt-search-ui','');
-            const search=[...searches].find(item=>!item.hidden)||[...searches][0];if(!search)return;
+            const candidates=[...searches],selectionNodes=new Set();
+            for(const item of candidates)for(let parent=item;parent&&parent!==document.body;parent=parent.parentElement)selectionNodes.add(parent);
+            if(selectionNodes.size!==this.selectionNodes.size||[...selectionNodes].some(item=>!this.selectionNodes.has(item))){
+                this.selectionObserver.disconnect();this.selectionNodes=selectionNodes;
+                for(const item of selectionNodes)this.selectionObserver.observe(item,{attributes:true,attributeFilter:['hidden','aria-hidden','class','style']});
+            }
+            const search=candidates.find(item=>!item.closest('[hidden],[aria-hidden="true"]')&&item.getClientRects().length&&getComputedStyle(item).visibility!=='hidden')||candidates[0];if(!search)return;
             if(this.search!==search){
+                this.search?.removeEventListener('load',this.changed,true);
                 this.observer.disconnect();this.search=search;
                 this.observer.observe(search,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['href','src','srcset','data-src','data-srcset','class','hidden','aria-label','aria-pressed','subscribed','is-subscribed','disabled']});
                 search.addEventListener('load',this.changed,true);
@@ -431,6 +473,8 @@
             flush(false);container.replaceChildren(...content);
         }
         destroy(){
+            this.nativeStyle.remove();
+            this.selectionObserver.disconnect();this.selectionNodes.clear();
             document.documentElement.removeAttribute('data-myt-search-ui');
             cancelAnimationFrame(this.cardFrame);this.pendingCards?.clear();
             cancelAnimationFrame(this.frame);this.observer.disconnect();this.resize.disconnect();this.search?.removeEventListener('load',this.changed,true);

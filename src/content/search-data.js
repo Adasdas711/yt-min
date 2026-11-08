@@ -66,7 +66,8 @@
     // before the background has registered its optional response-pruning hook.
     if(typeof document!=='undefined'&&!globalThis.chrome?.runtime?.id)document.addEventListener('minimal-youtube:search-snapshot',()=>{
         if(globalThis.__minimalYouTubeDataPruning||location.pathname!=='/results'||!document.documentElement?.hasAttribute('data-myt-search-ui'))return;
-        const publicData=collect(document.querySelector('ytd-search')?.data||globalThis.ytInitialData),records=[];
+        const search=document.querySelector('#myt-search')?.closest('ytd-search')||document.querySelector('ytd-search');
+        const publicData=collect(search?.data||globalThis.ytInitialData),records=[];
         for(const source of document.querySelectorAll('[data-myt-search-source-key]')){
             const kind=source.getAttribute('data-myt-search-source-kind');let value;
             for(const data of [source.data,source.__data?.data,source.__data?.data?.data]){value=record(data,kind)||collect(data).records.find(item=>item.kind===kind);if(value)break;}

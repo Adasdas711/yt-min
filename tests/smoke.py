@@ -2630,10 +2630,15 @@ def main():
               <div style="height:3000px">Native content</div></div></{renderer}>
               </ytd-page-manager></ytd-app>'''
             page = setup(browser, path, fixture)
+            if renderer=='ytd-search':
+                from search import video as owned_video
+                page.locator('#inner-scroll').evaluate('(node,html)=>node.insertAdjacentHTML("beforeend",html)',''.join(owned_video(i) for i in range(12)))
+                expect(page.locator('#myt-search .media')).to_have_count(12)
+                assert page.locator('#myt-search').evaluate('node=>node.getClientRects().length>0')
             page.evaluate("document.documentElement.style.cssText='height:100%;overflow:hidden'; document.body.style.cssText='height:100%;overflow:hidden'")
             page.mouse.move(10, 400)
             page.mouse.wheel(0, 300)
-            page.wait_for_function("document.querySelector('#inner-scroll').scrollTop >= 250")
+            page.wait_for_function('scrollY>=250' if renderer=='ytd-search' else "document.querySelector('#inner-scroll').scrollTop >= 250")
             ok(f"{renderer} detects an inner scrollport and ignores a stale hidden SPA renderer")
             page.close()
 

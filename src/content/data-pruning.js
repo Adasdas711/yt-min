@@ -23,7 +23,8 @@
     document.addEventListener('minimal-youtube:search-snapshot',()=>{
         const model=globalThis.MinimalYouTubeSearchData;if(!enabled||!model||location.pathname!=='/results')return;
         const records=new Map(searchRecords),filters=[...searchFilters];
-        for(const data of [document.querySelector('ytd-search')?.data,window.ytInitialData]){
+        const search=document.querySelector('#myt-search')?.closest('ytd-search')||document.querySelector('ytd-search');
+        for(const data of [search?.data,window.ytInitialData]){
             const found=model.collect(data);for(const value of found.records)records.set(value.href,value);filters.push(...found.filters);
         }
         const result=[];

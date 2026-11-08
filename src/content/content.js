@@ -1526,7 +1526,19 @@
                 (element === document.scrollingElement && !/clip/.test(overflow));
         };
         const page = root.dataset.mytPage;
-        if ((page === "playlist" && playlistLayoutNodes.size || page === "search" && root.hasAttribute('data-myt-search-ui')) && canScroll(document.scrollingElement)) {
+        if(page==='search'&&root.hasAttribute('data-myt-search-ui')){
+            // The owned canvas replaces native child scrollports. Retain an
+            // enclosing app scrollport, or scroll the document when none exists.
+            let scroller=null;
+            for(let node=searchView?.search?.parentElement;node&&node!==root;node=node.parentElement)if(canScroll(node)){scroller=node;break;}
+            scroller ||= canScroll(document.scrollingElement)?document.scrollingElement:null;
+            if(scroller){
+                for(let node=target;node&&node!==document.body&&node!==root;node=node.parentElement)if(node!==scroller&&!node.contains(searchView?.search)&&canScroll(node))return;
+                const unit=event.deltaMode===WheelEvent.DOM_DELTA_PAGE?scroller.clientHeight:event.deltaMode===WheelEvent.DOM_DELTA_LINE?20:1;
+                scroller.scrollBy({top:event.deltaY*unit,behavior:'instant'});event.preventDefault();event.stopPropagation();return;
+            }
+        }
+        if (page === "playlist" && playlistLayoutNodes.size && canScroll(document.scrollingElement)) {
             // Owned layouts scroll the document. Avoid searching all native
             // source descendants to rediscover that scrollport on each tick.
             for (let node = target; node && node !== document.body && node !== root; node = node.parentElement) if (canScroll(node)) return;
