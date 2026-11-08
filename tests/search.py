@@ -10,8 +10,9 @@ def video(i):
 
 
 
-def playlist(i,modern=False):
+def playlist(i,modern=False,count=None):
     content=f'<a class="cover-link" href="/playlist?list=PL{i}"><img src="{cover()}"></a><h3><a href="/playlist?list=PL{i}">Playlist {i}</a></h3><a href="/@creator">Creator {i}</a>'
+    if count is not None:content+=f'<span id="video-count-text">{count} videos</span>'
     return ('<yt-lockup-view-model content-type="playlist">' + content + '</yt-lockup-view-model>') if modern else '<ytd-playlist-renderer>'+content+'</ytd-playlist-renderer>'
 
 
@@ -61,6 +62,30 @@ def check(browser,width,dark,prune=True):
       chrome.runtime.getURL=path=>'https://www.youtube.com/'+path;__setEnabled(true);
     }""")
     root=page.locator('#myt-search');expect(root.locator('.media')).to_have_count(11)
+    sources=page.locator('ytd-playlist-renderer,yt-lockup-view-model[content-type="playlist"]')
+    for index,count in enumerate([256,64]):sources.nth(index).evaluate('(node,count)=>node.insertAdjacentHTML("beforeend",`<span id="video-count-text">${count} videos</span>`)',count)
+    expect(root.locator('.playlist-badge')).to_have_text(['256 videos','64 videos'])
+    dimensions=page.evaluate('''()=>{const search=document.querySelector('#myt-search').parentElement,s=getComputedStyle(search),box=search.getBoundingClientRect(),result=document.querySelector('#myt-search').getBoundingClientRect();return{before:search.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight),after:result.width,offset:result.x+result.width/2-box.x-box.width/2};}''')
+    assert abs(dimensions['after']-dimensions['before']*.9)<.05,dimensions
+    assert abs(dimensions['offset'])<1,dimensions
+    if width>=900:
+        columns=3 if dimensions['before']>=900 else 2
+        old_card=(dimensions['before']-20*(columns-1))/columns*2+20
+        old_cover=(old_card-44)*1.15/2.15
+        cover_box=root.locator('.media.playlist .cover').first.bounding_box()
+        assert cover_box['width']>old_cover*1.08,(cover_box,old_cover)
+        assert abs(cover_box['height']-cover_box['width']*9/16)<1,cover_box
+    count_source=sources.first.locator('#video-count-text')
+    count_source.evaluate('node=>node.firstChild.data="257 videos"')
+    expect(root.locator('.playlist-badge').first).to_have_text('257 videos')
+    for count,label in [(0,'0 videos'),(1,'1 video'),(256,'256 videos')]:
+        count_source.evaluate('(node,count)=>node.setAttribute("data-video-count",String(count))',count)
+        expect(root.locator('.playlist-badge').first).to_have_text(label)
+    page.locator('.native-results').evaluate('(node,html)=>node.insertAdjacentHTML("beforeend",html)',playlist(99))
+    page.evaluate('document.documentElement.setAttribute("data-myt-search-playlists",JSON.stringify([{id:"PL99",count:"347"}]))')
+    expect(root.locator('.playlist-badge')).to_have_text(['256 videos','64 videos','347 videos'])
+    page.locator('ytd-playlist-renderer').last.evaluate('node=>node.remove()')
+    expect(root.locator('.media')).to_have_count(11)
     expect(root.locator('.group h2')).to_have_text(['For you','Watch again'])
     page.wait_for_function('Array.from(document.fonts).some(face=>face.family==="MYT Barlow Condensed"&&face.status==="loaded")')
     expect(root.locator('.media-channel').first).to_have_text('Creator')

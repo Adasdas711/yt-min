@@ -24,6 +24,20 @@
         }
         return best;
     }
+    function playlistCount(value){
+        const parse=input=>{
+            const text=(typeof input==='number'?String(input):label(input)).replace(/[\u00a0\u202f]/g,' ').trim();
+            return text.match(/([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*)/iu)?.[1]?.trim()||(/^[\d][\d\s,.]*\+?$/.test(text)?text:'');
+        };
+        for(const input of [value.videoCount,value.videoCountText,value.videoCountShortText]){const count=parse(input);if(count)return count;}
+        const stack=[value.contentImage,value.thumbnailRenderer,value.metadata?.lockupMetadataViewModel?.metadata||value.metadata?.metadata||value.metadata],seen=new Set();let scanned=0;
+        while(stack.length&&scanned++<1200){
+            const item=stack.pop();if(!item||typeof item!=='object'||seen.has(item))continue;seen.add(item);
+            const count=parse(item.text)||parse(item);if(count)return count;
+            for(const [key,child]of Object.entries(item))if(key!=='title'&&child&&typeof child==='object')stack.push(child);
+        }
+        return '';
+    }
     function record(input,hint=''){
         if(!input||typeof input!=='object')return null;
         let kind=hint,value=input;
@@ -49,7 +63,7 @@
         const metadataText=[label(value.subscriberCountText),label(value.videoCountText)].filter(Boolean);
         const handle=metadataText.find(text=>/^@\S+$/.test(text))||'';
         const avatar=image([value.thumbnail,value.thumbnails,value.avatar,value.contentImage]);
-        return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,4),count:label(value.videoCountText)||String(value.videoCount||'')};
+        return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,4),count:kind==='playlist'?playlistCount(value):''};
     }
     function collect(root){
         const records=[],filters=[],seen=new Set(),stack=[root];let scans=0;
@@ -61,7 +75,7 @@
         }
         return {records,filters};
     }
-    globalThis.MinimalYouTubeSearchData={label,url,youtube,channelURL,endpoint,image,record,collect};
+    globalThis.MinimalYouTubeSearchData={label,url,youtube,channelURL,endpoint,image,playlistCount,record,collect};
     // Static MAIN injection also serves the first page after installation,
     // before the background has registered its optional response-pruning hook.
     if(typeof document!=='undefined'&&!globalThis.chrome?.runtime?.id)document.addEventListener('minimal-youtube:search-snapshot',()=>{

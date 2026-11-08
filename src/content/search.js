@@ -43,7 +43,7 @@
     const playlistSelector='ytd-playlist-renderer,ytd-grid-playlist-renderer,yt-lockup-view-model';
     const countSelector='#video-count-text,#video-count,#playlist-video-count,.formatted-video-count-label,yt-collection-thumbnail-overlay-view-model,ytd-thumbnail-overlay-side-panel-renderer,yt-thumbnail-overlay-badge-view-model,yt-thumbnail-bottom-overlay-view-model,yt-badge-shape,.ytBadgeShapeText,.yt-badge-shape__text,.badge-shape-wiz__text,[data-video-count]';
     const countNumber=value=>{
-        const input=String(value||'').replace(/[\u00a0\u202f]/g,' ').trim();
+        const input=String(value??'').replace(/[\u00a0\u202f]/g,' ').trim();
         return input.match(/([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*)/iu)?.[1]?.trim()||(/^[\d][\d\s,.]*\+?$/.test(input)?input:'');
     };
     function coverImage(source){
@@ -216,6 +216,30 @@
     // does not list the newer optional MAIN data adapter yet.
     const youtubeURL=value=>{const url=safeURL(value);return url?.protocol==='https:'&&/(^|\.)youtube\.com$/.test(url.hostname)?url.href:'';};
     const channelURL=value=>{const href=youtubeURL(value);return href&&channelPath.test(new URL(href).pathname)?href:'';};
+    const filterViews=new Set();
+    function routeFilterInput(event){
+        const path=event.composedPath(),keyboard=event.type==='keydown';
+        for(const view of filterViews){
+            if(!view.host.isConnected)continue;
+            const toggle=view.q('.filters-toggle'),close=view.q('.close-filters');
+            if(keyboard&&event.key==='Escape'&&view.open&&path.includes(view.host)){
+                event.preventDefault();event.stopImmediatePropagation();view.toggleFilters(false,true);return;
+            }
+            const control=path.find(item=>item===toggle||item===close||view.filterActions.has(item));
+            if(!control||(!keyboard&&event.button)||control!==toggle&&control!==close&&(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey))continue;
+            if(keyboard&&!(event.key==='Enter'||event.key===' '&&(control===toggle||control===close)))continue;
+            // Handle owned controls before YouTube's ancestor capture handlers
+            // can cancel the click or replace its target during pointer-down.
+            event.stopImmediatePropagation();
+            if(!keyboard&&event.type!=='click')return;
+            event.preventDefault();if(keyboard&&event.repeat)return;
+            if(control===toggle){toggle.focus({preventScroll:true});view.toggleFilters(!view.open);}
+            else if(control===close)view.toggleFilters(false,true);
+            else view.filterActions.get(control)?.();
+            return;
+        }
+    }
+    for(const type of ['pointerdown','mousedown','touchstart','click','keydown'])window.addEventListener(type,routeFilterInput,{capture:true,passive:type!=='click'&&type!=='keydown'});
     const headingCopy=new Map([
         ['Watch again',['Посмотреть еще раз','Посмотреть ещё раз','Посмотреть снова','Смотреть ещё раз','Erneut ansehen']],
         ['For you',['Для вас','Für dich','Für Sie']],['Previously watched',['Вы уже смотрели','Bereits angesehen']],
@@ -224,7 +248,7 @@
     const heading=value=>headingCopy.get(value.trim().toLocaleLowerCase())||value.replace(/^(?:Новые видео на канале|Последние видео (?:на канале|от)|Neueste Videos von)\s+/iu,'Latest from ');
     const node=(tag,className,value)=>{const result=document.createElement(tag);if(className)result.className=className;if(value)result.textContent=value;return result;};
     const styles=`
-      :host{all:initial!important;display:block!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;font:16px/1.45 Arial,sans-serif!important;color:var(--myt-ink)!important;position:relative!important}
+      :host{all:initial!important;display:block!important;width:90%!important;margin-inline:auto!important;min-width:0!important;box-sizing:border-box!important;font:16px/1.45 Arial,sans-serif!important;color:var(--myt-ink)!important;position:relative!important}
       *{box-sizing:border-box}[hidden]{display:none!important}a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}a:focus-visible,button:focus-visible{outline:2px solid var(--myt-muted);outline-offset:3px}
       .toolbar{display:flex;align-items:center;justify-content:space-between;padding:0 0 16px;margin-bottom:24px;border-bottom:1px solid var(--myt-border)}
       .filters-toggle,.close-filters{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:9px 14px;border:0;border-radius:12px;background:transparent;color:inherit;font-weight:600}
@@ -236,7 +260,7 @@
       .media:is(:hover,:focus-within){background:var(--myt-soft)}.cover{position:relative;display:block;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:var(--myt-soft)}.cover img{display:block;width:100%;height:100%;object-fit:cover}.media-info{display:flex;flex-direction:column;justify-content:center;gap:12px;min-width:0;padding:0 3px}
       .media-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;font-size:20px;line-height:1.35;font-weight:700}
       .media-channel{display:block;overflow-wrap:anywhere;color:var(--myt-muted);font-size:18px;font-weight:500;line-height:1.4}.media-channel:is(:hover,:focus-visible){color:var(--myt-ink)}
-      .media.playlist{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:center;gap:20px;padding-bottom:12px}.media.playlist .cover{width:100%}.playlist-badge{position:absolute;right:8px;bottom:8px;padding:4px 8px;border-radius:6px;background:#000b;color:#fff;font-size:13px}
+      .media.playlist{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:center;gap:20px;padding-bottom:12px}.media.playlist .cover{width:100%}.playlist-badge{position:absolute;right:8px;bottom:8px;padding:4px 8px;border-radius:6px;background:#000b;color:#fff;font-size:13px}
       .group{min-width:0;padding:20px;border-radius:22px;background:var(--myt-soft)}.group h2{margin:0 0 18px;padding-inline-end:.2em;overflow:visible;overflow-wrap:anywhere;font:italic 900 40px/1.05 "MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:-.025em}
       .empty{padding:32px 0;color:var(--myt-muted)}@media(max-width:700px){.filter-groups{grid-template-columns:repeat(2,minmax(0,1fr))}.channels{grid-template-columns:1fr}.media-title{font-size:18px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}}
     `;
@@ -262,6 +286,7 @@
             this.owner.hidden=!data.channel.name;if(data.channel.href)this.owner.href=data.channel.href;else this.owner.removeAttribute('href');
             if(this.image.getAttribute('src')!==data.image){if(data.image)this.image.src=data.image;else this.image.removeAttribute('src');}
             this.image.hidden=!data.image;
+            if(this.badge){const label=data.count?data.count+(data.count==='1'?' video':' videos'):'Playlist';if(this.badge.textContent!==label)this.badge.textContent=label;}
         }
         destroy(){this.host.remove();}
     }
@@ -302,7 +327,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search {
     display:block !important;position:relative !important;box-sizing:border-box !important;
     width:100% !important;max-width:1280px !important;margin:0 auto !important;padding:28px 24px 48px !important;
 }
-html.minimal-youtube[data-myt-search-ui] #myt-search { margin:0 !important;padding:0 !important; }
+html.minimal-youtube[data-myt-search-ui] #myt-search { width:90% !important;margin:0 auto !important;padding:0 !important; }
 html.minimal-youtube[data-myt-search-ui] ytd-page-manager { margin-left:0 !important;margin-right:0 !important;width:100% !important;min-width:0 !important;height:auto !important;max-height:none !important;overflow:visible !important; }
 html.minimal-youtube[data-myt-search-ui] ytd-search > :not(#myt-search):not([data-myt-search-continuation-path]),
 html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-native-root]:not([data-myt-search-continuation-path]),
@@ -326,8 +351,8 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
             this.host=node('div');this.host.id='myt-search';this.host.lang='en';this.shadow=this.host.attachShadow({mode:'open'});
             this.shadow.innerHTML='<style>'+styles+'</style><div class="toolbar"><button class="filters-toggle" aria-expanded="false" aria-controls="search-filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 18h18"/><circle cx="8" cy="6" r="3" fill="var(--myt-bg)"/><circle cx="16" cy="18" r="3" fill="var(--myt-bg)"/></svg>Filters</button></div><section id="search-filters" class="filter-panel" aria-label="Search filters" hidden><div class="filter-head"><h2>Search filters</h2><button class="close-filters">Close</button></div><div class="filter-groups"></div></section><div class="channels" aria-label="Channels"></div><div class="stream"></div><p class="empty" hidden>No results found.</p>';
             this.q=selector=>this.shadow.querySelector(selector);
-            this.q('.filters-toggle').onclick=()=>this.toggleFilters(!this.open);this.q('.close-filters').onclick=()=>this.toggleFilters(false,true);
-            this.shadow.addEventListener('keydown',event=>{if(event.key==='Escape'&&this.open){event.preventDefault();this.toggleFilters(false,true);}});
+            this.filterActions=new WeakMap();filterViews.add(this);
+            this.shadow.addEventListener('click',routeFilterInput);this.shadow.addEventListener('keydown',routeFilterInput);
             this.resize=new ResizeObserver(()=>this.layout());this.resize.observe(this.host);
             this.observer=new MutationObserver(records=>{
                 if(records.every(record=>record.type==='attributes'&&record.attributeName?.startsWith('data-myt-search-')))return;
@@ -335,9 +360,9 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
                 for(const record of records){
                     const target=record.target instanceof Element?record.target:record.target.parentElement,source=target?.closest(sourceSelector);
                     const textOnly=record.type==='characterData'||record.type==='childList'&&[...record.addedNodes,...record.removedNodes].every(node=>node.nodeType===Node.TEXT_NODE);
-                    const imageOnly=record.type==='attributes'&&['src','srcset','data-src','data-srcset','href'].includes(record.attributeName);
+                    const imageOnly=record.type==='attributes'&&['src','srcset','data-src','data-srcset','href','data-video-count'].includes(record.attributeName);
                     if(source&&this.cards.has(source)&&(textOnly||imageOnly)){
-                        if(!textOnly||target.closest('h3,ytd-channel-name,#channel-info,a'))this.queueCard(source);
+                        if(!textOnly||target.closest('h3,ytd-channel-name,#channel-info,a')||this.cards.get(source).host.dataset.kind==='playlist'&&target.closest(countSelector))this.queueCard(source);
                     }else rebuild=true;
                 }
                 if(rebuild)this.queue();
@@ -355,18 +380,18 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
         toggleFilters(open,focus=false){this.open=open;this.q('.filter-panel').hidden=!open;this.q('.filters-toggle').setAttribute('aria-expanded',String(open));if(open)this.renderFilters();if(focus)this.q('.filters-toggle').focus();}
         renderFilters(){
             const available=new Map();
-            for(const option of this.snapshot?.filters||[]){const label=englishFilter(option.label)||option.label;if(youtubeURL(option.href))available.set(label,{href:option.href});}
+            for(const option of this.snapshot?.filters||[]){const label=englishFilter(String(option.label||''))||String(option.label||'');if(youtubeURL(option.href))available.set(label,{href:option.href});}
             for(const option of document.querySelectorAll('ytd-search-filter-renderer a[href],ytd-search-filter-group-renderer a[href]')){
-                const label=englishFilter(text(option))||text(option);available.set(label,{href:option.href,source:option});
+                const label=englishFilter(text(option))||text(option),href=youtubeURL(option.href);if(href)available.set(label,{href,source:option});
             }
             const signature=JSON.stringify([location.href,[...available].map(([key,item])=>[key,item.href])]);if(signature===this.filterSignature)return;this.filterSignature=signature;
-            const container=this.q('.filter-groups');container.replaceChildren();
+            const container=this.q('.filter-groups');container.replaceChildren();this.filterActions=new WeakMap();
             for(const [title,options]of filterGroups){
                 const group=node('div','filter-group');group.append(node('h3','',title));
                 for(const [label,field,value]of options){
                     const item=available.get(label),link=node('a','',label);link.href=item?.href||filterURL(field,value);
                     link.setAttribute('aria-current',String(new URL(link.href).searchParams.get('sp')===new URL(location.href).searchParams.get('sp')));
-                    if(item?.source)link.onclick=event=>{if(!event.button&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){event.preventDefault();item.source.click();this.toggleFilters(false,true);}};
+                    this.filterActions.set(link,()=>{this.toggleFilters(false,true);if(item?.source?.isConnected)item.source.click();else location.assign(link.href);});
                     group.append(link);
                 }
                 container.append(group);
@@ -379,9 +404,11 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
             const owner=source.querySelector('ytd-channel-name a[href],#channel-info a[href],.ytLockupMetadataViewModelMetadata a[href],a[href^="/@"]')||anchors.find(link=>channelURL(link.href));
             const href=youtubeURL(main?.href||record?.href);
             if(!href||kind==='video'&&(new URL(href).pathname!=='/watch'||!new URL(href).searchParams.has('v')))return null;
-            let image=coverImage(source)||record?.image;
-            const parsed=new URL(href);if(!image&&parsed.searchParams.get('v')?.match(/^[-\w]{11}$/))image='https://i.ytimg.com/vi/'+parsed.searchParams.get('v')+'/hqdefault.jpg';
-            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,channel:{name:text(owner)||record?.channel?.name||'',href:channelURL(owner?.href||record?.channel?.href)}};
+            const parsed=new URL(href),cached=kind==='playlist'?this.playlistMetadata?.get(parsed.searchParams.get('list')||record?.id):null;
+            let image=coverImage(source)||record?.image||cached?.image;
+            if(!image&&parsed.searchParams.get('v')?.match(/^[-\w]{11}$/))image='https://i.ytimg.com/vi/'+parsed.searchParams.get('v')+'/hqdefault.jpg';
+            const count=kind==='playlist'?([...source.querySelectorAll(countSelector)].map(node=>countNumber(node.getAttribute('data-video-count')||node.getAttribute('aria-label')||text(node))).find(Boolean)||countNumber(record?.count)||countNumber(cached?.count)):'';
+            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,count,channel:{name:text(owner)||record?.channel?.name||'',href:channelURL(owner?.href||record?.channel?.href)}};
         }
         sync(searches){
             if(!this.nativeStyle.isConnected)document.documentElement.append(this.nativeStyle);
@@ -396,7 +423,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
             if(this.search!==search){
                 this.search?.removeEventListener('load',this.changed,true);
                 this.observer.disconnect();this.search=search;
-                this.observer.observe(search,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['href','src','srcset','data-src','data-srcset','class','hidden','aria-label','aria-pressed','subscribed','is-subscribed','disabled']});
+                this.observer.observe(search,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['href','src','srcset','data-src','data-srcset','data-video-count','class','hidden','aria-label','aria-pressed','subscribed','is-subscribed','disabled']});
                 search.addEventListener('load',this.changed,true);
             }
             if(this.host.parentElement!==search)search.prepend(this.host);
@@ -410,6 +437,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
             document.dispatchEvent(new Event('minimal-youtube:search-snapshot'));
             try{this.snapshot=JSON.parse(document.documentElement.getAttribute('data-myt-search-snapshot')||'{}');}catch{this.snapshot={};}
             const records=new Map((this.snapshot.records||[]).map(record=>[record.key,record])),channelCache=new Map();
+            this.playlistMetadata=new Map();try{for(const value of JSON.parse(document.documentElement.getAttribute('data-myt-search-playlists')||'[]').slice(-200))if(typeof value.id==='string')this.playlistMetadata.set(value.id,value);}catch{}
             try{for(const value of JSON.parse(document.documentElement.getAttribute('data-myt-search-channels')||'[]'))channelCache.set(value.id,value);}catch{}
             const stream=[],groups=new Map();
             for(const source of sources){
@@ -452,7 +480,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
         }
         layout(){
             if(!this.host.isConnected||!this.stream)return;
-            const width=this.host.clientWidth,columns=width<560?1:width<900?2:3;
+            const style=getComputedStyle(this.search),width=this.search.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),columns=width<560?1:width<900?2:3;
             this.place(this.q('.stream'),this.stream,columns);
             for(const group of this.groups.values())this.place(group.stream,group.items,columns===3&&[2,4].includes(group.items.length)?2:columns);
         }
@@ -473,6 +501,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
             flush(false);container.replaceChildren(...content);
         }
         destroy(){
+            filterViews.delete(this);this.filterActions=new WeakMap();
             this.nativeStyle.remove();
             this.selectionObserver.disconnect();this.selectionNodes.clear();
             document.documentElement.removeAttribute('data-myt-search-ui');

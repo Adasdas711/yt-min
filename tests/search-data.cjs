@@ -10,4 +10,13 @@ const video=plain(model.record(modern));assert.equal(video.title,'Пользов
 const snapshot=model.collect({contents:[{channelRenderer:channel},modern,{searchFilterRenderer:{label:{simpleText:'Плейлист'},navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/results?search_query=x&sp=EgIQAw%3D%3D'}}}}}]});
 assert(snapshot.records.some(item=>item.kind==='channel'));assert.equal(snapshot.filters[0].label,'Плейлист');assert(snapshot.filters[0].href.includes('sp='));
 assert.equal(model.youtube('https://example.com/watch?v=x'),'');assert.equal(model.url('javascript:alert(1)'),'');assert.equal(model.channelURL('/watch?v=abcdefghijk'),'');
+for(const [value,count]of [[{videoCount:0},'0'],[{videoCount:1},'1'],[{videoCountText:{runs:[{text:'1 234 видео'}]}},'1 234'],[{videoCountShortText:{simpleText:'50+ videos'}},'50+'],[{contentImage:{collectionThumbnailViewModel:{primaryThumbnail:{thumbnailViewModel:{overlays:[{thumbnailBottomOverlayViewModel:{badges:[{thumbnailBadgeViewModel:{text:'128 videos'}}]}}]}}}}},'128']]){
+    const item=model.record({lockupViewModel:{contentId:'PLcounts',contentType:'LOCKUP_CONTENT_TYPE_PLAYLIST',...value}});
+    assert.equal(item.count,count);
+}
+const notACount={metadata:{lockupMetadataViewModel:{
+    title:{content:'200 videos I like'},
+    metadata:{contentMetadataViewModel:{metadataRows:[{metadataParts:[{text:{content:'3,000 views'}}]}]}},
+}}};
+assert.equal(model.playlistCount(notACount),'');
 console.log('PASS legacy and modern public search records, nested avatars, channel endpoints, native filters and unchanged user text');
