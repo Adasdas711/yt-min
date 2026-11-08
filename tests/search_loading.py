@@ -49,6 +49,18 @@ def alignment_and_headings(browser,width):
     header=page.locator('#watch-again h2')
     expect(header).to_have_css('font-style','italic');expect(header).to_have_css('font-weight','900');expect(header).to_have_css('-webkit-text-stroke-width','0px')
     page.wait_for_function('Array.from(document.fonts).some(face=>face.family==="MYT Barlow Condensed"&&face.status==="loaded")')
+    # Native formatted strings clip italic glyph overhang at their advance
+    # width. Exercise the exact nested, shrink-to-fit heading shape.
+    header.evaluate('''e=>e.innerHTML='<yt-formatted-string style="display:inline-block;overflow:hidden;white-space:nowrap;max-width:100%">WATCH AGAIN</yt-formatted-string>' ''')
+    label=header.locator('yt-formatted-string')
+    expect(label).to_have_css('overflow','visible')
+    ink=label.evaluate('''e=>{
+      const s=getComputedStyle(e),c=document.createElement('canvas').getContext('2d');
+      c.font=s.fontStyle+' '+s.fontWeight+' '+s.fontSize+' '+s.fontFamily;c.letterSpacing=s.letterSpacing;
+      const m=c.measureText(e.textContent);return{ink:m.actualBoundingBoxRight,width:e.getBoundingClientRect().width,padding:parseFloat(s.paddingRight)};
+    }''')
+    assert ink['padding']>=7 and ink['ink']<=ink['width'],ink
+    page.screenshot(path=f'/tmp/yt-min-search-heading-{width}.png',full_page=True)
     header.evaluate('e=>e.textContent="Посмотреть снова"')
     page.wait_for_function('Array.from(document.fonts).some(face=>face.family==="MYT Cyrillic Condensed"&&face.status==="loaded")')
     page.evaluate('''()=>document.querySelector('#generic-results').insertAdjacentHTML('beforeend','<ytd-shelf-renderer id="latest-shorts"><div id="title-container"><yt-formatted-string id="title">Latest Shorts from MrBeast</yt-formatted-string></div><div id="content"><yt-lockup-view-model><h3><a href="/watch?v=vertical">A vertical video with a watch endpoint</a></h3></yt-lockup-view-model></div></ytd-shelf-renderer><yt-section-header-view-model id="orphan-latest"><h2>Latest Shorts from Creator</h2></yt-section-header-view-model>')''')

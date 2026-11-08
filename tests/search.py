@@ -187,36 +187,37 @@ def subscription_buttons(browser,width,dark,modern):
     page=setup(browser,'/results?search_query=creator',body,width=width,native_dark=dark)
     page.evaluate('''modern=>{
       window.__subscriptionCalls=0;window.__presses=0;const button=window.__subscriptionButton=document.querySelector('#native-subscribe'),parent=button.parentElement;
-      const control=document.querySelector('[data-myt-search-channel-card]').shadowRoot.querySelector('.subscribe');const animate=control.animate;control.animate=function(...args){__presses++;return animate.apply(this,args)};
+      const control=document.querySelector('[data-myt-search-channel-card]').shadowRoot.querySelector('.channel-card');const animate=control.animate;control.animate=function(...args){__presses++;return animate.apply(this,args)};
       button.onclick=()=>{
         __subscriptionCalls++;const next=modern?button.getAttribute('aria-pressed')!=='true':!parent.hasAttribute('subscribed');
         if(modern)button.setAttribute('aria-pressed',String(next));else parent.toggleAttribute('subscribed',next);
         button.querySelector('span').textContent=next?'Вы подписаны':'Подписаться';button.setAttribute('aria-label',next?'Вы подписаны':'Подписаться на канал');
       };
     }''',modern)
-    control=page.locator('[data-myt-search-channel-card] .subscribe');card=page.locator('ytd-channel-renderer');before=card.bounding_box()
+    host=page.locator('[data-myt-search-channel-card]');control=host.locator('.subscribe');card=host.locator('.channel-card');before=card.bounding_box()
     regular=page.locator('#video-1').bounding_box()
     assert abs(before['width']-(regular['width']*1.5+12 if width>1000 else regular['width']))<1,(before,regular)
-    expect(control).to_have_attribute('data-myt-search-subscribe','false')
-    expect(control).to_have_css('background-color','rgb(25, 25, 29)' if dark else 'rgb(255, 255, 255)')
-    expect(control).to_have_css('border-radius','999px');expect(control.locator('svg')).to_be_hidden()
-    expect(control).to_have_text('Subscribe')
-    control.click();page.mouse.move(1,1)
-    expect(control).to_have_attribute('data-myt-search-subscribe','true');expect(control).to_have_css('background-color','rgb(201, 31, 55)')
-    expect(control).to_have_text('Subscribed')
+    expect(control).to_have_attribute('aria-pressed','false')
+    expect(card).to_have_css('background-color','rgb(25, 25, 29)' if dark else 'rgb(255, 255, 255)')
+    expect(control).to_have_css('border-radius','16px');expect(host.locator('.subscription-state svg')).to_have_count(0)
+    expect(control).to_have_attribute('aria-label','Subscribe to Creator')
+    control.click(position={'x':12,'y':12});page.mouse.move(1,1)
+    expect(control).to_have_attribute('aria-pressed','true');expect(card).to_have_css('background-color','rgb(201, 31, 55)')
+    expect(host.locator('.subscription-state')).to_have_text('Subscribed')
     assert page.evaluate('__subscriptionCalls===1&&__presses===0&&__subscriptionButton===document.querySelector("#native-subscribe")')
-    page.emulate_media(reduced_motion='no-preference');control.click();page.mouse.move(1,1)
-    expect(control).to_have_attribute('data-myt-search-subscribe','false')
+    page.emulate_media(reduced_motion='no-preference');control.click(position={'x':12,'y':12});page.mouse.move(1,1)
+    expect(control).to_have_attribute('aria-pressed','false')
     assert page.evaluate('__subscriptionCalls===2&&__presses===1')
+    page.wait_for_function('document.querySelector("[data-myt-search-channel-card]").shadowRoot.querySelector(".channel-card").getAnimations().length===0')
     assert abs(card.bounding_box()['width']-before['width'])<1
     page.locator('#native-subscribe').evaluate('e=>e.disabled=true');expect(control).to_be_disabled();box=control.bounding_box();page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
     assert page.evaluate('__subscriptionCalls===2')
     page.locator('#native-subscribe').evaluate('e=>e.disabled=false');expect(control).to_be_enabled()
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     page.emulate_media(reduced_motion='reduce');assert_stable(page)
-    control.click();page.mouse.move(1,1);expect(control).to_have_attribute('data-myt-search-subscribe','true');assert_stable(page)
+    control.click(position={'x':12,'y':12});page.mouse.move(1,1);expect(control).to_have_attribute('aria-pressed','true');assert_stable(page)
     page.screenshot(path=f'/tmp/yt-min-search-subscribe29-{width}-{dark}-{modern}.png')
-    page.evaluate('__setEnabled(false)');expect(page.locator('[data-myt-search-subscribe]')).to_have_count(0)
+    page.evaluate('__setEnabled(false)');expect(page.locator('[data-myt-search-channel-card]')).to_have_count(0)
     expect(page.locator('#native-subscribe svg')).to_be_visible();assert page.evaluate('__subscriptionButton===document.querySelector("#native-subscribe")')
     page.close();print(f'PASS subscription style/state, native actions, motion and 1.5-column width: {width}px, dark={dark}, modern={modern}',flush=True)
 

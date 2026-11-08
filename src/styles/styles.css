@@ -1185,13 +1185,15 @@ html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="searc
 }
 /* Channel contents are rendered in a shadow root. Native rows remain in place
    for YouTube state/actions, but cannot contribute layout or paint. */
-html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search [data-myt-search-channel] {
+html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search ytd-channel-renderer[data-myt-search-channel] {
     display: block !important;
     position: relative !important;
     box-sizing: border-box;
     min-width: 0;
     min-height: 128px;
     height: auto !important;
+    padding: 0 !important;
+    background: transparent !important;
 }
 html.minimal-youtube [data-myt-search-channel] > :not([data-myt-search-channel-card]) {
     position: absolute !important;
@@ -1274,6 +1276,13 @@ html.minimal-youtube [data-myt-search-heading-text] :is(span,a,yt-formatted-stri
     font-size: 40px !important; font-weight: 900 !important; font-style: italic !important;
     text-transform: uppercase; line-height: 1 !important; letter-spacing: -.025em;
     color: var(--myt-ink) !important; -webkit-text-fill-color: currentColor !important; -webkit-text-stroke: 0 transparent !important;
+    /* Italic glyph ink extends beyond its advance width. Reserve that space
+       inside native ellipsis boxes, including nested attributed text. */
+    padding-inline-end: .18em !important;
+    box-sizing: border-box;
+    overflow: visible !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
 }
 /* Native carousel offsets must never center or shift a partial search row. */
 html.minimal-youtube:is([data-myt-page="search"], [data-myt-previous-page="search"]) ytd-search :is([data-myt-search-cell],[data-myt-search-channel-cell],[data-myt-search-playlist-cell]) {
@@ -1436,11 +1445,11 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="popups"] { displ
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="popups"] > * { pointer-events: auto; }
 /* The native unsubscribe command still runs; its transient menu/confirmation
    stays masked through its closing animation, without hiding other dialogs. */
-html.minimal-youtube[data-myt-watch-ui] [data-myt-subscription-transient] {
+html.minimal-youtube [data-myt-subscription-transient] {
     opacity: 0 !important; pointer-events: none !important;
     transition: none !important; animation: none !important;
 }
-html.minimal-youtube[data-myt-watch-ui] [data-myt-subscription-transient]::backdrop {
+html.minimal-youtube [data-myt-subscription-transient]::backdrop {
     background: transparent !important; backdrop-filter: none !important;
 }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="anchor"] { display: block !important; opacity: 0 !important; pointer-events: none !important; }

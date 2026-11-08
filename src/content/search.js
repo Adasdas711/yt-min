@@ -111,17 +111,16 @@
     }
 
     const channelStyles=`
-      :host{all:initial!important;display:block!important;position:relative!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;color:var(--myt-ink)!important}
+      :host{all:initial!important;--ink:var(--myt-ink);--muted:var(--myt-muted);--surface:var(--myt-surface);--soft:var(--myt-soft);--border:var(--myt-border);display:block!important;position:relative!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;color:var(--ink)!important}
       :host::before,:host::after{content:none!important;display:none!important}
       *{box-sizing:border-box}[hidden]{display:none!important}a{color:inherit;text-decoration:none;cursor:pointer}button{font:inherit;cursor:pointer}a:focus-visible,button:focus-visible{outline:2px solid var(--myt-muted);outline-offset:3px}
-      .surface{display:grid;grid-template-columns:80px minmax(0,1fr) auto;align-items:center;gap:16px;min-height:110px}
-      .avatar{display:grid;place-items:center;position:relative;width:80px;height:80px;overflow:hidden;border-radius:50%;background:var(--myt-soft);font-size:28px;font-weight:600;flex:none}
-      .avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.info{min-width:0;display:flex;flex-direction:column;gap:6px;overflow-wrap:anywhere}
-      .heading{display:flex;align-items:baseline;gap:5px;min-width:0}.name{font-size:18px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}.verified{flex:none;width:14px;height:14px;align-self:center;color:var(--myt-muted)}
-      .metadata,.description{margin:0;font-size:13px;line-height:1.5;color:var(--myt-muted)}.description{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-      .subscribe{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-width:0;max-width:100%;min-height:44px;padding:10px 20px;border:1px solid var(--myt-border);border-radius:999px;background:var(--myt-surface);color:var(--myt-ink);font:500 16px/1.3 Arial,sans-serif;transition:none;white-space:nowrap}
-      .subscribe:hover:not(:disabled){background:var(--myt-soft)}.subscribe[aria-pressed=true]{background:#c91f37;border-color:#c91f37;color:#fff}.subscribe[aria-pressed=true]:hover:not(:disabled){background:#b51b31;border-color:#b51b31}.subscribe svg{width:18px;height:18px;flex:none}.subscribe:disabled{opacity:.55;cursor:default}
-      @media(max-width:600px){.surface{grid-template-columns:80px minmax(0,1fr);row-gap:12px}.subscribe{grid-column:2;justify-self:start}.name{font-size:17px}}
+      ${globalThis.MinimalYouTubeWatch?.subscriptionStyles||''}
+      .surface.channel-card{grid-template-columns:80px minmax(0,1fr) 20px;width:100%;max-width:none;min-height:128px;padding:20px;gap:6px 16px;border-radius:16px}
+      .avatar{display:grid;place-items:center;width:80px;height:80px;overflow:hidden;border-radius:50%;background:var(--myt-soft);font-size:28px;font-weight:600}
+      .owner .avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+      .heading{display:flex;align-items:baseline;gap:5px;min-width:0}.name{font-size:18px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}.verified{flex:none;width:14px;height:14px;align-self:center;color:var(--muted)}
+      .metadata{margin:0;overflow-wrap:anywhere;color:var(--muted)}
+      @media(max-width:600px){.surface.channel-card{grid-template-columns:64px minmax(0,1fr) 18px;gap:4px 12px;padding:16px}.avatar{width:64px;height:64px}.name{font-size:17px}}
     `;
     const channelText=node=>{
         if(!node)return '';
@@ -135,15 +134,16 @@
             this.source=source;this.queue=queue;this.parts=new Set();
             this.host=document.createElement('div');this.host.dataset.mytSearchChannelCard='';this.host.lang='en';
             this.shadow=this.host.attachShadow({mode:'open'});
-            this.shadow.innerHTML=`<style>${channelStyles}</style><article class="surface"><a class="avatar" data-myt-search-avatar-link><span class="initial" aria-hidden="true"></span><img alt="" decoding="async" hidden></a><div class="info"><div class="heading"><a class="name"></a><svg class="verified" role="img" aria-label="Verified" viewBox="0 0 24 24" hidden><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m7 12 3 3 7-7" fill="none" stroke="var(--myt-card-bg)" stroke-width="2"/></svg></div><p class="metadata" hidden></p><p class="description" hidden></p></div><button class="subscribe" data-myt-search-subscribe="false" aria-pressed="false" hidden><svg aria-hidden="true" viewBox="0 0 24 24" hidden><path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Subscribe</span></button></article>`;
+            this.shadow.innerHTML=`<style>${channelStyles}</style><article class="surface channel-card"><button class="subscribe channel-subscribe" type="button" aria-pressed="false" aria-describedby="search-subscription-status" disabled></button><div class="owner"><a class="avatar avatar-link" data-myt-search-avatar-link><span class="initial" aria-hidden="true"></span><img alt="" decoding="async" hidden></a><div class="info owner-text"><div class="heading"><a class="name owner-link owner-name"></a><svg class="verified" role="img" aria-label="Verified" viewBox="0 0 24 24" hidden><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m7 12 3 3 7-7" fill="none" stroke="var(--surface)" stroke-width="2"/></svg></div></div></div><span class="subscription-state" id="search-subscription-status" aria-live="polite"></span><p class="metadata stats" hidden></p></article>`;
             this.q=selector=>this.shadow.querySelector(selector);
-            this.q('img').onerror=()=>{this.q('img').hidden=true;this.q('.initial').hidden=false;};
-            this.q('img').onload=()=>{this.q('.initial').hidden=true;};
+            this.subscription=globalThis.MinimalYouTubeWatch.createSubscriptionController({q:this.q,readState:()=>this.subscriptionState(),prepareAction:button=>this.prepareSubscriptionAction(button)});
+            this.q('img').onerror=()=>{const image=this.q('img');this.failedImage=image.getAttribute('src');if(this.fallbackImage&&image.src!==this.fallbackImage){image.src=this.fallbackImage;image.hidden=false;return;}image.hidden=true;this.q('.initial').hidden=false;};
+            this.q('img').onload=()=>{if(this.q('img').naturalWidth<=1){this.q('img').onerror();return;}this.q('.initial').hidden=true;};
             for(const link of [this.q('.avatar'),this.q('.name')])link.addEventListener('click',event=>{
                 if(event.button||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey||!this.link?.isConnected)return;
                 event.preventDefault();event.stopPropagation();this.link.click();
             });
-            this.q('.subscribe').addEventListener('click',()=>this.subscribe());
+            this.q('.subscribe').addEventListener('click',()=>this.subscription.toggleSubscription());
             this.observer=new MutationObserver(records=>{
                 if(this.host.isConnected&&records.every(record=>record.type==='childList'&&[...record.addedNodes,...record.removedNodes].every(node=>node===this.host)))return;
                 queue();
@@ -157,7 +157,7 @@
             const button=[...this.source.querySelectorAll('button')].find(node=>/^(?:subscribe\b|subscribed\b|подписаться|вы подписаны|abonnieren|abonniert)/iu.test((node.getAttribute('aria-label')||text(node)).trim()));
             return {button,subscribed:button?.getAttribute('aria-pressed')==='true'||/^(?:subscribed\b|вы подписаны|abonniert)/iu.test(text(button)),disabled:!button||button.matches(':disabled,[aria-disabled="true"],[aria-busy="true"]')};
         }
-        update(){
+        update(cache=new Map()){
             const source=this.source;
             const anchors=[...source.querySelectorAll('a[href]')].filter(node=>{const url=safeURL(node.href);return url?.protocol==='https:'&&(url.hostname==='youtube.com'||url.hostname.endsWith('.youtube.com'))&&channelPath.test(url.pathname);});
             const image=source.querySelector('#avatar img,yt-avatar-shape img,#avatar-section img,.yt-spec-avatar-shape__image')||source.querySelector('img');
@@ -167,13 +167,20 @@
                 name=channelText(source.querySelector(selector));if(name)break;
             }
             name ||= anchors.map(channelText).find(Boolean)||'Channel';
-            const href=this.link?.href||'';
+            const nativeText=[...source.querySelectorAll('#channel-handle,#channel-stats,#metadata-line')].map(channelText).join(' ')||channelText(source),path=safeURL(this.link?.href)?.pathname;
+            const handle=nativeText.match(/@[^\s·•/]+/u)?.[0];
+            const matches=[...cache.values()].filter(item=>item.url===path||path==='/channel/'+item.id||(handle&&item.handle===handle));
+            const byName=[...cache.values()].filter(item=>item.name===name);
+            const cached=matches[0]||(!path&&!handle&&byName.length===1?byName[0]:null);
+            if(name==='Channel'&&cached?.name)name=cached.name;
+            const href=this.link?.href||safeURL(cached?.url)?.href||(handle?safeURL('/'+handle)?.href:'')||'';
             for(const link of [this.q('.avatar'),this.q('.name')]){if(href){if(link.href!==href)link.href=href;}else link.removeAttribute('href');}
             if(this.q('.name').textContent!==name)this.q('.name').textContent=name;
             this.q('.avatar').setAttribute('aria-label','Open channel '+name);
             if(this.q('.initial').textContent!==name.slice(0,1))this.q('.initial').textContent=name.slice(0,1);
             const srcset=image?.getAttribute('data-srcset')||image?.getAttribute('srcset')||'';
-            const src=[image?.getAttribute('data-src'),...srcset.split(',').reverse().map(value=>value.trim().split(/\s+/)[0]),image?.currentSrc,image?.getAttribute('src')].find(value=>value&&(safeURL(value)||/^data:image\//i.test(value)))||'';
+            this.fallbackImage=cached?.image||'';
+            const src=[image?.getAttribute('data-src'),...srcset.split(',').reverse().map(value=>value.trim().split(/\s+/)[0]),image?.currentSrc,image?.getAttribute('src'),this.fallbackImage].find(value=>value&&value!==this.failedImage&&(safeURL(value)||/^data:image\//i.test(value)))||'';
             if(this.q('img').getAttribute('src')!==src){this.q('.initial').hidden=false;if(src)this.q('img').src=src;else this.q('img').removeAttribute('src');this.q('img').hidden=!src;}
             const description=source.querySelector('#description,#description-text,.channel-description')||source.querySelector('#channel-info p:last-of-type');
             const values=[...source.querySelectorAll('#channel-handle,#subscribers,#subscriber-count,#channel-stats,#metadata-line')].map(channelText).filter(Boolean);
@@ -182,30 +189,20 @@
                 const value=channelText(node);
                 if(/^@[^\s·•]+(?:\s*[·•].*)?$/u.test(value)||/^[\d.,]+\s*(?:[kmb]|тыс\.?|млн\.?)?\s+(?:subscribers?|подписчик[а-яё]*|Abonnenten)(?:\s*[·•].*)?$/iu.test(value))values.push(value);
             }
-            const metadata=[...new Set(values)].filter(value=>!values.some(other=>other!==value&&other.includes(value))).join(' · ').replace(/(\d[\d.,\s]*(?:[kmb]|тыс\.?|млн\.?)?)\s+(?:подписчик[а-яё]*|Abonnenten)(?=$|[\s·•])/giu,'$1 subscribers');
-            for(const[selector,value]of [['.metadata',metadata],['.description',channelText(description)]]){const node=this.q(selector);if(node.textContent!==value)node.textContent=value;node.hidden=!value;}
+            if(!values.length)values.push(...(cached?.metadata||[]));
+            const metadata=[...new Set(values)].filter(value=>!values.some(other=>other!==value&&other.includes(value))).join(' · ').replace(/(\d[\d.,\s]*(?:[kmb]|тыс\.?|млн\.?|млрд\.?|Tsd\.?|Mio\.?|Mrd\.?)?)\s+(?:подписчик[а-яё]*|Abonnenten)(?=$|[\s·•])/giu,(_,count)=>count.replace(/\s*(тыс\.?|Tsd\.?)$/iu,'K').replace(/\s*(млн\.?|Mio\.?)$/iu,'M').replace(/\s*(млрд\.?|Mrd\.?)$/iu,'B').trim()+' subscribers');
+            const metadataNode=this.q('.metadata');if(metadataNode.textContent!==metadata)metadataNode.textContent=metadata;metadataNode.hidden=!metadata;
             this.q('.verified').toggleAttribute('hidden',!source.querySelector('.badge-style-type-verified,.badge-style-type-verified-artist,[aria-label="Verified"],[aria-label="Проверено"],[aria-label="Bestätigt"]'));
-            const state=this.subscriptionState(),control=this.q('.subscribe');
-            control.hidden=!state.button;control.disabled=Boolean(state.disabled);
-            const value=String(Boolean(state.subscribed));
-            if(control.getAttribute('aria-pressed')!==value)control.setAttribute('aria-pressed',value);
-            if(control.dataset.mytSearchSubscribe!==value)control.dataset.mytSearchSubscribe=value;
-            control.setAttribute('aria-label',(state.subscribed?'Unsubscribe from ':'Subscribe to ')+name);
-            const label=state.subscribed?'Subscribed':'Subscribe';if(this.q('.subscribe span').textContent!==label)this.q('.subscribe span').textContent=label;
-            this.q('.subscribe svg').toggleAttribute('hidden',!state.subscribed);
-            if(this.anchor&&this.anchor.button!==state.button)this.clearAnchor();
+            const state=this.subscriptionState();
+            this.subscription.update({owner:source,name,subscriptionName:name},href||name);
+            if(this.anchor&&(this.anchor.button!==state.button||!this.subscription.subscriptionPending))this.clearAnchor();
             if(this.host.parentElement!==source)source.append(this.host);
             for(const part of this.parts)if(part.parentElement!==source){part.removeAttribute('data-myt-search-channel-source');this.parts.delete(part);}
             for(const part of source.children)if(part!==this.host&&!this.parts.has(part)){part.setAttribute('data-myt-search-channel-source','');this.parts.add(part);}
             this.positionAnchor();
         }
-        subscribe(){
-            const state=this.subscriptionState();if(!state.button||state.disabled)return;
-            const control=this.q('.subscribe');
-            this.press?.cancel();
-            if(!matchMedia('(prefers-reduced-motion: reduce)').matches)this.press=control.animate([{transform:'scale(.98)'},{transform:'scale(1)'}],{duration:180,easing:'cubic-bezier(.2,.8,.2,1)'});
+        prepareSubscriptionAction(button){
             this.clearAnchor();
-            const button=state.button;
             if(typeof button.showPopover==='function'){
                 // Leave the native control in its original DOM. A transparent
                 // popover gives YouTube the visible button's rectangle for menus.
@@ -229,7 +226,6 @@
                     document.addEventListener('keydown',this.anchorDismiss,true);
                 }
             }
-            button.click();this.queue();
         }
         positionAnchor(){
             if(!this.anchor)return;
@@ -259,13 +255,13 @@
             document.removeEventListener('pointerdown',this.anchorDismiss,true);document.removeEventListener('keydown',this.anchorDismiss,true);
         }
         destroy(){
-            this.observer.disconnect();this.source.removeEventListener('load',this.queue,true);this.press?.cancel();this.clearAnchor();
+            this.observer.disconnect();this.source.removeEventListener('load',this.queue,true);this.subscription.destroy();this.clearAnchor();
             this.host.remove();for(const part of this.parts)part.removeAttribute('data-myt-search-channel-source');this.parts.clear();
         }
     }
 
     class Search {
-        constructor(){this.cards=new Map();this.channels=new Map();this.filters=new Map();this.filterLabels=new Map();this.layout=new Map();this.metadata=new Map();this.click=event=>this.toggleFilter(event);document.addEventListener('click',this.click,true);}
+        constructor(){this.cards=new Map();this.channels=new Map();this.filters=new Map();this.filterLabels=new Map();this.layout=new Map();this.metadata=new Map();this.channelMetadata=new Map();this.click=event=>this.toggleFilter(event);document.addEventListener('click',this.click,true);}
         static isPlaylist(card){
             if(card.matches('ytd-playlist-renderer,ytd-grid-playlist-renderer'))return true;
             if(!card.matches('yt-lockup-view-model'))return false;
@@ -278,6 +274,8 @@
             const wanted=new Set();
             const raw=document.documentElement.getAttribute('data-myt-search-playlists')||'';
             if(raw!==this.metadataRaw){this.metadataRaw=raw;this.metadata.clear();try{const values=JSON.parse(raw);if(Array.isArray(values))for(const value of values.slice(-200))if(typeof value.id==='string')this.metadata.set(value.id,{image:safeURL(value.image)?.href||'',count:countNumber(value.count)});}catch{}}
+            const channels=document.documentElement.getAttribute('data-myt-search-channels')||'';
+            if(channels!==this.channelsRaw){this.channelsRaw=channels;this.channelMetadata.clear();try{const values=JSON.parse(channels);if(Array.isArray(values))for(const value of values.slice(-200))if(/^UC[-\w]{22}$/.test(value.id)&&typeof value.name==='string'){const url=safeURL(value.url);if(url?.origin!==location.origin||!channelPath.test(url.pathname))continue;this.channelMetadata.set(value.id,{id:value.id,name:value.name.slice(0,300),url:url.pathname,handle:typeof value.handle==='string'?value.handle:'',image:safeURL(value.image)?.href||'',metadata:Array.isArray(value.metadata)?value.metadata.filter(item=>typeof item==='string').map(item=>item.slice(0,300)):[]});}}catch{}}
             this.syncLayout(searches);
             this.syncChannels(searches);
             this.syncFilterLabels(searches);
@@ -302,7 +300,7 @@
         queueCard(source){
             this.pendingCards ||=new Set();this.pendingCards.add(source);
             if(this.cardFrame)return;
-            this.cardFrame=requestAnimationFrame(()=>{this.cardFrame=0;for(const source of this.pendingCards)if(source.isConnected)(this.cards.get(source)||this.channels.get(source))?.update(this.metadata);this.pendingCards.clear();});
+            this.cardFrame=requestAnimationFrame(()=>{this.cardFrame=0;for(const source of this.pendingCards)if(source.isConnected){this.cards.get(source)?.update(this.metadata);this.channels.get(source)?.update(this.channelMetadata);}this.pendingCards.clear();});
         }
         syncFilterLabels(searches){
             const wanted=new Map();
@@ -342,7 +340,7 @@
             const wanted=new Set();
             for(const search of searches)for(const source of search.querySelectorAll('[data-myt-search-channel]')){
                 wanted.add(source);let card=this.channels.get(source);
-                if(!card){card=new ChannelCard(source,()=>this.queueCard(source));this.channels.set(source,card);}card.update();
+                if(!card){card=new ChannelCard(source,()=>this.queueCard(source));this.channels.set(source,card);}card.update(this.channelMetadata);
             }
             for(const[source,card]of this.channels)if(!wanted.has(source)){card.destroy();this.channels.delete(source);}
         }

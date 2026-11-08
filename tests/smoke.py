@@ -672,16 +672,17 @@ def check_native_hover_surface(browser, dark):
         background: transparent !important;
       }
     """)
-    for selector,hover_target in [('#native-hover-video','#native-hover-video ytd-thumbnail'),('#native-hover-channel','#native-hover-channel a'),('#native-hover-modern','#native-hover-modern a')]:
+    for selector,hover_target in [('#native-hover-video','#native-hover-video ytd-thumbnail'),('#native-hover-channel','#native-hover-channel .channel-subscribe'),('#native-hover-modern','#native-hover-modern a')]:
+        surface=page.locator(selector+' .channel-card' if selector=='#native-hover-channel' else selector)
         page.mouse.move(1,1)
-        before=page.locator(selector).evaluate('element=>getComputedStyle(element).backgroundColor')
-        page.locator(hover_target+':visible').first.hover()
-        color=page.locator(selector).evaluate('element=>getComputedStyle(element).backgroundColor')
+        before=surface.evaluate('element=>getComputedStyle(element).backgroundColor')
+        page.locator(hover_target+':visible').first.hover(position={'x':12,'y':12})
+        color=surface.evaluate('element=>getComputedStyle(element).backgroundColor')
         assert color not in ['transparent','rgba(0, 0, 0, 0)'], (selector,before,color)
         assert color!=before, (selector,before,color)
         page.mouse.move(1,1)
         page.locator(selector+' a:visible').first.focus()
-        color=page.locator(selector).evaluate('element=>getComputedStyle(element).backgroundColor')
+        color=surface.evaluate('element=>getComputedStyle(element).backgroundColor')
         assert color not in ['transparent','rgba(0, 0, 0, 0)'], (selector,color)
         page.evaluate('()=>{let active=document.activeElement;while(active?.shadowRoot?.activeElement)active=active.shadowRoot.activeElement;active?.blur();}')
     page.evaluate("""() => document.body.insertAdjacentHTML('beforeend', '<ytd-video-preview id=floating-preview style="display:none;width:360px"><div id=wrapper><div style="height:150px;background:black">Player</div><div id=details>Metadata</div></div></ytd-video-preview>')""")
@@ -731,7 +732,7 @@ def check_settings_short_viewport(browser):
     page.close()
 
 
-def assert_card_surface(page, selector):
+def assert_card_surface(page, selector, channel=False):
     card = page.locator(selector)
     color = "element => getComputedStyle(element).backgroundColor.match(/[\\d.]+/g).map(Number)"
     page.evaluate("()=>{let active=document.activeElement;while(active?.shadowRoot?.activeElement)active=active.shadowRoot.activeElement;active?.blur();}")
@@ -740,6 +741,14 @@ def assert_card_surface(page, selector):
     assert len(base) == 3 or base[3] > .95, (selector, base)
     assert max(base[:3]) - min(base[:3]) < 16, (selector, base)
     assert card.evaluate("element => parseFloat(getComputedStyle(element).borderRadius)") >= 12
+    if channel:
+        # A result without a native subscription exposes its channel link,
+        # whose own background supplies hover/focus feedback (as on watch).
+        expect(card.locator('.channel-subscribe')).to_be_hidden()
+        name=card.locator('.owner-name');name.hover()
+        assert name.evaluate(color)[3]>0
+        name.focus();assert name.evaluate(color)[3]>0
+        return
     card.hover()
     hover = card.evaluate(color)
     assert sum(hover[:3]) > sum(base[:3]), (selector, base, hover)
@@ -916,8 +925,7 @@ def check_native_watch(browser, theater=False, width=1440):
     expect(page.locator('.owner img')).to_be_visible()
     page.wait_for_function("document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.owner img').naturalWidth===48")
     assert 'invalid-badge' not in page.locator('.owner img').get_attribute('src')
-    expect(page.locator('#watch-description')).to_have_text('The real video description is available here.')
-    page.locator('#myt-watch .expand').click()
+    # Lazy native text is fetched before deciding whether an expander is needed.
     expect(page.locator('#watch-description')).to_contain_text('Full video description with native markup')
     expect(page.locator('#watch-description a')).to_have_attribute('href','https://example.com/description')
     assert page.evaluate('window.__descriptionLoaded') is True
@@ -1340,7 +1348,8 @@ def check_playlist_layout(browser, theater=False, width=1440):
             assert playlist['y']>=media['bottom'] and abs(playlist['y']-details['y'])<1,bounds
             assert playlist['height']>=details['height']-1,bounds
             description=page.locator('.description').bounding_box()
-            assert abs(playlist['bottom']-description['y']-description['height'])<1,(bounds,description)
+            minimum_height=page.locator('.sidecar').evaluate('e=>parseFloat(getComputedStyle(e).minHeight)')
+            assert abs(playlist['bottom']-max(description['y']+description['height'],playlist['y']+minimum_height))<1,(bounds,description)
             assert details['height']<600,bounds
         else:
             assert abs(playlist['y']-media['y'])<1,bounds
@@ -1732,13 +1741,14 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
 
 
 
-def check_subscription_card(browser, dark, width, modern=False):
+def check_subscription_card(browser, dark, width, modern=False, search=False):
     avatar='data:image/svg+xml;base64,'+base64.b64encode(b'<svg xmlns="http://www.w3.org/2000/svg" width="46" height="46"><rect width="46" height="46" rx="23" fill="#ef493c"/></svg>').decode()
     renderer='yt-subscribe-button-view-model' if modern else 'ytd-subscribe-button-renderer'
     state=' aria-pressed="true"' if modern else ''
     owner=f'''<div id="owner"><a id="avatar" href="/@revolt"><img src="{avatar}"></a><ytd-channel-name><a href="/@revolt">REVOLT</a></ytd-channel-name><span id="subscriber-count">3.33M subscribers</span><{renderer} id="subscribe-button"><button id="native-subscribe"{state}>{'Subscribed' if modern else 'Subscribe'}</button></{renderer}></div>'''
     body=watch_details_fixture().replace('<div id="description" class=',owner+'<div id="description" class=',1)+'<ytd-popup-container></ytd-popup-container>'
-    page=setup(browser,'/watch?v=details',body,native_dark=dark,width=width,language='ru')
+    if search:body='<ytd-app>'+MASTHEAD+'<ytd-search><ytd-section-list-renderer><div id="contents"><ytd-channel-renderer>'+owner+'</ytd-channel-renderer></div></ytd-section-list-renderer></ytd-search></ytd-app><ytd-popup-container></ytd-popup-container>'
+    page=setup(browser,'/results?search_query=revolt' if search else '/watch?v=details',body,native_dark=dark,width=width,language='ru')
     page.evaluate('''() => {
       window.__subscribeCalls=0;window.__channelVisits=0;
       for(const a of document.querySelectorAll('#owner a'))a.onclick=e=>{e.preventDefault();window.__channelVisits++;};
@@ -1779,10 +1789,11 @@ def check_subscription_card(browser, dark, width, modern=False):
         button.click(position={'x':box['width']-12,'y':box['height']/2})
 
     expect(button).to_have_attribute('aria-pressed',str(modern).lower())
-    expect(card.locator('.stats')).to_have_text('906.35k · 8 March 2025')
-    expect(page.locator('#watch-chapters h2')).to_have_count(0)
-    expect(page.locator('#watch-chapters')).to_have_attribute('aria-label','Chapters')
-    assert card.evaluate('e=>getComputedStyle(e).backgroundColor')!=page.locator('.viewport').evaluate('e=>getComputedStyle(e).backgroundColor')
+    expect(card.locator('.stats')).to_have_text('3.33M subscribers' if search else '906.35k · 8 March 2025')
+    if not search:
+        expect(page.locator('#watch-chapters h2')).to_have_count(0)
+        expect(page.locator('#watch-chapters')).to_have_attribute('aria-label','Chapters')
+    assert card.evaluate('e=>getComputedStyle(e).backgroundColor')!=page.locator('html' if search else '.viewport').evaluate('e=>getComputedStyle(e).backgroundColor')
     page.evaluate('__setSubscribed(false)')
     expect(button).to_have_attribute('aria-pressed','false')
     card.scroll_into_view_if_needed()
@@ -1852,9 +1863,9 @@ def check_subscription_card(browser, dark, width, modern=False):
     expect(button).to_have_attribute('aria-pressed','false')
     page.locator('#native-subscribe').evaluate('e=>e.disabled=true')
     expect(button).to_be_disabled()
-    assert page.locator('.viewport').evaluate('e=>e.scrollWidth<=e.clientWidth')
+    assert page.locator('html' if search else '.viewport').evaluate('e=>e.scrollWidth<=e.clientWidth')
     page.evaluate('__setEnabled(false)')
-    expect(page.locator('#myt-watch')).to_have_count(0)
+    expect(page.locator('[data-myt-search-channel-card]' if search else '#myt-watch')).to_have_count(0)
     page.close()
 
 
@@ -2027,7 +2038,7 @@ def check_watch_stats(browser, language):
     ru=False  # Raw source may be Russian; the extension interface is English.
     date=lambda ru_value,en_value:ru_value if ru else en_value
     expect(stats).to_have_text(('906 тыс.' if ru else '906.35k')+' · '+date('8 марта 2025 г.','8 March 2025'))
-    for raw,compact in [('1234 views','1,23 тыс.' if ru else '1.23k'),('3,33 млн просмотров','3,33 млн.' if ru else '3.33m'),('1.2K views','1,2 тыс.' if ru else '1.20k'),('999999 views','1 млн.' if ru else '999.99k'),('1000 views','1k'),('1000000 views','1m'),('1000000000 views','1b'),('1009999 views','1m'),('1010000 views','1.01m'),('1100000 views','1.10m'),('1009999K views','1b'),('1010000K views','1.01b'),('999 views','999'),('No views','0')]:
+    for raw,compact in [('1234 views','1,23 тыс.' if ru else '1.23k'),('3,33 млн просмотров','3,33 млн.' if ru else '3.33m'),('1.2K views','1,2 тыс.' if ru else '1.20k'),('999999 views','1 млн.' if ru else '999.99k'),('1000 views','1.00k'),('1000000 views','1.00m'),('1000000000 views','1.00b'),('1009999 views','1.00m'),('1010000 views','1.01m'),('1100000 views','1.10m'),('1009999K views','1.00b'),('1010000K views','1.01b'),('999 views','999'),('No views','0')]:
         page.locator('#info-container').evaluate('(e,value)=>e.textContent=value+" · Jul 4, 2026"',raw)
         expect(stats).to_have_text(compact+' · '+date('4 июля 2026 г.','4 July 2026'))
     page.locator('#info-container').evaluate('e=>e.textContent="853 views · 1 month ago"')
@@ -3149,7 +3160,7 @@ def main():
             page.emulate_media(reduced_motion='reduce')
             for selector in ['#result-1', '#modern-video']:
                 assert_card_surface(page, selector)
-            assert_card_surface(page, '#channel-result')
+            assert_card_surface(page, '#channel-result .channel-card', channel=True)
             for selector in ['#playlist-result', '#continuation']:
                 assert page.locator(selector).evaluate("element => getComputedStyle(element).backgroundColor") == 'rgba(0, 0, 0, 0)', selector
             page.set_viewport_size({'width':390, 'height':960})

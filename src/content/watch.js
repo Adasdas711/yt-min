@@ -33,7 +33,7 @@ main.has-sidecar .details { min-height:0; }
     :host(:not([theater])) .has-sidecar .details { grid-column:1 / -1;grid-row:2;justify-self:center;width:calc(100% - 48px); }
     :host(:not([theater])) .has-sidecar .sidecar { grid-column:2;grid-row:1;align-self:start;height:var(--playlist-player-height,320px);min-height:0;margin-top:20px; }
 }
-#watch-title { --title-ink:var(--ink);font-family:"MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;font-size:32px;font-weight:900;font-style:italic;text-transform:uppercase;line-height:.82;letter-spacing:-.025em;color:var(--title-ink);-webkit-text-fill-color:var(--title-ink);-webkit-text-stroke:0 transparent;overflow:visible;overflow-wrap:anywhere; }
+#watch-title { --title-ink:var(--ink);font-family:"MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;font-size:32px;font-weight:900;font-style:italic;text-transform:uppercase;line-height:.82;letter-spacing:-.025em;color:var(--title-ink);-webkit-text-fill-color:var(--title-ink);-webkit-text-stroke:0 transparent;overflow:visible;overflow-wrap:anywhere;padding-inline-end:.18em; }
 :host([dark]) #watch-title { --title-ink:#fff; }
 #watch-title .title-outline { -webkit-text-fill-color:transparent;-webkit-text-stroke:.5px var(--title-ink); }
 .meta-row { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin:22px 0 0; }
@@ -109,7 +109,7 @@ main.has-sidecar .details { min-height:0; }
             this.surface=document.createElement("div"); this.shadow=this.surface.attachShadow({mode:"open"});this.host.append(this.surface);
             this.shadow.innerHTML=`<style>${css}</style><div class="viewport"><header class="header"><a class="brand" href="/" aria-label="YouTube"><svg viewBox="0 0 28 20" fill="currentColor" aria-hidden="true"><rect width="28" height="20" rx="6"/><path d="m11 5 8 5-8 5Z" fill="#fff"/></svg><span>YouTube</span></a><form class="search" action="/results" method="get" role="search"><input name="search_query" id="watch-search" autocomplete="off"><button type="button" id="watch-clear" hidden aria-label="Clear">×</button></form></header><main><div class="layout"><div class="primary"><div class="media" aria-label="YouTube player"></div><article class="details"><h1 id="watch-title"></h1><div class="meta-row"><div class="channel-card" hidden><button type="button" class="channel-subscribe" data-watch-action="subscription" aria-describedby="watch-subscription-status" disabled></button><div class="owner"></div><span class="subscription-state" id="watch-subscription-status" aria-live="polite"></span><div class="stats" hidden><span class="views-icon" hidden>${icon('eye')}</span><span class="stats-value"></span></div></div><div class="actions"></div></div><section class="section" id="watch-chapters" hidden aria-label="Chapters"><div class="chapter-list"></div></section><section class="description" aria-label="Description"><div class="prose" id="watch-description"></div><button class="expand" aria-expanded="false" aria-controls="watch-description"></button></section><section class="section" id="watch-people" hidden><div class="section-head"><h2></h2></div><div class="people"></div></section><section class="section transcript-card" id="watch-transcript" hidden><div class="transcript-head"><div class="transcript-intro"><span class="transcript-icon">${icon('transcript')}</span><div class="transcript-copy"><h2></h2><p class="hint"></p></div></div><button class="transcript-toggle" aria-expanded="false" aria-controls="watch-transcript-content"></button></div><div class="transcript-content" id="watch-transcript-content" hidden><input class="transcript-search" type="search"><div class="segments"></div><p class="transcript-status" role="status"></p><button class="transcript-retry" hidden></button></div></section><section class="section" id="watch-socials" hidden><div class="section-head"><h2></h2></div><div class="socials"></div></section><section class="comments-section" id="watch-comments" hidden><h2></h2><div class="comments"></div></section></article></div><aside class="sidecar" hidden></aside></div></main></div>`;
             this.q=selector=>this.shadow.querySelector(selector);this.viewport=this.q('.viewport');
-            this.q('.expand').onclick=()=>{this.expanded=!this.expanded;const description=this.descriptionData(this.native.querySelector('ytd-watch-metadata,ytd-video-primary-info-renderer,ytd-video-secondary-info-renderer'));(this.expanded?description.expand:description.root?.querySelector('#collapse'))?.click();this.updateExpanded();};
+            this.q('.expand').onclick=()=>{this.expanded=!this.expanded;this.updateExpanded();};
             this.q('.transcript-toggle').onclick=()=>this.toggleTranscript();
             this.q('.transcript-search').oninput=()=>this.renderTranscript();
             this.q('.chapter-list').addEventListener('wheel',event=>{if(!event.deltaX&&event.deltaY&&!event.ctrlKey){const list=event.currentTarget;if(list.scrollWidth>list.clientWidth){const before=list.scrollLeft;list.scrollLeft+=event.deltaY;if(list.scrollLeft!==before)event.preventDefault();}}},{passive:false});
@@ -195,7 +195,7 @@ main.has-sidecar .details { min-height:0; }
                         // rather than rewriting the title for every dragged pixel.
                         this.titleTimer=setTimeout(()=>{this.queuedTitleWidth=null;if(this.host.isConnected){this.layoutTitle();this.position();}},100);
                     }
-                    this.syncPlaylistMinimum();this.position();if(this.q('.more-popup')?.matches(':popover-open'))this.positionMore();
+                    this.updateDescriptionOverflow();this.syncPlaylistMinimum();this.position();if(this.q('.more-popup')?.matches(':popover-open'))this.positionMore();
                 });
             };
             this.viewport.addEventListener('scroll',()=>{
@@ -592,7 +592,7 @@ main.has-sidecar .details { min-height:0; }
             this.subscriptionObserver.observe(document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['subscribed','is-subscribed','aria-pressed','aria-label','aria-busy','hidden','aria-hidden','disabled','aria-disabled','style','class','open','opened']});
             this.subscriptionTimer=setTimeout(()=>{this.clearSubscription(true);this.syncSubscription(this.subscriptionData||{});},6000);
             this.syncSubscription(data);
-            try{state.button.click();this.continueSubscription();}catch{this.clearSubscription(true);this.syncSubscription(data);}
+            try{this.prepareSubscriptionAction?.(state.button);state.button.click();this.continueSubscription();}catch{this.clearSubscription(true);this.syncSubscription(data);}
         }
         animateSubscriptionPress() {
             this.subscriptionPress?.cancel();this.subscriptionPress=null;
@@ -642,13 +642,21 @@ main.has-sidecar .details { min-height:0; }
             return { root, body: body || root, expand };
         }
         renderDescription(data) {
+            // Expand the hidden native source once to obtain lazy full text.
+            // The visible control depends on our actual rendered height.
+            this.descriptionProbes ||= new WeakMap();
+            const complete=data.body?.matches('#attributed-description-text,#expanded,ytd-video-description-body-renderer,#attributed-description-container,#description-text');
+            if(data.expand&&!complete&&this.descriptionProbes.get(data.expand)!==this.options.video){
+                this.descriptionProbes.set(data.expand,this.options.video);
+                data.expand.click();
+                data=this.descriptionData();
+            }
             this.descriptionRoot=data.root;
             const prose = this.q('.prose');
             prose.replaceChildren();
             if (data.body) this.copyProse(data.body, prose, true);
             this.q('.description').hidden = !data.root && !prose.textContent.trim();
             this.q('.description').setAttribute('aria-label',this.copy.description);
-            this.q('.expand').hidden = prose.textContent.trim().length < 220 && !data.expand;
             this.updateExpanded();
         }
         syncStats() {
@@ -676,7 +684,7 @@ main.has-sidecar .details { min-height:0; }
             if(this.viewsLocale!==locale){this.viewsLocale=locale;this.viewsFormat=new Intl.NumberFormat(locale,{notation:'compact',minimumFractionDigits:2,maximumFractionDigits:2});}
             const scale=count>=1e12?1e12:count>=1e9?1e9:count>=1e6?1e6:1e3;
             const truncated=Math.floor(count/(scale/100))*(scale/100);
-            return (count<1000?String(count):this.viewsFormat.format(truncated)).toLowerCase().replace(/[.,]00(?=\D|$)/u,'').replace(/\s+/g,' ').replace(/млн$/u,'млн.').replace(/млрд$/u,'млрд.');
+            return (count<1000?String(count):this.viewsFormat.format(truncated)).toLowerCase().replace(/\s+/g,' ').replace(/млн$/u,'млн.').replace(/млрд$/u,'млрд.');
         }
         publicationDate(meta,info,readable) {
             const locale=this.options.language==='ru'?'ru-RU':'en-GB';
@@ -783,10 +791,16 @@ main.has-sidecar .details { min-height:0; }
             const node=allowed.includes(tag)?document.createElement(tag):document.createDocumentFragment();
             for(const child of source.childNodes)this.copyProse(child,node);target.append(node);
         }
+        updateDescriptionOverflow() {
+            const prose=this.q('.prose'),button=this.q('.expand');
+            const limit=parseFloat(getComputedStyle(prose).fontSize)*8.75;
+            button.hidden=prose.scrollHeight<=limit+1;
+            if(button.hidden&&this.expanded){this.expanded=false;prose.classList.remove('expanded');button.setAttribute('aria-expanded','false');button.setAttribute('aria-label',this.copy.more);}
+        }
         updateExpanded() {
             this.q('.prose').classList.toggle('expanded',this.expanded);
             const button=this.q('.expand');if(!button.firstElementChild)button.innerHTML=icon('chevron');
-            button.setAttribute('aria-label',this.expanded?this.copy.less:this.copy.more);button.setAttribute('aria-expanded',String(this.expanded));this.position();
+            button.setAttribute('aria-label',this.expanded?this.copy.less:this.copy.more);button.setAttribute('aria-expanded',String(this.expanded));this.updateDescriptionOverflow();this.position();
         }
         sync(options) {
             options={...options,language:"en"};this.options=options;this.copy=words.en;const c=this.copy;
@@ -1087,5 +1101,14 @@ main.has-sidecar .details { min-height:0; }
     }
     WatchView.loadTitleFonts=loadTitleFonts;
     WatchView.readSubscriptionState=WatchView.prototype.subscriptionState;
+    WatchView.subscriptionStyles=css.slice(css.indexOf('.channel-card {'),css.indexOf('.actions {'));
+    WatchView.createSubscriptionController=({q,readState,prepareAction})=>{
+        const controller={q,copy:words.en,options:{video:''},closeMore(){},prepareSubscriptionAction:prepareAction};
+        for(const name of ['node','subscriptionState','syncSubscription','clearSubscription','subscriptionPanelTarget','subscriptionPopupPassThrough','prepareSubscriptionPopups','cleanSubscriptionPopups','maskSubscriptionPopup','maskSubscriptionBackdrops','toggleSubscription','animateSubscriptionPress','continueSubscription'])controller[name]=WatchView.prototype[name].bind(controller);
+        if(readState)controller.subscriptionState=readState;
+        controller.update=(data,key)=>{controller.options.video=key;controller.syncSubscription(data);};
+        controller.destroy=()=>{controller.subscriptionPress?.cancel();controller.clearSubscription(true);};
+        return controller;
+    };
     globalThis.MinimalYouTubeWatch=WatchView;
 })();

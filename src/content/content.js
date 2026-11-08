@@ -1514,7 +1514,7 @@
             classObserver.observe(root, { attributes: true, attributeFilter: ["class"] });
             observer.observe(document.documentElement, {
                 subtree: true, childList: true, characterData: true,
-                attributes: true, attributeFilter: ["href", "aria-label", "title", "aria-hidden", "visibility", "is-shorts", "is-playlist", "data-myt-search-playlists", "data-video-count", "content-type", "data-content-type", "overlay-style", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "data-srcset", "expanded", "is-expanded", "aria-pressed", "subscribed", "is-subscribed", "disabled", "aria-disabled", "aria-busy", "aria-valuetext", "data-value", "value", "content"],
+                attributes: true, attributeFilter: ["href", "aria-label", "title", "aria-hidden", "visibility", "is-shorts", "is-playlist", "data-myt-search-playlists", "data-myt-search-channels", "data-video-count", "content-type", "data-content-type", "overlay-style", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "data-srcset", "expanded", "is-expanded", "aria-pressed", "subscribed", "is-subscribed", "disabled", "aria-disabled", "aria-busy", "aria-valuetext", "data-value", "value", "content"],
             });
             updateRoute(true);
             syncBrand();

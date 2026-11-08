@@ -13,9 +13,33 @@
     let processed = new WeakSet();
     let enabled = false;
     const initialHooks = new Map();
-    // Only public playlist IDs, cover URLs and counts are retained. Lazy native
-    // thumbnails may never mount once their source card is visually hidden.
+    // Retain small public card summaries: lazy native thumbnails/avatars may
+    // never mount once their source card is visually hidden.
     const searchPlaylists = new Map();
+    const searchChannels = new Map();
+    const label=value=>typeof value==='string'?value:value?.simpleText||value?.content||value?.runs?.map(run=>run.text||'').join('')||'';
+    function channelSummary(node){
+        const legacy=node.channelRenderer||node.gridChannelRenderer,modern=node.lockupViewModel;
+        const value=legacy||(/CHANNEL/.test(modern?.contentType||'')?modern:null);
+        if(!value)return null;
+        const endpoint=value.navigationEndpoint?.browseEndpoint||value.rendererContext?.commandContext?.onTap?.innertubeCommand?.browseEndpoint||{};
+        const id=value.channelId||endpoint.browseId||value.contentId;
+        if(typeof id!=='string'||!/^UC[-\w]{22}$/.test(id))return null;
+        const name=label(value.title||modern?.metadata?.lockupMetadataViewModel?.title).slice(0,300);
+        const metadata=[label(value.subscriberCountText),label(value.videoCountText)].filter(text=>text&&text.length<=300);
+        let url=endpoint.canonicalBaseUrl||value.navigationEndpoint?.commandMetadata?.webCommandMetadata?.url||'';
+        url=url.replace(/^https:\/\/(?:www\.)?youtube\.com(?=\/)/i,'').split(/[?#]/)[0];
+        if(!/^\/(?:@[^/]+|channel\/UC[-\w]{22}|(?:c|user)\/[^/]+)\/?$/.test(url))url='/channel/'+id;
+        const handle=url.startsWith('/@')?url.slice(1):metadata.find(text=>/^@\S+$/.test(text))||'';
+        if(url==='/channel/'+id&&handle)url='/'+handle;
+        let image='',width=-1;const stack=[value.thumbnail||value.avatar||value.contentImage];let scans=0;
+        while(stack.length&&scans++<800){
+            const item=stack.pop();if(!item||typeof item!=='object')continue;
+            if(typeof item.url==='string'&&/^https:\/\//.test(item.url)&&item.url.length<2048){const size=Number(item.width)||0;if(size>width){width=size;image=item.url;}}
+            for(const child of Object.values(item))if(child&&typeof child==='object')stack.push(child);
+        }
+        return {id,name,url,handle,image,metadata};
+    }
     function playlistSummary(node) {
         const legacy=node.playlistRenderer||node.gridPlaylistRenderer,modern=node.lockupViewModel;
         if(!legacy&&!(modern&&(modern.contentImage?.collectionThumbnailViewModel||/PLAYLIST/.test(modern.contentType||''))))return null;
@@ -142,7 +166,7 @@
         try { stripPlayerAds(data);stripPlayerAds(data.playerResponse); } catch { /* Immutable/revived player data stays native. */ }
         if (!feed(data) || processed.has(data)) return data;
         try {
-            let removed = 0, playlistDataChanged = false;
+            let removed = 0, playlistDataChanged = false, channelDataChanged = false;
             const secondary = data.contents?.twoColumnWatchNextResults?.secondaryResults;
             if (secondary) removed += trimRecommendations(secondary);
             const seen = new WeakSet();
@@ -157,6 +181,12 @@
                     continue;
                 }
                 if(location.pathname==='/results'){
+                    const channel=channelSummary(node);
+                    if(channel){
+                        const previous=searchChannels.get(channel.id)||{};
+                        const next={...channel,url:channel.url==='/channel/'+channel.id?(previous.url||channel.url):channel.url,handle:channel.handle||previous.handle||'',image:channel.image||previous.image||'',name:channel.name||previous.name||'',metadata:channel.metadata.length?channel.metadata:previous.metadata||[]};
+                        if(JSON.stringify(previous)!==JSON.stringify(next)){searchChannels.delete(next.id);searchChannels.set(next.id,next);channelDataChanged=true;while(searchChannels.size>200)searchChannels.delete(searchChannels.keys().next().value);}
+                    }
                     const summary=playlistSummary(node);
                     if(summary){
                         const previous=searchPlaylists.get(summary.id)||{};
@@ -180,6 +210,7 @@
             }
             processed.add(data);
             if(playlistDataChanged)document.documentElement?.setAttribute('data-myt-search-playlists',JSON.stringify([...searchPlaylists.values()]));
+            if(channelDataChanged)document.documentElement?.setAttribute('data-myt-search-channels',JSON.stringify([...searchChannels.values()]));
             if (removed && document.documentElement && !document.documentElement.hasAttribute("data-myt-pruned")) {
                 document.documentElement.setAttribute("data-myt-pruned", "");
             }
@@ -204,7 +235,7 @@
         if (enabled === value) return;
         enabled = value;
         if (enabled) { processed = new WeakSet(); install(); }
-        else {uninstall();searchPlaylists.clear();document.documentElement?.removeAttribute?.('data-myt-search-playlists');}
+        else {uninstall();searchPlaylists.clear();searchChannels.clear();document.documentElement?.removeAttribute?.('data-myt-search-playlists');document.documentElement?.removeAttribute?.('data-myt-search-channels');}
     }
     document.addEventListener("minimal-youtube:optimization", event => {
         if (typeof event.detail?.enabled === "boolean") configure(event.detail.enabled);

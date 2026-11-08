@@ -10,7 +10,7 @@ def fixture(layout):
     image = '<yt-img-shadow id="avatar"><img alt="MrBeast" src="data:image/svg+xml;base64,' + base64.b64encode(svg.encode()).decode() + '"></yt-img-shadow>'
     avatar = image if layout == 'direct-avatar' else '<div id="avatar-section">' + image + '</div>'
     copy = '<div id="channel-info"><h3 id="channel-title">MrBeast <span aria-label="Verified">✓</span></h3><p id="channel-stats">@MrBeast · 525M subscribers</p><p id="description">SUBSCRIBE FOR A COOKIE! New MrBeast or MrBeast Gaming video every single Saturday at noon eastern time!</p></div>'
-    action = '<ytd-subscribe-button-renderer id="subscribe-button"><button id="native-subscribe" aria-label="Subscribe to MrBeast" onclick="window.__subscribed=(window.__subscribed||0)+1">Subscribe</button></ytd-subscribe-button-renderer>'
+    action = '<ytd-subscribe-button-renderer id="subscribe-button"><button id="native-subscribe" aria-label="Subscribe to MrBeast" onclick="window.__subscribed=(window.__subscribed||0)+1;const active=this.parentElement.toggleAttribute(\'subscribed\');this.textContent=active?\'Subscribed\':\'Subscribe\'">Subscribe</button></ytd-subscribe-button-renderer>'
     link = lambda text: '<a id="main-link" href="/@MrBeast" onclick="event.preventDefault();window.__channelVisits=(window.__channelVisits||0)+1">' + text + '</a>'
     if layout == 'legacy':
         content = avatar + '<div id="info-section">' + link(copy) + action + '</div>'
@@ -48,16 +48,16 @@ def check_geometry(page):
     metrics = page.evaluate('''() => {
       const shadow=document.querySelector('[data-myt-search-channel-card]').shadowRoot;
       const rect=selector=>{const b=(selector==='ytd-channel-renderer'?document.querySelector(selector):shadow.querySelector(selector)).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height,right:b.right,bottom:b.bottom};};
-      return {card:rect('ytd-channel-renderer'),avatar:rect('.avatar img'),title:rect('.name'),stats:rect('.metadata'),description:rect('.description'),button:rect('.subscribe'),overflow:document.documentElement.scrollWidth>innerWidth};
+      return {card:rect('ytd-channel-renderer'),avatar:rect('.avatar img'),title:rect('.name'),stats:rect('.metadata'),button:rect('.subscribe'),bio:!!shadow.querySelector('.description'),overflow:document.documentElement.scrollWidth>innerWidth};
     }''')
     avatar, button, card = (metrics[key] for key in ['avatar', 'button', 'card'])
-    assert avatar['width'] == avatar['height'] == 80, metrics
-    for key in ['title', 'stats', 'description']:
+    assert avatar['width'] == avatar['height'] == (64 if page.viewport_size['width']<=600 else 80), metrics
+    assert not metrics['bio'], metrics
+    for key in ['title', 'stats']:
         box = metrics[key]
         assert box['x'] >= avatar['right'] + 11, (key, metrics)
         assert box['right'] <= card['right'] + 1, (key, metrics)
-        overlap = box['x'] < button['right'] and box['right'] > button['x'] and box['y'] < button['bottom'] and box['bottom'] > button['y']
-        assert not overlap, (key, metrics)
+    assert all(abs(button[key]-card[key])<=2 for key in ['x','y','width','height']),metrics
     for box in [avatar, button]:
         assert box['x'] >= card['x'] and box['right'] <= card['right'] + 1, metrics
         assert box['y'] >= card['y'] and box['bottom'] <= card['bottom'] + 1, metrics
@@ -93,7 +93,7 @@ def check(browser, layout, dark):
         box=avatar.bounding_box();page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
         assert page.evaluate('__channelVisits>0')
         before = page.evaluate('__channelVisits')
-        page.locator('[data-myt-search-channel-card] .subscribe').click()
+        page.locator('[data-myt-search-channel-card] .subscribe').click(position={'x':12,'y':12})
         assert page.evaluate('__subscribed>0&&__channelVisits') == before
         assert page.evaluate('__nativeNodes.every(([node,parent])=>node.parentElement===parent)')
         assert_stable(page)

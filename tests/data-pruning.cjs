@@ -115,6 +115,15 @@ async function main() {
     assert.equal(JSON.parse(attributes.get('data-myt-search-playlists')).find(item=>item.id==='PLlegacy').count,'257');
     parse({contents:{twoColumnSearchResultsRenderer:{contents:Array.from({length:205},(_,i)=>({playlistRenderer:{playlistId:'PLlimit'+i,videoCount:String(i)}}))}}});
     assert.equal(JSON.parse(attributes.get('data-myt-search-playlists')).length,200);
+    const channel={channelRenderer:{channelId:'UCX6OQ3DkcsbYNE6H8uQQuVA',title:{simpleText:'MrBeast'},subscriberCountText:{simpleText:'@MrBeast'},videoCountText:{runs:[{text:'525M subscribers'}]},navigationEndpoint:{browseEndpoint:{canonicalBaseUrl:'/@MrBeast'}},thumbnail:{thumbnails:[{url:'https://yt3.ggpht.com/small',width:88},{url:'https://yt3.ggpht.com/large',width:176}]},descriptionSnippet:{simpleText:'Do not copy bio'},trackingParams:'Do not copy tracking'}};
+    const channelResult=parse({contents:{twoColumnSearchResultsRenderer:{contents:[channel]}}});
+    const publicChannel=()=>JSON.parse(attributes.get('data-myt-search-channels'));
+    assert.deepEqual(publicChannel(),[{id:'UCX6OQ3DkcsbYNE6H8uQQuVA',name:'MrBeast',url:'/@MrBeast',handle:'@MrBeast',image:'https://yt3.ggpht.com/large',metadata:['@MrBeast','525M subscribers']}]);
+    assert.deepEqual(JSON.parse(JSON.stringify(channelResult.contents.twoColumnSearchResultsRenderer.contents[0])),channel);
+    await new Response({onResponseReceivedActions:[{appendContinuationItemsAction:{continuationItems:[{channelRenderer:{channelId:channel.channelRenderer.channelId,title:{simpleText:'MrBeast'},videoCountText:{simpleText:'526M subscribers'}}}]}}]}).json();
+    assert.equal(publicChannel()[0].image,'https://yt3.ggpht.com/large');assert.deepEqual(publicChannel()[0].metadata,['526M subscribers']);
+    parse({contents:{twoColumnSearchResultsRenderer:{contents:Array.from({length:205},(_,i)=>({channelRenderer:{channelId:'UC'+String(i).padStart(22,'0'),title:{simpleText:'Creator '+i}}}))}}});
+    assert.equal(publicChannel().length,200);
     context.location.pathname='/watch';
 
     const headed = parse({contents:{twoColumnSearchResultsRenderer:{contents:[
@@ -191,6 +200,7 @@ async function main() {
     ] } } }).contents.twoColumnSearchResultsRenderer.contents.length, 0);
 
     command(false);
+    assert(!attributes.has('data-myt-search-channels'));
     resize({width:1920,height:1080});assert.equal(resizes.length,0,'Disabled mode must not resize native controls');
     assert.equal(vm.runInContext("JSON.parse", context), originalParse);
     assert.equal(Response.prototype.json, originalResponseJSON);
