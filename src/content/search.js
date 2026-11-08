@@ -3,6 +3,41 @@
     'use strict';
     const channelPath=/^\/(?:@|channel\/|c\/|user\/)/;
     const text=node=>node?.textContent.replace(/\s+/g,' ').trim()||'';
+    const filterScopeSelector='ytd-search-sub-menu-renderer,ytd-search-filter-dialog-renderer,yt-search-filter-dialog-view-model,ytd-search-filter-group-renderer,yt-chip-cloud-chip-renderer';
+    // SPA responses can retain the profile language even when the page uses
+    // hl=en. Only translate native filter UI, never result titles or queries.
+    const filterCopy=new Map([
+        ['Filters','Фильтры','Filter'],['Search filters','Фильтры поиска','Suchfilter'],
+        ['Close','Закрыть','Schließen'],['Apply','Применить','Anwenden'],
+        ['Reset','Сбросить','Zurücksetzen'],['Clear all','Сбросить все','Alle löschen'],
+        ['Cancel','Отмена','Abbrechen'],['Done','Готово','Fertig'],
+        ['Upload date','Дата загрузки','По дате загрузки','Hochladedatum'],['Type','Тип','Typ'],
+        ['Duration','Длительность','Dauer'],['Features','Особенности','Funktionen','Eigenschaften'],
+        ['Sort by','Упорядочить','Сортировать по','Sortieren nach'],
+        ['Last hour','За последний час','Letzte Stunde'],['Today','Сегодня','За сегодня','Heute'],
+        ['This week','На этой неделе','За эту неделю','Diese Woche'],
+        ['This month','В этом месяце','За этот месяц','Diesen Monat'],
+        ['This year','В этом году','За этот год','Dieses Jahr'],
+        ['Video','Видео','Video'],['Channel','Канал','Kanal'],['Playlist','Плейлист','Playlist'],['Movie','Фильм','Film'],
+        ['Under 4 minutes','Менее 4 минут','Короче 4 минут','Unter 4 Minuten'],
+        ['Under 3 minutes','Менее 3 минут','Короче 3 минут','Unter 3 Minuten'],
+        ['4–20 minutes','4–20 минут','4–20 Minuten','4 bis 20 Minuten'],
+        ['3–20 minutes','3–20 минут','3–20 Minuten','3 bis 20 Minuten'],
+        ['Over 20 minutes','Более 20 минут','Длиннее 20 минут','Über 20 Minuten'],
+        ['Live','В прямом эфире','Прямой эфир','Трансляции','Live'],
+        ['Subtitles/CC','С субтитрами','Субтитры','Untertitel'],
+        ['Creative Commons','Лицензия Creative Commons','Creative Commons'],
+        ['Location','Местоположение','Standort'],['Purchased','Купленные','Куплено','Gekauft'],
+        ['Relevance','По релевантности','Релевантность','Relevanz'],
+        ['View count','По числу просмотров','Число просмотров','Anzahl der Aufrufe','Aufrufanzahl'],
+        ['Rating','По рейтингу','Рейтинг','Bewertung'],
+        ['All','Все','Alle'],['Videos','Videos'],['Channels','Каналы','Kanäle'],
+        ['Playlists','Плейлисты','Playlists'],['Movies','Фильмы','Filme'],
+        ['Unwatched','Не просмотрено','Непросмотренные','Nicht angesehen'],
+        ['Watched','Просмотрено','Просмотренные','Angesehen'],
+        ['Recently uploaded','Недавно загружено','Недавно загруженные','Kürzlich hochgeladen'],
+    ].flatMap(([english,...labels])=>labels.map(label=>[label.toLocaleLowerCase('en').replace(/[\s\u00a0]+/g,' ').replace(/[-–—]/g,'-'),english])));
+    const englishFilter=value=>filterCopy.get(value.trim().toLocaleLowerCase('en').replace(/[\s\u00a0]+/g,' ').replace(/[-–—]/g,'-'));
     const safeURL=value=>{if(typeof value!=='string'||!value.trim())return null;try{const url=new URL(value,location.href);return /^https?:$/.test(url.protocol)?url:null;}catch{return null;}};
     const titleSelector='a#video-title,a#video-title-link,h3 a[href],.yt-lockup-metadata-view-model__title,.yt-lockup-metadata-view-model-wiz__title,.ytLockupMetadataViewModelTitle';
     const playlistSelector='ytd-playlist-renderer,ytd-grid-playlist-renderer,yt-lockup-view-model';
@@ -76,7 +111,7 @@
     }
 
     class Search {
-        constructor(){this.cards=new Map();this.avatars=new Map();this.subscriptions=new Set();this.presses=new Map();this.filters=new Map();this.layout=new Map();this.metadata=new Map();this.click=event=>{this.animateSubscription(event);this.toggleFilter(event);};document.addEventListener('click',this.click,true);}
+        constructor(){this.cards=new Map();this.avatars=new Map();this.subscriptions=new Set();this.presses=new Map();this.filters=new Map();this.filterLabels=new Map();this.layout=new Map();this.metadata=new Map();this.click=event=>{this.animateSubscription(event);this.toggleFilter(event);};document.addEventListener('click',this.click,true);}
         static isPlaylist(card){
             if(card.matches('ytd-playlist-renderer,ytd-grid-playlist-renderer'))return true;
             if(!card.matches('yt-lockup-view-model'))return false;
@@ -92,6 +127,7 @@
             this.syncLayout(searches);
             this.syncAvatars(searches);
             this.syncSubscriptions(searches);
+            this.syncFilterLabels(searches);
             for(const search of searches){
                 for(const source of search.querySelectorAll('[data-myt-search-playlist]')){
                     wanted.add(source);let card=this.cards.get(source);if(!card){card=new PlaylistCard(source);this.cards.set(source,card);}card.update(this.metadata);
@@ -114,6 +150,40 @@
             this.pendingCards ||=new Set();this.pendingCards.add(source);
             if(this.cardFrame)return;
             this.cardFrame=requestAnimationFrame(()=>{this.cardFrame=0;for(const source of this.pendingCards)if(source.isConnected)this.cards.get(source)?.update(this.metadata);this.pendingCards.clear();});
+        }
+        syncFilterLabels(searches){
+            const wanted=new Map();
+            const translate=(node,attribute='')=>{
+                const value=attribute?node.getAttribute(attribute):node.data;
+                if(value===null)return;
+                const previous=this.filterLabels.get(node)?.get(attribute);
+                const english=englishFilter(value);
+                if(previous&&value!==previous.translated)this.filterLabels.get(node).delete(attribute);
+                if(!english&&value!==previous?.translated)return;
+                if(!wanted.has(node))wanted.set(node,new Set());wanted.get(node).add(attribute);
+                if(!english||value.trim()===english)return;
+                if(!this.filterLabels.has(node))this.filterLabels.set(node,new Map());
+                const translated=value.replace(/\S(?:[\s\S]*\S)?/,english);
+                this.filterLabels.get(node).set(attribute,{original:value,translated});
+                if(attribute)node.setAttribute(attribute,translated);else node.data=translated;
+            };
+            const scopes=new Set(document.querySelectorAll('ytd-search-filter-dialog-renderer,yt-search-filter-dialog-view-model,ytd-search-filter-group-renderer'));
+            for(const search of searches)for(const scope of search.querySelectorAll(filterScopeSelector))scopes.add(scope);
+            for(const scope of scopes){
+                const walk=document.createTreeWalker(scope,NodeFilter.SHOW_TEXT,{acceptNode:node=>node.parentElement.closest('script,style,input,textarea,[contenteditable]')?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
+                while(walk.nextNode())translate(walk.currentNode);
+                for(const node of [scope,...scope.querySelectorAll('[aria-label],[title]')])for(const attribute of ['aria-label','title'])translate(node,attribute);
+            }
+            for(const[node,attributes]of this.filterLabels){
+                for(const[attribute,state]of attributes)if(!wanted.get(node)?.has(attribute)){
+                    this.restoreFilterLabel(node,attribute,state);attributes.delete(attribute);
+                }
+                if(!attributes.size)this.filterLabels.delete(node);
+            }
+        }
+        restoreFilterLabel(node,attribute,state){
+            if((attribute?node.getAttribute(attribute):node.data)!==state.translated)return;
+            if(attribute)node.setAttribute(attribute,state.original);else node.data=state.original;
         }
         restoreAvatar(host,state){
             host.removeAttribute('data-myt-search-avatar-host');state.link.removeAttribute('data-myt-search-avatar-link');
@@ -220,8 +290,9 @@
             for(const[name,value]of [['hidden',state.hidden],['aria-hidden',state.aria]]){if(value===null)panel.removeAttribute(name);else panel.setAttribute(name,value);}
             for(const[button,value]of state.buttons){if(value===null)button.removeAttribute('aria-expanded');else button.setAttribute('aria-expanded',value);}
         }
-        destroy(){cancelAnimationFrame(this.cardFrame);this.pendingCards?.clear();document.removeEventListener('click',this.click,true);for(const card of this.cards.values())card.destroy();this.cards.clear();for(const[host,state]of this.avatars)this.restoreAvatar(host,state);for(const button of this.subscriptions)button.removeAttribute('data-myt-search-subscribe');this.subscriptions.clear();for(const animation of this.presses.values())animation.cancel();this.presses.clear();for(const[panel,state]of this.filters)this.restoreFilter(panel,state);this.filters.clear();for(const[node,attributes]of this.layout)for(const name of attributes.keys())node.removeAttribute(name);this.layout.clear();this.metadata.clear();}
+        destroy(){cancelAnimationFrame(this.cardFrame);this.pendingCards?.clear();document.removeEventListener('click',this.click,true);for(const card of this.cards.values())card.destroy();this.cards.clear();for(const[host,state]of this.avatars)this.restoreAvatar(host,state);for(const button of this.subscriptions)button.removeAttribute('data-myt-search-subscribe');this.subscriptions.clear();for(const animation of this.presses.values())animation.cancel();this.presses.clear();for(const[node,attributes]of this.filterLabels)for(const[attribute,state]of attributes)this.restoreFilterLabel(node,attribute,state);this.filterLabels.clear();for(const[panel,state]of this.filters)this.restoreFilter(panel,state);this.filters.clear();for(const[node,attributes]of this.layout)for(const name of attributes.keys())node.removeAttribute(name);this.layout.clear();this.metadata.clear();}
     }
     Search.playlistSelector=playlistSelector;
+    Search.filterScopeSelector=filterScopeSelector;
     globalThis.MinimalYouTubeSearch=Search;
 })();

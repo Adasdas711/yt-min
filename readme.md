@@ -1,8 +1,10 @@
-# Minimal YouTube 1.10.29
+# Minimal YouTube 0.9
 
 Расширение для Chrome / Chromium / Edge: спокойная главная с поиском, центрированные страницы каналов и видео, без рекомендаций и Shorts.
 
 ## Что изменилось
+
+- 0.9: все встроенные элементы интерфейса остаются английскими. Добавлен перевод русских и немецких подписей нативных поисковых фильтров, включая заголовки, варианты, chips, подсказки и отдельное всплывающее окно. Поздняя подгрузка и SPA-переходы сохраняют английские подписи; пользовательские тексты, ссылки и действия YouTube не меняются. Старые архивы удалены, в репозитории оставлена только актуальная сборка 0.9.
 
 - 1.10.29: кнопки подписки в поисковых карточках каналов получили оформление со страницы видео: округлая форма, нейтральный фон до подписки, красный фон с галочкой после неё, подсветка при наведении и анимация нажатия 180 мс. Видимые подписи Subscribe/Subscribed остаются английскими. Состояние определяется тем же считывателем нативной кнопки, что и в плеере; сама кнопка, её обработчики, доступность и команды YouTube сохраняются. Оформление снимается при отключении, а уменьшение анимации учитывается. Размер карточек каналов остаётся 1,5×1; размеры сетки и положение аватаров не менялись.
 
@@ -111,11 +113,11 @@
 
 ## Установка
 
-Готовое расширение: [articafts/minimal-youtube-1.10.29.zip](articafts/minimal-youtube-1.10.29.zip).
+Готовое расширение: [articafts/minimal-youtube-0.9.zip](articafts/minimal-youtube-0.9.zip).
 
 Требуется Chrome / Chromium 114+ или совместимый Edge с разрешённой установкой распакованных расширений.
 
-1. Распакуйте `minimal-youtube-1.10.29.zip` целиком в новую постоянную папку, включая каталог `src/home/`. Либо используйте корень этого репозитория, где находится `manifest.json`.
+1. Распакуйте `minimal-youtube-0.9.zip` целиком в новую постоянную папку, включая каталог `src/home/`. Либо используйте корень этого репозитория, где находится `manifest.json`.
 2. Откройте `chrome://extensions` (в Edge — `edge://extensions`), включите режим разработчика.
 3. Отключите прежнюю копию Minimal YouTube, чтобы её стили не конфликтовали с новой.
 4. Нажмите «Загрузить распакованное расширение» и выберите папку с `manifest.json`.
@@ -146,13 +148,15 @@
 
 ## Разработка и проверка
 
-Исходники находятся в `src/`, зависимости и сборка JavaScript не нужны. Исходный архив `imnffafnaoooaedkhappfhomnnpigogk.zip` оставлен без изменений для сравнения.
+Исходники находятся в `src/`, зависимости и сборка JavaScript не нужны. В `articafts/` хранится только актуальный архив расширения.
 
 ```sh
 cd /workspace/yt-min
 node --check src/content/data-pruning.js
 node --check src/optimization.js
 node --check src/content/watch.js
+node --check src/content/search.js
+node --check src/content/playlist.js
 node --check src/content/ads.js
 node --check src/content/content.js
 node --check src/popup/popup.js
@@ -166,6 +170,7 @@ python tests/interface.py
 python tests/scroll.py
 python tests/playlist.py
 python tests/search.py
+python tests/search_language.py
 python tests/search_loading.py
 python tests/description_stats.py
 python tests/comments.py

@@ -1409,10 +1409,12 @@
         const stableHome = root.dataset.mytPage === "home" && home?.isConnected && !pendingNavigation && !transitionActive;
         const stableWatch = watchView && root.dataset.mytPage === "watch" && !pendingNavigation && !transitionActive;
         const stableSearch=searchView&&root.dataset.mytPage==='search'&&!pendingNavigation&&!transitionActive;
+        const filterScope=globalThis.MinimalYouTubeSearch?.filterScopeSelector||'ytd-search-sub-menu-renderer';
         let statsChanged = false;
         const relevant = records.filter(record => {
             const target = record.target instanceof Element ? record.target : record.target.parentElement;
             if (!target) return false;
+            if (record.type === "attributes" && record.attributeName === "title" && !target.closest(filterScope)) return false;
             if (target.closest("title")) { cleanTitle(); return false; }
             if (stableHome) return record.target === root && record.attributeName === "dark";
             if (target.closest("#myt-watch, #myt-home, #myt-playlist-summary, [data-myt-search-avatar-overlay]")) return false;
@@ -1421,7 +1423,9 @@
                 if(changes.length&&changes.every(node=>node instanceof Element&&node.matches('#myt-watch,#myt-home,#myt-playlist-summary,[data-myt-search-playlist-card],[data-myt-search-avatar-overlay],.myt-masthead-brand'))&&(!changes.some(node=>node.matches('.myt-masthead-brand'))||target.querySelectorAll(':scope > .myt-masthead-brand').length<=1))return false;
             }
             if(stableSearch){
-                if(target.closest('yt-video-preview,ytd-popup-container'))return false;
+                const filterChange=target.closest(filterScope)||record.type==='childList'&&[...record.addedNodes].some(node=>node instanceof Element&&(node.matches(filterScope)||node.querySelector(filterScope)));
+                if(filterChange)for(const search of document.querySelectorAll('ytd-search'))pendingRoots.add(search);
+                if(target.closest('yt-video-preview')||target.closest('ytd-popup-container')&&!filterChange)return false;
                 if(record.type==='attributes'&&['aria-hidden','aria-expanded'].includes(record.attributeName)&&target.closest('ytd-search-sub-menu-renderer'))return false;
                 const card=target.closest('[data-myt-search-video],[data-myt-search-playlist]');
                 const textOnly=record.type==='characterData'||record.type==='childList'&&[...record.addedNodes,...record.removedNodes].every(node=>node.nodeType===Node.TEXT_NODE);
@@ -1482,6 +1486,7 @@
                 const target = record.target instanceof Element ? record.target : record.target.parentElement;
                 const container = target?.closest(`${tabSelector}, ${cardSelector}, [${hiddenAttribute}]`);
                 if (container) pendingRoots.add(container);
+                else if (target?.closest('ytd-search-sub-menu-renderer')) pendingRoots.add(target.closest('ytd-search-sub-menu-renderer'));
                 for (const node of record.addedNodes) {
                     if (node instanceof Element) pendingRoots.add(node);
                 }
@@ -1507,7 +1512,7 @@
             classObserver.observe(root, { attributes: true, attributeFilter: ["class"] });
             observer.observe(document.documentElement, {
                 subtree: true, childList: true, characterData: true,
-                attributes: true, attributeFilter: ["href", "aria-label", "aria-hidden", "visibility", "is-shorts", "is-playlist", "data-myt-search-playlists", "data-video-count", "content-type", "data-content-type", "overlay-style", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "data-srcset", "expanded", "is-expanded", "aria-pressed", "subscribed", "is-subscribed", "disabled", "aria-disabled", "aria-busy", "aria-valuetext", "data-value", "value", "content"],
+                attributes: true, attributeFilter: ["href", "aria-label", "title", "aria-hidden", "visibility", "is-shorts", "is-playlist", "data-myt-search-playlists", "data-video-count", "content-type", "data-content-type", "overlay-style", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "data-srcset", "expanded", "is-expanded", "aria-pressed", "subscribed", "is-subscribed", "disabled", "aria-disabled", "aria-busy", "aria-valuetext", "data-value", "value", "content"],
             });
             updateRoute(true);
             syncBrand();
