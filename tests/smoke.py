@@ -326,7 +326,7 @@ def check_latest_search_shelf(browser, title, renderer):
       </div></ytd-item-section-renderer></div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>'''
     page = setup(browser, '/results?search_query=creator', fixture)
     expect(page.locator('#latest')).to_be_hidden()
-    for selector in ['#matching-channel', '#subscribe', '#ordinary-video', '#ordinary-shelf']:
+    for selector in ['#matching-channel', '#matching-channel [data-myt-search-channel-card] .subscribe', '#ordinary-video', '#ordinary-shelf']:
         expect(page.locator(selector)).to_be_visible()
     page.locator('#latest #header h2').evaluate("element => element.textContent='Popular videos'")
     expect(page.locator('#latest')).to_be_visible()
@@ -575,7 +575,7 @@ def check_search_channels_and_row_gaps(browser, width):
     assert all(box['x']>=rail['x'] and box['x']+box['width']<=rail['x']+rail['width']+1 for box in boxes),boxes
     if width>1000:assert abs(a['width']-(rail['width']-24)/2)<1,(a,rail)
     for i in range(4):
-        expect(page.locator('#subscribe-'+str(i))).to_be_visible()
+        expect(page.locator('#channel-'+str(i)+' [data-myt-search-channel-card] .subscribe')).to_be_visible()
         expect(page.locator('#channel-'+str(i)+' #main-link')).to_have_attribute('href','/@creator'+str(i))
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     page.evaluate('__setEnabled(false)')
@@ -675,15 +675,15 @@ def check_native_hover_surface(browser, dark):
     for selector,hover_target in [('#native-hover-video','#native-hover-video ytd-thumbnail'),('#native-hover-channel','#native-hover-channel a'),('#native-hover-modern','#native-hover-modern a')]:
         page.mouse.move(1,1)
         before=page.locator(selector).evaluate('element=>getComputedStyle(element).backgroundColor')
-        page.locator(hover_target).first.hover()
+        page.locator(hover_target+':visible').first.hover()
         color=page.locator(selector).evaluate('element=>getComputedStyle(element).backgroundColor')
         assert color not in ['transparent','rgba(0, 0, 0, 0)'], (selector,before,color)
         assert color!=before, (selector,before,color)
         page.mouse.move(1,1)
-        page.locator(selector+' a').first.focus()
+        page.locator(selector+' a:visible').first.focus()
         color=page.locator(selector).evaluate('element=>getComputedStyle(element).backgroundColor')
         assert color not in ['transparent','rgba(0, 0, 0, 0)'], (selector,color)
-        page.evaluate('document.activeElement.blur()')
+        page.evaluate('()=>{let active=document.activeElement;while(active?.shadowRoot?.activeElement)active=active.shadowRoot.activeElement;active?.blur();}')
     page.evaluate("""() => document.body.insertAdjacentHTML('beforeend', '<ytd-video-preview id=floating-preview style="display:none;width:360px"><div id=wrapper><div style="height:150px;background:black">Player</div><div id=details>Metadata</div></div></ytd-video-preview>')""")
     expect(page.locator('#floating-preview')).to_be_hidden()
     page.locator('#floating-preview').evaluate("element=>element.style.display='block'")
@@ -734,7 +734,7 @@ def check_settings_short_viewport(browser):
 def assert_card_surface(page, selector):
     card = page.locator(selector)
     color = "element => getComputedStyle(element).backgroundColor.match(/[\\d.]+/g).map(Number)"
-    page.evaluate("document.activeElement?.blur()")
+    page.evaluate("()=>{let active=document.activeElement;while(active?.shadowRoot?.activeElement)active=active.shadowRoot.activeElement;active?.blur();}")
     page.mouse.move(1, 1)
     base = card.evaluate(color)
     assert len(base) == 3 or base[3] > .95, (selector, base)
@@ -744,10 +744,10 @@ def assert_card_surface(page, selector):
     hover = card.evaluate(color)
     assert sum(hover[:3]) > sum(base[:3]), (selector, base, hover)
     page.mouse.move(1, 1)
-    card.locator('a[href]').first.focus()
+    card.locator('a[href]:visible').first.focus()
     focused = card.evaluate(color)
     assert sum(focused[:3]) > sum(base[:3]), (selector, base, focused)
-    page.evaluate("document.activeElement?.blur()")
+    page.evaluate("()=>{let active=document.activeElement;while(active?.shadowRoot?.activeElement)active=active.shadowRoot.activeElement;active?.blur();}")
 
 
 def watch_details_fixture(legacy=False):
@@ -3062,7 +3062,8 @@ def main():
             expect(page.locator(selector)).to_be_visible()
             bounds = page.locator(selector).bounding_box()
             assert bounds["width"] > left["width"] * 2.9, (selector, bounds, left)
-        expect(page.locator("#channel-result a")).to_have_attribute("href", "/@channel")
+        expect(page.locator("#channel-result > a")).to_have_attribute("href", "/@channel")
+        expect(page.locator("#channel-result [data-myt-search-channel-card] .name")).to_have_attribute("href", "https://www.youtube.com/@channel")
         expect(page.locator("#playlist-result [data-myt-search-playlist-card] a.title")).to_have_attribute("href", "https://www.youtube.com/playlist?list=fixture")
         assert abs(page.locator("#playlist-result").bounding_box()["width"]-(left["width"]*2+24))<2
         expect(page.locator("#modern-video[data-myt-search-video]")).to_have_count(1)

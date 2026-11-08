@@ -130,10 +130,10 @@ def avatar_navigation(browser,width,native):
     body=f'<ytd-app>{MASTHEAD}<ytd-search><ytd-section-list-renderer><div id="contents"><ytd-channel-renderer><div id="content-section"><div id="avatar-section">{image}</div><div id="info-section"><a id="main-link" href="/@creator">Creator</a></div></div></ytd-channel-renderer></div></ytd-section-list-renderer></ytd-search></ytd-app>'
     page=setup(browser,'/results?search_query=creator',body,width=width)
     page.context.route('https://www.youtube.com/**',lambda route:route.fulfill(content_type='text/html',body='<title>Channel</title>'))
-    link=page.locator('[data-myt-search-avatar-link]');expect(link).to_have_attribute('href','/@creator' if native else 'https://www.youtube.com/@creator')
+    link=page.locator('[data-myt-search-avatar-link]');expect(link).to_have_attribute('href','https://www.youtube.com/@creator')
     page.evaluate('window.__avatarParent=document.querySelector("#avatar-section img").parentElement')
     link.hover();expect(link).to_have_css('cursor','pointer')
-    box=page.locator('#avatar-section img').bounding_box()
+    box=page.locator('[data-myt-search-channel-card] .avatar img').bounding_box()
     # Chromium starts background-tab requests before interception. Keep this
     # gesture offline; the routed normal click below verifies its destination.
     page.context.set_offline(True)
@@ -142,14 +142,14 @@ def avatar_navigation(browser,width,native):
     page.locator('ytd-channel-renderer').evaluate('''card=>{
       for(const a of card.querySelectorAll('a:not([data-myt-search-avatar-overlay])'))a.href='/@updated';
     }''')
-    expect(link).to_have_attribute('href','/@updated' if native else 'https://www.youtube.com/@updated')
+    expect(link).to_have_attribute('href','https://www.youtube.com/@updated')
     assert_stable(page)
     page.evaluate('__setEnabled(false)')
     expect(page.locator('[data-myt-search-avatar-link],[data-myt-search-avatar-host],[data-myt-search-avatar-overlay]')).to_have_count(0)
     assert page.evaluate('document.querySelector("#avatar-section img").parentElement===__avatarParent')
     expect(page.locator('#native-avatar')).to_have_count(1 if native else 0)
     page.evaluate('__setEnabled(true)');expect(link).to_have_count(1)
-    box=page.locator('#avatar-section img').bounding_box()
+    box=page.locator('[data-myt-search-channel-card] .avatar img').bounding_box()
     page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
     page.wait_for_url('**/@updated');page.close()
     print(f'PASS channel avatar navigation, new tab, recycled URL and cleanup: {width}px, native={native}',flush=True)
@@ -164,12 +164,12 @@ def avatar_layout(browser,native):
     for width in [1440,900,390]:
         page.set_viewport_size({'width':width,'height':960})
         expect(page.locator('[data-myt-search-avatar-link]')).to_have_count(1)
-        slot=page.locator('#avatar-section').bounding_box();image=page.locator('#avatar-section img').bounding_box()
-        link=page.locator('[data-myt-search-avatar-link]').bounding_box();info=page.locator('#channel-info').bounding_box()
+        slot=page.locator('[data-myt-search-channel-card] .avatar').bounding_box();image=page.locator('[data-myt-search-channel-card] .avatar img').bounding_box()
+        link=page.locator('[data-myt-search-avatar-link]').bounding_box();info=page.locator('[data-myt-search-channel-card] .info').bounding_box()
         assert all(abs(image[key]-slot[key])<1 and abs(link[key]-slot[key])<1 for key in ['x','y','width','height']),(slot,image,link)
         assert info['x']>=slot['x']+slot['width']+12,(slot,info)
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-        assert page.locator('#avatar-section img').evaluate('img=>{const r=img.getBoundingClientRect(),a=document.querySelector("[data-myt-search-avatar-link]"),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return a===hit||a.contains(hit)}')
+        assert page.locator('[data-myt-search-channel-card] .avatar img').evaluate('img=>{const r=img.getBoundingClientRect(),a=img.closest("a"),hit=img.getRootNode().elementFromPoint(r.x+r.width/2,r.y+r.height/2);return a===hit||a.contains(hit)}')
         assert_stable(page)
         page.screenshot(path=f'/tmp/yt-min-avatar28-{width}-{native}.png')
         print(f'PASS avatar, link and text stay aligned through resize: {width}px, native={native}',flush=True)
@@ -187,37 +187,37 @@ def subscription_buttons(browser,width,dark,modern):
     page=setup(browser,'/results?search_query=creator',body,width=width,native_dark=dark)
     page.evaluate('''modern=>{
       window.__subscriptionCalls=0;window.__presses=0;const button=window.__subscriptionButton=document.querySelector('#native-subscribe'),parent=button.parentElement;
-      const animate=button.animate;button.animate=function(...args){__presses++;return animate.apply(this,args)};
+      const control=document.querySelector('[data-myt-search-channel-card]').shadowRoot.querySelector('.subscribe');const animate=control.animate;control.animate=function(...args){__presses++;return animate.apply(this,args)};
       button.onclick=()=>{
         __subscriptionCalls++;const next=modern?button.getAttribute('aria-pressed')!=='true':!parent.hasAttribute('subscribed');
         if(modern)button.setAttribute('aria-pressed',String(next));else parent.toggleAttribute('subscribed',next);
         button.querySelector('span').textContent=next?'Вы подписаны':'Подписаться';button.setAttribute('aria-label',next?'Вы подписаны':'Подписаться на канал');
       };
     }''',modern)
-    control=page.locator('#native-subscribe');card=page.locator('ytd-channel-renderer');before=card.bounding_box()
+    control=page.locator('[data-myt-search-channel-card] .subscribe');card=page.locator('ytd-channel-renderer');before=card.bounding_box()
     regular=page.locator('#video-1').bounding_box()
     assert abs(before['width']-(regular['width']*1.5+12 if width>1000 else regular['width']))<1,(before,regular)
     expect(control).to_have_attribute('data-myt-search-subscribe','false')
     expect(control).to_have_css('background-color','rgb(25, 25, 29)' if dark else 'rgb(255, 255, 255)')
     expect(control).to_have_css('border-radius','999px');expect(control.locator('svg')).to_be_hidden()
-    assert control.evaluate('e=>getComputedStyle(e,"::after").content')=='"Subscribe"'
+    expect(control).to_have_text('Subscribe')
     control.click();page.mouse.move(1,1)
     expect(control).to_have_attribute('data-myt-search-subscribe','true');expect(control).to_have_css('background-color','rgb(201, 31, 55)')
-    assert control.evaluate('e=>getComputedStyle(e,"::after").content')=='"Subscribed"'
+    expect(control).to_have_text('Subscribed')
     assert page.evaluate('__subscriptionCalls===1&&__presses===0&&__subscriptionButton===document.querySelector("#native-subscribe")')
     page.emulate_media(reduced_motion='no-preference');control.click();page.mouse.move(1,1)
     expect(control).to_have_attribute('data-myt-search-subscribe','false')
     assert page.evaluate('__subscriptionCalls===2&&__presses===1')
     assert abs(card.bounding_box()['width']-before['width'])<1
-    control.evaluate('e=>e.disabled=true');box=control.bounding_box();page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
+    page.locator('#native-subscribe').evaluate('e=>e.disabled=true');expect(control).to_be_disabled();box=control.bounding_box();page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
     assert page.evaluate('__subscriptionCalls===2')
-    control.evaluate('e=>e.disabled=false')
+    page.locator('#native-subscribe').evaluate('e=>e.disabled=false');expect(control).to_be_enabled()
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     page.emulate_media(reduced_motion='reduce');assert_stable(page)
     control.click();page.mouse.move(1,1);expect(control).to_have_attribute('data-myt-search-subscribe','true');assert_stable(page)
     page.screenshot(path=f'/tmp/yt-min-search-subscribe29-{width}-{dark}-{modern}.png')
     page.evaluate('__setEnabled(false)');expect(page.locator('[data-myt-search-subscribe]')).to_have_count(0)
-    expect(control.locator('svg')).to_be_visible();assert page.evaluate('__subscriptionButton===document.querySelector("#native-subscribe")')
+    expect(page.locator('#native-subscribe svg')).to_be_visible();assert page.evaluate('__subscriptionButton===document.querySelector("#native-subscribe")')
     page.close();print(f'PASS subscription style/state, native actions, motion and 1.5-column width: {width}px, dark={dark}, modern={modern}',flush=True)
 
 

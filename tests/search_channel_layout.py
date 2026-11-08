@@ -16,6 +16,12 @@ def fixture(layout):
         content = avatar + '<div id="info-section">' + link(copy) + action + '</div>'
     elif layout == 'flat':
         content = avatar + '<div id="info-section">' + link(copy) + '</div>' + action
+    elif layout in ['nested', 'renamed', 'hostile']:
+        # No #info-section: source order puts the photo after the text and its
+        # wrappers use native offsets. The former CSS rules never covered this.
+        content = '<div class="native-shell">' + link('<section class="native-copy">' + copy + '<div class="photo-wrapper">' + avatar + '</div></section>') + '<div class="action-wrapper">' + action + '</div></div>'
+        if layout == 'renamed':
+            content = content.replace('id="avatar-section"', 'class="photo-wrapper"').replace('id="avatar"', 'class="native-avatar"').replace('id="channel-info"', 'class="native-copy"').replace('id="channel-title"', 'data-native-title').replace('id="channel-stats"', 'class="native-stats"').replace('id="description"', 'class="channel-description"')
     else:
         content = link(avatar + '<div id="info-section">' + copy + '</div>') + action
     return '''<style>
@@ -31,13 +37,18 @@ def fixture(layout):
       h3,p { margin:4px 0; } #channel-title { font-size:18px; }
       #channel-stats,#description { font-size:13px;color:#aaa;overflow-wrap:anywhere; }
       #description { display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden; }
-    </style><ytd-app>''' + MASTHEAD + '<ytd-page-manager><ytd-search><ytd-section-list-renderer><div id="contents"><ytd-channel-renderer><div id="content-section">' + content + '</div></ytd-channel-renderer>' + video(1) + '</div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>'
+      .native-shell { position:relative;padding-left:90px; }
+      .native-copy { display:block; }
+      .photo-wrapper { position:absolute;left:80px;top:60px; }
+      ytd-channel-renderer[hostile] div { display:flex!important;flex-direction:column!important;transform:translate(100px,50px)!important; }
+    </style><ytd-app>''' + MASTHEAD + '<ytd-page-manager><ytd-search><ytd-section-list-renderer><div id="contents"><ytd-channel-renderer' + (' hostile' if layout == 'hostile' else '') + '><div id="content-section">' + content + '</div></ytd-channel-renderer>' + video(1) + '</div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>'
 
 
 def check_geometry(page):
     metrics = page.evaluate('''() => {
-      const rect=selector=>{const b=document.querySelector(selector).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height,right:b.right,bottom:b.bottom};};
-      return {card:rect('ytd-channel-renderer'),avatar:rect('#avatar img'),title:rect('#channel-title'),stats:rect('#channel-stats'),description:rect('#description'),button:rect('#native-subscribe'),overflow:document.documentElement.scrollWidth>innerWidth};
+      const shadow=document.querySelector('[data-myt-search-channel-card]').shadowRoot;
+      const rect=selector=>{const b=(selector==='ytd-channel-renderer'?document.querySelector(selector):shadow.querySelector(selector)).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height,right:b.right,bottom:b.bottom};};
+      return {card:rect('ytd-channel-renderer'),avatar:rect('.avatar img'),title:rect('.name'),stats:rect('.metadata'),description:rect('.description'),button:rect('.subscribe'),overflow:document.documentElement.scrollWidth>innerWidth};
     }''')
     avatar, button, card = (metrics[key] for key in ['avatar', 'button', 'card'])
     assert avatar['width'] == avatar['height'] == 80, metrics
@@ -57,7 +68,7 @@ def check_geometry(page):
 def check(browser, layout, dark):
     page = setup(browser, '/results?search_query=mrbeast', fixture(layout), native_dark=dark)
     page.evaluate('''() => {
-      window.__nativeNodes=[...document.querySelectorAll('ytd-channel-renderer *:not([data-myt-search-avatar-overlay])')].map(node=>[node,node.parentElement,node.getAttribute('style')]);
+      window.__nativeNodes=[...document.querySelectorAll('ytd-channel-renderer *:not([data-myt-search-channel-card])')].map(node=>[node,node.parentElement,node.getAttribute('style')]);
       document.querySelector('ytd-channel-renderer').addEventListener('click',event=>{
         if(event.target.closest('[data-myt-search-avatar-overlay]')){event.preventDefault();window.__channelVisits=(window.__channelVisits||0)+1;}
       },true);
@@ -73,33 +84,34 @@ def check(browser, layout, dark):
         regular = page.locator('#video-1').bounding_box()
         expected = regular['width'] * 1.5 + 12 if width > 1000 else regular['width'] * 2 + 24 if width > 600 else regular['width']
         assert abs(metrics['card']['width'] - expected) < 1, metrics
-        avatar = page.locator('#avatar img')
+        avatar = page.locator('[data-myt-search-channel-card] .avatar img')
         assert avatar.evaluate('''image=>{
-          const box=image.getBoundingClientRect(),hit=document.elementFromPoint(box.x+box.width/2,box.y+box.height/2);
-          const link=image.closest('ytd-channel-renderer').querySelector('[data-myt-search-avatar-link]');
+          const box=image.getBoundingClientRect(),hit=image.getRootNode().elementFromPoint(box.x+box.width/2,box.y+box.height/2);
+          const link=image.closest('a');
           return link===hit||link.contains(hit);
         }''')
         box=avatar.bounding_box();page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
         assert page.evaluate('__channelVisits>0')
         before = page.evaluate('__channelVisits')
-        page.locator('#native-subscribe').click()
+        page.locator('[data-myt-search-channel-card] .subscribe').click()
         assert page.evaluate('__subscribed>0&&__channelVisits') == before
         assert page.evaluate('__nativeNodes.every(([node,parent])=>node.parentElement===parent)')
         assert_stable(page)
         page.screenshot(path=f'/tmp/yt-min-channel-fixed-{layout}-{width}-{dark}.png')
     # Native rerenders, long names and recycled URLs must not reintroduce overlap.
     page.set_viewport_size({'width': 390, 'height': 960})
-    page.locator('#channel-title').evaluate('e=>e.firstChild.data="A very long creator name with words that should wrap "')
-    page.locator('#info-section').evaluate('e=>{e.style.left="-80px";e.style.transform="translateX(-40px)";}')
+    page.locator('ytd-channel-renderer h3').evaluate('e=>e.firstChild.data="A very long creator name with words that should wrap "')
+    page.locator('#info-section,.native-shell').evaluate('e=>{e.style.left="-80px";e.style.transform="translateX(-40px)";}')
+    expect(page.locator('[data-myt-search-channel-card] .name')).to_have_text('A very long creator name with words that should wrap')
     check_geometry(page)
     page.locator('ytd-channel-renderer a#main-link').evaluate('e=>e.href="/@updated"')
-    expect(page.locator('[data-myt-search-avatar-link]')).to_have_attribute('href', 'https://www.youtube.com/@updated' if layout in ['flat', 'legacy'] else '/@updated')
+    expect(page.locator('[data-myt-search-avatar-link]')).to_have_attribute('href', 'https://www.youtube.com/@updated')
     assert_stable(page)
-    page.evaluate('window.__latestInfoStyle=document.querySelector("#info-section").getAttribute("style")')
+    page.evaluate('window.__latestInfo=document.querySelector("#info-section,.native-shell");window.__latestInfoStyle=__latestInfo.getAttribute("style")')
     page.evaluate('__setEnabled(false)')
     expect(page.locator('[data-myt-search-avatar-host],[data-myt-search-avatar-link]')).to_have_count(0)
-    assert page.evaluate('__nativeNodes.every(([node,parent,style])=>node.parentElement===parent&&(node.id==="info-section"||node.getAttribute("style")===style))')
-    assert page.evaluate('document.querySelector("#info-section").getAttribute("style")===__latestInfoStyle')
+    assert page.evaluate('__nativeNodes.every(([node,parent,style])=>node.parentElement===parent&&(node===__latestInfo||node.getAttribute("style")===style))')
+    assert page.evaluate('__latestInfo.getAttribute("style")===__latestInfoStyle')
     page.evaluate('__setEnabled(true)')
     expect(page.locator('[data-myt-search-avatar-link]')).to_have_count(1)
     check_geometry(page)
@@ -110,7 +122,7 @@ def check(browser, layout, dark):
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
-        for layout in ['wrapped', 'direct-avatar', 'flat', 'legacy']:
+        for layout in ['wrapped', 'direct-avatar', 'flat', 'legacy', 'nested', 'renamed', 'hostile']:
             for dark in [True, False]: check(browser, layout, dark)
         browser.close()
 

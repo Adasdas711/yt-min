@@ -1417,12 +1417,14 @@
             if (record.type === "attributes" && record.attributeName === "title" && !target.closest(filterScope)) return false;
             if (target.closest("title")) { cleanTitle(); return false; }
             if (stableHome) return record.target === root && record.attributeName === "dark";
-            if (target.closest("#myt-watch, #myt-home, #myt-playlist-summary, [data-myt-search-avatar-overlay]")) return false;
+            if (target.closest("#myt-watch, #myt-home, #myt-playlist-summary, [data-myt-search-channel-card]")) return false;
             if(record.type==='childList'){
                 const changes=[...record.addedNodes,...record.removedNodes];
-                if(changes.length&&changes.every(node=>node instanceof Element&&node.matches('#myt-watch,#myt-home,#myt-playlist-summary,[data-myt-search-playlist-card],[data-myt-search-avatar-overlay],.myt-masthead-brand'))&&(!changes.some(node=>node.matches('.myt-masthead-brand'))||target.querySelectorAll(':scope > .myt-masthead-brand').length<=1))return false;
+                if(changes.length&&changes.every(node=>node instanceof Element&&node.matches('#myt-watch,#myt-home,#myt-playlist-summary,[data-myt-search-playlist-card],[data-myt-search-channel-card],.myt-masthead-brand'))&&(!changes.some(node=>node.matches('.myt-masthead-brand'))||target.querySelectorAll(':scope > .myt-masthead-brand').length<=1))return false;
             }
             if(stableSearch){
+                const channel=target.closest('[data-myt-search-channel]');
+                if(channel&&searchView.channels.has(channel)&&target!==channel)return false;
                 const filterChange=target.closest(filterScope)||record.type==='childList'&&[...record.addedNodes].some(node=>node instanceof Element&&(node.matches(filterScope)||node.querySelector(filterScope)));
                 if(filterChange)for(const search of document.querySelectorAll('ytd-search'))pendingRoots.add(search);
                 if(target.closest('yt-video-preview')||target.closest('ytd-popup-container')&&!filterChange)return false;

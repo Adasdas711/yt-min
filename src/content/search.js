@@ -1,4 +1,4 @@
-/* Own playlist result cards and a stable controller for native search filters. */
+/* Isolated channel/playlist cards and a controller for native search filters. */
 (() => {
     'use strict';
     const channelPath=/^\/(?:@|channel\/|c\/|user\/)/;
@@ -110,8 +110,162 @@
         destroy(){this.host.remove();for(const part of this.parts)part.removeAttribute('data-myt-search-playlist-source');this.parts.clear();}
     }
 
+    const channelStyles=`
+      :host{all:initial!important;display:block!important;position:relative!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;color:var(--myt-ink)!important}
+      :host::before,:host::after{content:none!important;display:none!important}
+      *{box-sizing:border-box}[hidden]{display:none!important}a{color:inherit;text-decoration:none;cursor:pointer}button{font:inherit;cursor:pointer}a:focus-visible,button:focus-visible{outline:2px solid var(--myt-muted);outline-offset:3px}
+      .surface{display:grid;grid-template-columns:80px minmax(0,1fr) auto;align-items:center;gap:16px;min-height:110px}
+      .avatar{display:grid;place-items:center;position:relative;width:80px;height:80px;overflow:hidden;border-radius:50%;background:var(--myt-soft);font-size:28px;font-weight:600;flex:none}
+      .avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.info{min-width:0;display:flex;flex-direction:column;gap:6px;overflow-wrap:anywhere}
+      .heading{display:flex;align-items:baseline;gap:5px;min-width:0}.name{font-size:18px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}.verified{flex:none;width:14px;height:14px;align-self:center;color:var(--myt-muted)}
+      .metadata,.description{margin:0;font-size:13px;line-height:1.5;color:var(--myt-muted)}.description{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+      .subscribe{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-width:0;max-width:100%;min-height:44px;padding:10px 20px;border:1px solid var(--myt-border);border-radius:999px;background:var(--myt-surface);color:var(--myt-ink);font:500 16px/1.3 Arial,sans-serif;transition:none;white-space:nowrap}
+      .subscribe:hover:not(:disabled){background:var(--myt-soft)}.subscribe[aria-pressed=true]{background:#c91f37;border-color:#c91f37;color:#fff}.subscribe[aria-pressed=true]:hover:not(:disabled){background:#b51b31;border-color:#b51b31}.subscribe svg{width:18px;height:18px;flex:none}.subscribe:disabled{opacity:.55;cursor:default}
+      @media(max-width:600px){.surface{grid-template-columns:80px minmax(0,1fr);row-gap:12px}.subscribe{grid-column:2;justify-self:start}.name{font-size:17px}}
+    `;
+    const channelText=node=>{
+        if(!node)return '';
+        const copy=node.cloneNode(true);
+        copy.querySelectorAll('button,[role="button"],script,style,svg,yt-icon,ytd-badge-supported-renderer,tp-yt-paper-tooltip,yt-tooltip,[hidden],[aria-hidden="true"],[aria-label="Verified"]').forEach(child=>child.remove());
+        return text(copy);
+    };
+
+    class ChannelCard {
+        constructor(source,queue){
+            this.source=source;this.queue=queue;this.parts=new Set();
+            this.host=document.createElement('div');this.host.dataset.mytSearchChannelCard='';this.host.lang='en';
+            this.shadow=this.host.attachShadow({mode:'open'});
+            this.shadow.innerHTML=`<style>${channelStyles}</style><article class="surface"><a class="avatar" data-myt-search-avatar-link><span class="initial" aria-hidden="true"></span><img alt="" decoding="async" hidden></a><div class="info"><div class="heading"><a class="name"></a><svg class="verified" role="img" aria-label="Verified" viewBox="0 0 24 24" hidden><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m7 12 3 3 7-7" fill="none" stroke="var(--myt-card-bg)" stroke-width="2"/></svg></div><p class="metadata" hidden></p><p class="description" hidden></p></div><button class="subscribe" data-myt-search-subscribe="false" aria-pressed="false" hidden><svg aria-hidden="true" viewBox="0 0 24 24" hidden><path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Subscribe</span></button></article>`;
+            this.q=selector=>this.shadow.querySelector(selector);
+            this.q('img').onerror=()=>{this.q('img').hidden=true;this.q('.initial').hidden=false;};
+            this.q('img').onload=()=>{this.q('.initial').hidden=true;};
+            for(const link of [this.q('.avatar'),this.q('.name')])link.addEventListener('click',event=>{
+                if(event.button||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey||!this.link?.isConnected)return;
+                event.preventDefault();event.stopPropagation();this.link.click();
+            });
+            this.q('.subscribe').addEventListener('click',()=>this.subscribe());
+            this.observer=new MutationObserver(records=>{
+                if(this.host.isConnected&&records.every(record=>record.type==='childList'&&[...record.addedNodes,...record.removedNodes].every(node=>node===this.host)))return;
+                queue();
+            });
+            this.observer.observe(source,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['href','src','srcset','data-src','data-srcset','class','aria-label','title','aria-pressed','aria-disabled','aria-busy','subscribed','is-subscribed','disabled']});
+            source.addEventListener('load',queue,true);
+        }
+        subscriptionState(){
+            const state=globalThis.MinimalYouTubeWatch?.readSubscriptionState?.(this.source);
+            if(state?.button)return state;
+            const button=[...this.source.querySelectorAll('button')].find(node=>/^(?:subscribe\b|subscribed\b|подписаться|вы подписаны|abonnieren|abonniert)/iu.test((node.getAttribute('aria-label')||text(node)).trim()));
+            return {button,subscribed:button?.getAttribute('aria-pressed')==='true'||/^(?:subscribed\b|вы подписаны|abonniert)/iu.test(text(button)),disabled:!button||button.matches(':disabled,[aria-disabled="true"],[aria-busy="true"]')};
+        }
+        update(){
+            const source=this.source;
+            const anchors=[...source.querySelectorAll('a[href]')].filter(node=>{const url=safeURL(node.href);return url?.protocol==='https:'&&(url.hostname==='youtube.com'||url.hostname.endsWith('.youtube.com'))&&channelPath.test(url.pathname);});
+            const image=source.querySelector('#avatar img,yt-avatar-shape img,#avatar-section img,.yt-spec-avatar-shape__image')||source.querySelector('img');
+            this.link=anchors.find(link=>image&&link.contains(image))||anchors[0];
+            let name='';
+            for(const selector of ['ytd-channel-name #text','#channel-title #text','ytd-channel-name a','ytd-channel-name','#channel-title','#channel-info h3','#info-section h3','h3','a#main-link']){
+                name=channelText(source.querySelector(selector));if(name)break;
+            }
+            name ||= anchors.map(channelText).find(Boolean)||'Channel';
+            const href=this.link?.href||'';
+            for(const link of [this.q('.avatar'),this.q('.name')]){if(href){if(link.href!==href)link.href=href;}else link.removeAttribute('href');}
+            if(this.q('.name').textContent!==name)this.q('.name').textContent=name;
+            this.q('.avatar').setAttribute('aria-label','Open channel '+name);
+            if(this.q('.initial').textContent!==name.slice(0,1))this.q('.initial').textContent=name.slice(0,1);
+            const srcset=image?.getAttribute('data-srcset')||image?.getAttribute('srcset')||'';
+            const src=[image?.getAttribute('data-src'),...srcset.split(',').reverse().map(value=>value.trim().split(/\s+/)[0]),image?.currentSrc,image?.getAttribute('src')].find(value=>value&&(safeURL(value)||/^data:image\//i.test(value)))||'';
+            if(this.q('img').getAttribute('src')!==src){this.q('.initial').hidden=false;if(src)this.q('img').src=src;else this.q('img').removeAttribute('src');this.q('img').hidden=!src;}
+            const description=source.querySelector('#description,#description-text,.channel-description')||source.querySelector('#channel-info p:last-of-type');
+            const values=[...source.querySelectorAll('#channel-handle,#subscribers,#subscriber-count,#channel-stats,#metadata-line')].map(channelText).filter(Boolean);
+            if(!values.length){const first=source.querySelector('#channel-info p,#info-section p');if(first&&first!==description)values.push(channelText(first));}
+            if(!values.length)for(const node of source.querySelectorAll('yt-formatted-string,p,span')){
+                const value=channelText(node);
+                if(/^@[^\s·•]+(?:\s*[·•].*)?$/u.test(value)||/^[\d.,]+\s*(?:[kmb]|тыс\.?|млн\.?)?\s+(?:subscribers?|подписчик[а-яё]*|Abonnenten)(?:\s*[·•].*)?$/iu.test(value))values.push(value);
+            }
+            const metadata=[...new Set(values)].filter(value=>!values.some(other=>other!==value&&other.includes(value))).join(' · ').replace(/(\d[\d.,\s]*(?:[kmb]|тыс\.?|млн\.?)?)\s+(?:подписчик[а-яё]*|Abonnenten)(?=$|[\s·•])/giu,'$1 subscribers');
+            for(const[selector,value]of [['.metadata',metadata],['.description',channelText(description)]]){const node=this.q(selector);if(node.textContent!==value)node.textContent=value;node.hidden=!value;}
+            this.q('.verified').toggleAttribute('hidden',!source.querySelector('.badge-style-type-verified,.badge-style-type-verified-artist,[aria-label="Verified"],[aria-label="Проверено"],[aria-label="Bestätigt"]'));
+            const state=this.subscriptionState(),control=this.q('.subscribe');
+            control.hidden=!state.button;control.disabled=Boolean(state.disabled);
+            const value=String(Boolean(state.subscribed));
+            if(control.getAttribute('aria-pressed')!==value)control.setAttribute('aria-pressed',value);
+            if(control.dataset.mytSearchSubscribe!==value)control.dataset.mytSearchSubscribe=value;
+            control.setAttribute('aria-label',(state.subscribed?'Unsubscribe from ':'Subscribe to ')+name);
+            const label=state.subscribed?'Subscribed':'Subscribe';if(this.q('.subscribe span').textContent!==label)this.q('.subscribe span').textContent=label;
+            this.q('.subscribe svg').toggleAttribute('hidden',!state.subscribed);
+            if(this.anchor&&this.anchor.button!==state.button)this.clearAnchor();
+            if(this.host.parentElement!==source)source.append(this.host);
+            for(const part of this.parts)if(part.parentElement!==source){part.removeAttribute('data-myt-search-channel-source');this.parts.delete(part);}
+            for(const part of source.children)if(part!==this.host&&!this.parts.has(part)){part.setAttribute('data-myt-search-channel-source','');this.parts.add(part);}
+            this.positionAnchor();
+        }
+        subscribe(){
+            const state=this.subscriptionState();if(!state.button||state.disabled)return;
+            const control=this.q('.subscribe');
+            this.press?.cancel();
+            if(!matchMedia('(prefers-reduced-motion: reduce)').matches)this.press=control.animate([{transform:'scale(.98)'},{transform:'scale(1)'}],{duration:180,easing:'cubic-bezier(.2,.8,.2,1)'});
+            this.clearAnchor();
+            const button=state.button;
+            if(typeof button.showPopover==='function'){
+                // Leave the native control in its original DOM. A transparent
+                // popover gives YouTube the visible button's rectangle for menus.
+                this.anchor={button,popover:button.getAttribute('popover'),tabindex:button.getAttribute('tabindex'),aria:button.getAttribute('aria-hidden'),style:button.getAttribute('style'),properties:new Map()};
+                button.setAttribute('popover','manual');
+                button.setAttribute('tabindex','-1');button.setAttribute('aria-hidden','true');
+                this.positionAnchor();
+                try{button.showPopover();}catch{this.clearAnchor();}
+                if(this.anchor){
+                    this.anchor.observer=new MutationObserver(()=>{if(this.anchor&&button.getAttribute('style')!==this.anchor.appliedStyle)this.positionAnchor();});
+                    this.anchor.observer.observe(button,{attributes:true,attributeFilter:['style']});
+                    this.anchorMove=()=>this.positionAnchor();
+                    this.anchorDismiss=event=>{
+                        if(event.type==='keydown'&&event.key!=='Escape')return;
+                        this.clearAnchor();
+                        if(event.type==='keydown')queueMicrotask(()=>{if(this.host.isConnected)this.q('.subscribe').focus({preventScroll:true});});
+                    };
+                    window.addEventListener('resize',this.anchorMove);
+                    document.addEventListener('scroll',this.anchorMove,true);
+                    document.addEventListener('pointerdown',this.anchorDismiss,true);
+                    document.addEventListener('keydown',this.anchorDismiss,true);
+                }
+            }
+            button.click();this.queue();
+        }
+        positionAnchor(){
+            if(!this.anchor)return;
+            const {button,properties}=this.anchor,rect=this.q('.subscribe').getBoundingClientRect();
+            if(this.anchor.appliedStyle!==undefined&&button.getAttribute('style')!==this.anchor.appliedStyle)this.anchor.externalStyle=true;
+            const values={position:'fixed',right:'auto',bottom:'auto',left:rect.x+'px',top:rect.y+'px',width:rect.width+'px',height:rect.height+'px','min-width':'0','max-width':'none','min-height':'0','max-height':'none',margin:'0',padding:'0',display:'inline-flex',visibility:'visible',opacity:'0','pointer-events':'none','box-sizing':'border-box',transform:'none',translate:'none'};
+            for(const[name,value]of Object.entries(values)){
+                const previous=properties.get(name);
+                if(!previous||button.style.getPropertyValue(name)!==previous.applied||button.style.getPropertyPriority(name)!=='important')properties.set(name,{value:button.style.getPropertyValue(name),priority:button.style.getPropertyPriority(name)});
+                if(button.style.getPropertyValue(name)!==value||button.style.getPropertyPriority(name)!=='important')button.style.setProperty(name,value,'important');
+                properties.get(name).applied=button.style.getPropertyValue(name);
+            }
+            this.anchor.appliedStyle=button.getAttribute('style');
+        }
+        clearAnchor(){
+            if(!this.anchor)return;
+            const {button,popover,tabindex,aria,style,properties,appliedStyle,externalStyle,observer}=this.anchor;this.anchor=null;
+            observer?.disconnect();
+            const unchanged=!externalStyle&&button.getAttribute('style')===appliedStyle;
+            if(button.matches(':popover-open'))button.hidePopover();
+            if(button.getAttribute('popover')==='manual'){if(popover===null)button.removeAttribute('popover');else button.setAttribute('popover',popover);}
+            for(const[name,value]of [['tabindex',tabindex],['aria-hidden',aria]]){if(value===null)button.removeAttribute(name);else button.setAttribute(name,value);}
+            for(const[name,state]of properties)if(button.style.getPropertyValue(name)===state.applied&&button.style.getPropertyPriority(name)==='important'){if(state.value)button.style.setProperty(name,state.value,state.priority);else button.style.removeProperty(name);}
+            if(unchanged){if(style===null)button.removeAttribute('style');else button.setAttribute('style',style);}
+            else if(style===null&&!button.style.cssText)button.removeAttribute('style');
+            window.removeEventListener('resize',this.anchorMove);document.removeEventListener('scroll',this.anchorMove,true);
+            document.removeEventListener('pointerdown',this.anchorDismiss,true);document.removeEventListener('keydown',this.anchorDismiss,true);
+        }
+        destroy(){
+            this.observer.disconnect();this.source.removeEventListener('load',this.queue,true);this.press?.cancel();this.clearAnchor();
+            this.host.remove();for(const part of this.parts)part.removeAttribute('data-myt-search-channel-source');this.parts.clear();
+        }
+    }
+
     class Search {
-        constructor(){this.cards=new Map();this.avatars=new Map();this.subscriptions=new Set();this.presses=new Map();this.filters=new Map();this.filterLabels=new Map();this.layout=new Map();this.metadata=new Map();this.click=event=>{this.animateSubscription(event);this.toggleFilter(event);};document.addEventListener('click',this.click,true);}
+        constructor(){this.cards=new Map();this.channels=new Map();this.filters=new Map();this.filterLabels=new Map();this.layout=new Map();this.metadata=new Map();this.click=event=>this.toggleFilter(event);document.addEventListener('click',this.click,true);}
         static isPlaylist(card){
             if(card.matches('ytd-playlist-renderer,ytd-grid-playlist-renderer'))return true;
             if(!card.matches('yt-lockup-view-model'))return false;
@@ -125,8 +279,7 @@
             const raw=document.documentElement.getAttribute('data-myt-search-playlists')||'';
             if(raw!==this.metadataRaw){this.metadataRaw=raw;this.metadata.clear();try{const values=JSON.parse(raw);if(Array.isArray(values))for(const value of values.slice(-200))if(typeof value.id==='string')this.metadata.set(value.id,{image:safeURL(value.image)?.href||'',count:countNumber(value.count)});}catch{}}
             this.syncLayout(searches);
-            this.syncAvatars(searches);
-            this.syncSubscriptions(searches);
+            this.syncChannels(searches);
             this.syncFilterLabels(searches);
             for(const search of searches){
                 for(const source of search.querySelectorAll('[data-myt-search-playlist]')){
@@ -149,7 +302,7 @@
         queueCard(source){
             this.pendingCards ||=new Set();this.pendingCards.add(source);
             if(this.cardFrame)return;
-            this.cardFrame=requestAnimationFrame(()=>{this.cardFrame=0;for(const source of this.pendingCards)if(source.isConnected)this.cards.get(source)?.update(this.metadata);this.pendingCards.clear();});
+            this.cardFrame=requestAnimationFrame(()=>{this.cardFrame=0;for(const source of this.pendingCards)if(source.isConnected)(this.cards.get(source)||this.channels.get(source))?.update(this.metadata);this.pendingCards.clear();});
         }
         syncFilterLabels(searches){
             const wanted=new Map();
@@ -185,47 +338,13 @@
             if((attribute?node.getAttribute(attribute):node.data)!==state.translated)return;
             if(attribute)node.setAttribute(attribute,state.original);else node.data=state.original;
         }
-        restoreAvatar(host,state){
-            host.removeAttribute('data-myt-search-avatar-host');state.link.removeAttribute('data-myt-search-avatar-link');
-            if(state.owned)state.link.remove();this.avatars.delete(host);
-        }
-        syncSubscriptions(searches){
+        syncChannels(searches){
             const wanted=new Set();
-            for(const search of searches)for(const card of search.querySelectorAll('[data-myt-search-channel]')){
-                const state=globalThis.MinimalYouTubeWatch?.readSubscriptionState?.(card);if(!state?.button)continue;
-                const button=state.button,value=String(state.subscribed);wanted.add(button);
-                if(button.getAttribute('data-myt-search-subscribe')!==value)button.setAttribute('data-myt-search-subscribe',value);
+            for(const search of searches)for(const source of search.querySelectorAll('[data-myt-search-channel]')){
+                wanted.add(source);let card=this.channels.get(source);
+                if(!card){card=new ChannelCard(source,()=>this.queueCard(source));this.channels.set(source,card);}card.update();
             }
-            for(const button of this.subscriptions)if(!wanted.has(button)){button.removeAttribute('data-myt-search-subscribe');this.presses.get(button)?.cancel();this.presses.delete(button);}
-            this.subscriptions=wanted;
-        }
-        animateSubscription(event){
-            const button=event.target.closest?.('[data-myt-search-subscribe]');
-            if(!button||button.matches(':disabled,[aria-disabled="true"],[aria-busy="true"]')||matchMedia('(prefers-reduced-motion: reduce)').matches||typeof button.animate!=='function')return;
-            this.presses.get(button)?.cancel();
-            const animation=button.animate([{transform:'scale(.98)'},{transform:'scale(1)'}],{duration:180,easing:'cubic-bezier(.2,.8,.2,1)'});
-            this.presses.set(button,animation);
-            const clear=()=>{if(this.presses.get(button)===animation)this.presses.delete(button);};animation.onfinish=clear;animation.oncancel=clear;
-        }
-        syncAvatars(searches){
-            const wanted=new Set();
-            const channelURL=link=>{const url=safeURL(link.href);return url?.protocol==='https:'&&(url.hostname==='youtube.com'||url.hostname.endsWith('.youtube.com'))&&channelPath.test(url.pathname)?url:null;};
-            for(const search of searches)for(const card of search.querySelectorAll('[data-myt-search-channel]')){
-                const host=card.querySelector('#avatar-section,yt-img-shadow#avatar');if(!host)continue;
-                const links=[...card.querySelectorAll('a[href]:not([data-myt-search-avatar-overlay])')].filter(channelURL);
-                const native=links.find(link=>host.contains(link)||link.contains(host));
-                const destination=native||links[0];if(!destination)continue;
-                let state=this.avatars.get(host);
-                if(state&&!(native?state.link===native:state.owned&&state.link.parentElement===host)){this.restoreAvatar(host,state);state=null;}
-                if(!state){
-                    const link=native||document.createElement('a');state={link,owned:!native};
-                    if(state.owned){link.dataset.mytSearchAvatarOverlay='';link.setAttribute('aria-label','Open channel');link.addEventListener('click',event=>event.stopPropagation());}
-                    link.dataset.mytSearchAvatarLink='';host.dataset.mytSearchAvatarHost='';this.avatars.set(host,state);
-                }
-                if(state.owned){if(state.link.href!==destination.href)state.link.href=destination.href;if(state.link.parentElement!==host)host.append(state.link);}
-                wanted.add(host);
-            }
-            for(const[host,state]of this.avatars)if(!wanted.has(host))this.restoreAvatar(host,state);
+            for(const[source,card]of this.channels)if(!wanted.has(source)){card.destroy();this.channels.delete(source);}
         }
         syncLayout(searches){
             const wanted=new Map(),mark=(node,name,value='')=>{if(!node)return;if(!wanted.has(node))wanted.set(node,new Map());wanted.get(node).set('data-myt-search-'+name,value);};
@@ -290,7 +409,7 @@
             for(const[name,value]of [['hidden',state.hidden],['aria-hidden',state.aria]]){if(value===null)panel.removeAttribute(name);else panel.setAttribute(name,value);}
             for(const[button,value]of state.buttons){if(value===null)button.removeAttribute('aria-expanded');else button.setAttribute('aria-expanded',value);}
         }
-        destroy(){cancelAnimationFrame(this.cardFrame);this.pendingCards?.clear();document.removeEventListener('click',this.click,true);for(const card of this.cards.values())card.destroy();this.cards.clear();for(const[host,state]of this.avatars)this.restoreAvatar(host,state);for(const button of this.subscriptions)button.removeAttribute('data-myt-search-subscribe');this.subscriptions.clear();for(const animation of this.presses.values())animation.cancel();this.presses.clear();for(const[node,attributes]of this.filterLabels)for(const[attribute,state]of attributes)this.restoreFilterLabel(node,attribute,state);this.filterLabels.clear();for(const[panel,state]of this.filters)this.restoreFilter(panel,state);this.filters.clear();for(const[node,attributes]of this.layout)for(const name of attributes.keys())node.removeAttribute(name);this.layout.clear();this.metadata.clear();}
+        destroy(){cancelAnimationFrame(this.cardFrame);this.pendingCards?.clear();document.removeEventListener('click',this.click,true);for(const card of this.cards.values())card.destroy();this.cards.clear();for(const card of this.channels.values())card.destroy();this.channels.clear();for(const[node,attributes]of this.filterLabels)for(const[attribute,state]of attributes)this.restoreFilterLabel(node,attribute,state);this.filterLabels.clear();for(const[panel,state]of this.filters)this.restoreFilter(panel,state);this.filters.clear();for(const[node,attributes]of this.layout)for(const name of attributes.keys())node.removeAttribute(name);this.layout.clear();this.metadata.clear();}
     }
     Search.playlistSelector=playlistSelector;
     Search.filterScopeSelector=filterScopeSelector;
