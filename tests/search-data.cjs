@@ -19,4 +19,6 @@ const notACount={metadata:{lockupMetadataViewModel:{
     metadata:{contentMetadataViewModel:{metadataRows:[{metadataParts:[{text:{content:'3,000 views'}}]}]}},
 }}};
 assert.equal(model.playlistCount(notACount),'');
+const modernChannel=plain(model.record({lockupViewModel:{contentId:'UCmodern',contentType:'LOCKUP_CONTENT_TYPE_CHANNEL',metadata:{lockupMetadataViewModel:{title:{content:'Joe Speen'},metadata:{contentMetadataViewModel:{metadataRows:[{metadataParts:[{text:{content:'@JoeSpeen'}},{text:{content:'2.24M subscribers'}}]}]}}}}}}));
+assert(modernChannel.metadata.includes('2.24M subscribers'));assert.equal(modernChannel.handle,'@JoeSpeen');
 console.log('PASS legacy and modern public search records, nested avatars, channel endpoints, native filters and unchanged user text');

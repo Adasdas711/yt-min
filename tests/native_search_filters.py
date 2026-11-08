@@ -20,14 +20,15 @@ def filters(language='ru', modern=False):
     panel += '</dialog>' if modern else '</div>'
     open_action = "window.__filterClicks=(window.__filterClicks||0)+1;window.__filterButtonTrusted=event.isTrusted;const panel=document.querySelector('#native-filters');"
     open_action += "if(panel.open){panel.close();this.setAttribute('aria-expanded','false');}else{panel.showModal();this.setAttribute('aria-expanded','true');}" if modern else "panel.hidden=!panel.hidden;this.setAttribute('aria-expanded',String(!panel.hidden));"
-    toolbar = '<ytd-search-sub-menu-renderer id="native-toolbar"><div id="filter-menu"><yt-button-shape><button id="native-filters-toggle" aria-label="' + labels[0] + '" aria-expanded="false" onclick="' + escape(open_action, quote=True) + '"><svg viewBox="0 0 24 24" width="24" height="24"><path d="M2 6h20M2 18h20" stroke="currentColor"/></svg><span>' + labels[0] + '</span></button></yt-button-shape></div>'
+    toolbar = '<ytd-search-sub-menu-renderer id="native-toolbar"><div id="container"><div id="filter-menu"><yt-button-shape><button id="native-filters-toggle" aria-label="' + labels[0] + '" aria-expanded="false" onclick="' + escape(open_action, quote=True) + '"><svg viewBox="0 0 24 24" width="24" height="24"><path d="M2 6h20M2 18h20" stroke="currentColor"/></svg><span>' + labels[0] + '</span></button></yt-button-shape></div>'
     if not modern:toolbar += panel
-    toolbar += '</ytd-search-sub-menu-renderer>'
+    toolbar += '</div></ytd-search-sub-menu-renderer>'
     return toolbar, ('<ytd-popup-container>' + panel + '</ytd-popup-container>' if modern else '')
 
 
 NATIVE_STYLE = '''<style>
   #native-toolbar { font:16px/1.5 Arial,sans-serif; }
+  #native-toolbar > #container { padding-bottom:16px;border-bottom:1px solid var(--myt-border); }
   #native-filters-toggle,#native-filters-close { display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:8px 12px;border:0;border-radius:12px;background:transparent;color:inherit;font:600 16px Arial,sans-serif;cursor:pointer; }
   #native-filters-toggle svg { width:24px;height:24px; }
   #native-filters { color:var(--myt-ink);background:var(--myt-surface);border:1px solid var(--myt-border);border-radius:16px;padding:20px; }

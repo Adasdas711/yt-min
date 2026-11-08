@@ -60,10 +60,11 @@
                 const href=channelURL(endpoint(command));if(name&&href){channel={name:name.slice(0,500),href};break;}
             }
         }
-        const metadataText=[label(value.subscriberCountText),label(value.videoCountText)].filter(Boolean);
+        const rows=kind==='channel'?(metadata.metadata?.contentMetadataViewModel?.metadataRows||metadata.metadataRows||[]):[];
+        const metadataText=[...new Set([label(value.subscriberCountText),label(value.videoCountText),...rows.flatMap(row=>(row.metadataParts||[]).map(part=>label(part.text)))].filter(Boolean))];
         const handle=metadataText.find(text=>/^@\S+$/.test(text))||'';
         const avatar=image([value.thumbnail,value.thumbnails,value.avatar,value.contentImage]);
-        return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,4),count:kind==='playlist'?playlistCount(value):''};
+        return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,kind==='channel'?8:4),count:kind==='playlist'?playlistCount(value):''};
     }
     function collect(root){
         const records=[],filters=[],seen=new Set(),stack=[root];let scans=0;

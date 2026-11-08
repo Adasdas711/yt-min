@@ -17,7 +17,7 @@ def check(browser,prune,adapter=True):
     page.add_style_tag(path=str(ROOT/'src/styles/styles.css'))
     page.add_script_tag(path=str(ROOT/'src/content/search-data.js'))
     if prune:page.add_script_tag(path=str(ROOT/'src/content/data-pruning.js'))
-    page.evaluate('''()=>document.querySelector('#channel').data={channelRenderer:{channelId:'UCX6OQ3DkcsbYNE6H8uQQuVA',title:{simpleText:'Creator'},navigationEndpoint:{browseEndpoint:{canonicalBaseUrl:'/@creator'}},thumbnail:{thumbnails:[{url:'https://yt3.googleusercontent.com/main-only-avatar',width:176}]},trackingParams:'PRIVATE-NEVER-COPY',descriptionSnippet:{simpleText:'BIO-NEVER-COPY'}}}''')
+    page.evaluate('''()=>document.querySelector('#channel').data={channelRenderer:{channelId:'UCX6OQ3DkcsbYNE6H8uQQuVA',title:{simpleText:'Creator'},subscriberCountText:{simpleText:'@creator'},videoCountText:{simpleText:'2.24M subscribers'},navigationEndpoint:{browseEndpoint:{canonicalBaseUrl:'/@creator'}},thumbnail:{thumbnails:[{url:'https://yt3.googleusercontent.com/main-only-avatar',width:176}]},trackingParams:'PRIVATE-NEVER-COPY',descriptionSnippet:{simpleText:'BIO-NEVER-COPY'}}}''')
     page.evaluate('''()=>{
       const filters=sp=>({searchFilterRenderer:{label:{simpleText:'Видео'},navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/results?search_query=worlds&sp='+sp}}}}});
       document.querySelector('#cached-search').data=filters('inactive');document.querySelector('#active-pane ytd-search').data=filters('active');
@@ -49,6 +49,7 @@ def check(browser,prune,adapter=True):
     image=page.locator('#myt-search [data-myt-search-channel-card] .avatar img')
     expect(image).to_have_attribute('src','https://yt3.googleusercontent.com/main-only-avatar')
     expect(image).to_be_visible()
+    expect(root.locator('.subscriber-value')).to_have_text('2.24 M')
     page.wait_for_function('document.querySelector("#myt-search").shadowRoot.querySelector("[data-myt-search-channel-card]").shadowRoot.querySelector("img").naturalWidth===176')
     assert page.evaluate('typeof MinimalYouTubeSearch==="undefined"') is True
     snapshot=page.locator('html').get_attribute('data-myt-search-snapshot')

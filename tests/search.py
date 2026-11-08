@@ -55,7 +55,7 @@ def check(browser,width,dark,prune=True):
         channelId:'UC'+String(i).padStart(22,'0'),title:{simpleText:'Creator '+i},
         navigationEndpoint:{browseEndpoint:{canonicalBaseUrl:'/@creator'+i}},
         avatar:{decoratedAvatarViewModel:{avatar:{avatarViewModel:{image:{sources:[{url:'https://yt3.googleusercontent.com/avatar'+i,width:176}]}}}}},
-        subscriberCountText:{simpleText:'@creator'+i}
+        subscriberCountText:{simpleText:'@creator'+i},videoCountText:{simpleText:i===1?'525M subscribers':'2.24M subscribers'}
       };
       document.querySelector('#video-1 #video-title').onclick=e=>{e.preventDefault();window.__videoClicked=true;};
       document.querySelector('#video-2').insertAdjacentHTML('beforeend','<div id="native-comment">52:12 комментарии и описание</div>');
@@ -64,6 +64,7 @@ def check(browser,width,dark,prune=True):
       chrome.runtime.getURL=path=>'https://www.youtube.com/'+path;__setEnabled(true);
     }""")
     root=page.locator('#myt-search');expect(root.locator('.media')).to_have_count(11)
+    expect(root.locator('.subscriber-value')).to_have_text(['525 M','2.24 M'])
     sources=page.locator('ytd-playlist-renderer,yt-lockup-view-model[content-type="playlist"]')
     for index,count in enumerate([256,64]):sources.nth(index).evaluate('(node,count)=>node.insertAdjacentHTML("beforeend",`<span id="video-count-text">${count} videos</span>`)',count)
     expect(root.locator('.playlist-badge')).to_have_text(['256 videos','64 videos'])
