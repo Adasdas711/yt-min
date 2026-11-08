@@ -1,47 +1,82 @@
-"""Search channels share watch subscriptions and retain native navigation/data."""
+"""Every point in a search channel card navigates, without subscribing."""
 import re
 from playwright.sync_api import sync_playwright, expect
-from smoke import setup, assert_stable, check_subscription_card
+from smoke import setup, assert_stable
 from search_channel_layout import fixture, check_geometry
+from search import channel
 
 
 def restamps(browser):
     page=setup(browser,'/results?search_query=mrbeast',fixture('nested'),native_dark=True)
-    card=page.locator('[data-myt-search-channel-card]');control=card.locator('.subscribe')
+    card=page.locator('[data-myt-search-channel-card]');link=card.locator('.channel-link')
     page.evaluate('''()=>{
-      window.__ownButton=document.querySelector('#myt-search').shadowRoot.querySelector('[data-myt-search-channel-card]').shadowRoot.querySelector('.subscribe');
-      const native=document.querySelector('#native-subscribe');native.style.borderColor='pink';
-      window.__originalStyle=native.getAttribute('style');
-      native.onclick=()=>{
-        const rect=native.getBoundingClientRect();window.__anchorAtClick={x:rect.x,y:rect.y,width:rect.width,height:rect.height};
-        window.__userActivation=navigator.userActivation.isActive;
-        native.parentElement.setAttribute('subscribed','');native.textContent='Subscribed';
-      };
+      window.__ownLink=document.querySelector('#myt-search').shadowRoot.querySelector('[data-myt-search-channel-card]').shadowRoot.querySelector('.channel-link');
+      window.__nativeNodes=[...document.querySelectorAll('ytd-channel-renderer *')].map(node=>[node,node.parentElement,node.getAttribute('style')]);
+      navigation.addEventListener('navigate',event=>{if(new URL(event.destination.url).pathname.startsWith('/@')){event.preventDefault();window.__channelDestination=event.destination.url;}});
     }''')
-    own=control.bounding_box();control.click(position={'x':12,'y':12})
-    expect(control).to_have_attribute('aria-pressed','true')
-    assert page.evaluate('__userActivation')
-    anchor=page.evaluate('__anchorAtClick')
-    assert all(abs(own[key]-anchor[key])<1 for key in own),(own,anchor)
-    page.wait_for_function('document.querySelector("#native-subscribe").getAttribute("style")===__originalStyle')
-    assert page.evaluate('!document.querySelector("#native-subscribe").hasAttribute("popover")')
+    link.click(position={'x':12,'y':12})
+    assert page.evaluate('__channelDestination')=='https://www.youtube.com/@MrBeast'
+    assert page.evaluate('__nativeNodes.every(([node,parent,style])=>node.parentElement===parent&&node.getAttribute("style")===style)')
     for index in range(5):
         html=fixture('renamed').split('<ytd-channel-renderer>',1)[1].split('</ytd-channel-renderer>',1)[0]
         html=html.replace('MrBeast',f'UpdatedCreator{index}').replace('525M','600M')
         page.locator('ytd-channel-renderer').evaluate('(node,html)=>node.innerHTML=html',html)
         expect(card.locator('.name')).to_have_text(f'UpdatedCreator{index}')
         expect(card.locator('.metadata')).to_contain_text('600M subscribers')
-        assert page.evaluate('document.querySelector("#myt-search").shadowRoot.querySelector("[data-myt-search-channel-card]").shadowRoot.querySelector(".subscribe")===__ownButton')
+        expect(link).to_have_attribute('href',f'https://www.youtube.com/@UpdatedCreator{index}')
+        assert page.evaluate('document.querySelector("#myt-search").shadowRoot.querySelector("[data-myt-search-channel-card]").shadowRoot.querySelector(".channel-link")===__ownLink')
+        card.locator('.avatar img').click()
+        assert page.evaluate('__channelDestination')==f'https://www.youtube.com/@UpdatedCreator{index}'
         check_geometry(page)
-    control.click(position={'x':12,'y':12});expect(control).to_have_attribute('aria-pressed','true')
-    assert page.evaluate('__subscribed===1')
+    assert page.evaluate('!window.__subscribed')
     page.evaluate('__setEnabled(false)');expect(card).to_have_count(0)
     expect(page.locator('[data-myt-search-channel-source]')).to_have_count(0)
     expect(page.locator('#native-subscribe')).to_be_visible()
     page.evaluate('__setEnabled(true)');expect(card.locator('.name')).to_have_text('UpdatedCreator4')
     check_geometry(page);assert_stable(page)
-    page.screenshot(path='/tmp/yt-min-owned-channel-after-restamp.png');page.close()
-    print('PASS native action/user activation/anchor, style restore, five full restamps and cleanup',flush=True)
+    page.screenshot(path='/workspace/yt-min-qa/channel-link-after-restamp.png');page.close()
+    print('PASS channel destination updates through five restamps, native nodes unchanged and disable/enable cleanup',flush=True)
+
+
+def full_card(browser,width,dark):
+    body=fixture('nested').replace('</ytd-channel-renderer>','</ytd-channel-renderer>'+channel(2),1)
+    page=setup(browser,'/results?search_query=mrbeast',body,width=width,native_dark=dark)
+    page.evaluate('''()=>{
+      window.__destinations=[];window.__subscribeCalls=0;window.__nativeLinkCalls=0;window.__blockedChannelEvents=0;
+      for(const button of document.querySelectorAll('ytd-channel-renderer button'))button.onclick=()=>window.__subscribeCalls++;
+      for(const link of document.querySelectorAll('ytd-channel-renderer a'))link.onclick=event=>{event.preventDefault();window.__nativeLinkCalls++;};
+      window.__recordChannelNavigation=event=>{if(new URL(event.destination.url).pathname.startsWith('/@')){event.preventDefault();window.__destinations.push(event.destination.url);}};
+      navigation.addEventListener('navigate',window.__recordChannelNavigation);
+      for(const type of ['pointerdown','mousedown','click','keydown'])document.addEventListener(type,event=>{
+        if(event.composedPath().some(node=>node instanceof Element&&node.matches('.channel-link'))){window.__blockedChannelEvents++;event.preventDefault();event.stopImmediatePropagation();}
+      },true);
+    }''')
+    cards=page.locator('[data-myt-search-channel-card]');expect(cards).to_have_count(2)
+    first=cards.first;link=first.locator('.channel-link')
+    expect(first.locator('button')).to_have_count(0)
+    expect(first.locator('a')).to_have_count(1)
+    for selector in ['.avatar img','.name','.metadata','.verified']:
+        first.locator(selector).click()
+        assert page.evaluate('__destinations.at(-1)')=='https://www.youtube.com/@MrBeast'
+    box=link.bounding_box()
+    for x,y in [(12,12),(box['width']-12,12),(12,box['height']-12),(box['width']-12,box['height']-12),(box['width']-24,box['height']/2)]:
+        link.click(position={'x':x,'y':y})
+        assert page.evaluate('__destinations.at(-1)')=='https://www.youtube.com/@MrBeast'
+    page.locator('.filters-toggle').focus();page.keyboard.press('Tab');expect(link).to_be_focused()
+    page.keyboard.press('Enter')
+    assert page.evaluate('__destinations.length')==10
+    page.keyboard.press('Tab');expect(cards.nth(1).locator('.channel-link')).to_be_focused()
+    page.keyboard.press('Enter');assert page.evaluate('__destinations.at(-1)')=='https://www.youtube.com/@creator2'
+    assert page.evaluate('__subscribeCalls===0&&__nativeLinkCalls===0&&__blockedChannelEvents===0')
+    # Browser-created tabs exercise the real anchor's modified and middle clicks.
+    page.evaluate("navigation.removeEventListener('navigate',window.__recordChannelNavigation)")
+    page.context.route('https://www.youtube.com/@MrBeast',lambda route:route.fulfill(content_type='text/html',body='<title>Channel</title>Channel'))
+    for arguments in [{'modifiers':['Control']},{'button':'middle'}]:
+        with page.context.expect_page() as opened:link.click(**arguments)
+        popup=opened.value;popup.bring_to_front();popup.wait_for_url('https://www.youtube.com/@MrBeast',wait_until='domcontentloaded');popup.close();page.bring_to_front()
+    page.screenshot(path=f'/workspace/yt-min-qa/channel-link-{width}-{dark}.png',full_page=True)
+    assert_stable(page);page.close()
+    print(f'PASS first channel avatar/name/metadata/background, keyboard and new tabs, zero subscriptions: {width}px, dark={dark}',flush=True)
 
 
 def cached_photo(browser,width):
@@ -59,8 +94,7 @@ def cached_photo(browser,width):
     card=page.locator('[data-myt-search-channel-card]');image=card.locator('.avatar img')
     expect(image).to_have_attribute('src',photo);expect(image).to_be_visible()
     page.wait_for_function('document.querySelector("#myt-search").shadowRoot.querySelector("[data-myt-search-channel-card]").shadowRoot.querySelector("img").naturalWidth===160')
-    expect(card.locator('.avatar')).to_have_attribute('href','https://www.youtube.com/@MrBeast')
-    expect(card.locator('.name')).to_have_attribute('href','https://www.youtube.com/@MrBeast')
+    expect(card.locator('.channel-link')).to_have_attribute('href','https://www.youtube.com/@MrBeast')
     expect(card.locator('.description')).to_have_count(0)
     page.locator('#channel-stats').evaluate('e=>e.textContent="@MrBeast · 525 Mio. Abonnenten"')
     expect(card.locator('.metadata')).to_have_text('@MrBeast · 525M subscribers')
@@ -86,11 +120,9 @@ def main():
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         for width in [1440,390]:
             cached_photo(browser,width)
-            for dark in [False,True]:
-                for modern in [False,True]:
-                    check_subscription_card(browser,dark,width,modern=modern,search=True)
+            for dark in [False,True]:full_card(browser,width,dark)
         restamps(browser);browser.close()
-    print('PASS shared subscription background, avatar/name links, keyboard, pending/disabled states, dialogs and motion',flush=True)
+    print('PASS complete channel links, first avatar, keyboard, modified clicks, cached photos and restoration',flush=True)
 
 
 if __name__=='__main__':main()

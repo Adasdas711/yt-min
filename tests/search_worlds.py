@@ -96,7 +96,8 @@ def check(browser,prune,adapter=True):
     page.evaluate('document.querySelector("#active-pane").style.display="block";document.querySelector("#cached-pane").style.display="none"')
     expect(page.locator('#active-pane #myt-search')).to_be_visible()
     expect(root.locator('.media')).to_have_count(4)
-    image.click();assert page.evaluate('__channelVisits')==1
+    page.evaluate('''navigation.addEventListener('navigate',event=>{if(new URL(event.destination.url).pathname==='/@creator'){event.preventDefault();window.__channelDestination=event.destination.url;}})''')
+    image.click();assert page.evaluate('__channelDestination')=='https://www.youtube.com/@creator'
     evaluate('__setEnabled(false)');expect(page.locator('#myt-search')).to_have_count(0)
     evaluate('__setEnabled(true)');expect(image).to_have_attribute('src','https://yt3.googleusercontent.com/main-only-avatar')
     expect(root.locator('.media')).to_have_count(4)

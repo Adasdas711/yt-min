@@ -115,7 +115,8 @@ def check(browser,width,dark,prune=True):
     root.locator('.filters-toggle').press('Enter');expect(root.locator('.filter-panel')).to_be_visible()
     root.locator('.filters-toggle').press('Escape');expect(root.locator('.filter-panel')).to_be_hidden()
     root.locator('.media-title').first.click();assert page.evaluate('__videoClicked')
-    images.first.click();assert page.evaluate('__visits')==1
+    page.evaluate('''navigation.addEventListener('navigate',event=>{if(new URL(event.destination.url).pathname==='/@creator1'){event.preventDefault();window.__channelDestination=event.destination.url;}})''')
+    images.first.click();assert page.evaluate('__channelDestination')=='https://www.youtube.com/@creator1'
     assert page.evaluate('__parents.every(([node,parent])=>node.parentElement===parent)')
     # Continuation sentinel remains at the end of our flow, with native identity.
     sentinel=page.locator('#continuation').bounding_box();last=root.locator('.stream > .group').last.bounding_box()

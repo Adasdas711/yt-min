@@ -1,4 +1,4 @@
-/* Isolated channel/playlist cards and a controller for native search filters. */
+/* Owned search cards, channel links and English search filters. */
 (() => {
     'use strict';
     const channelPath=/^\/(?:@|channel\/|c\/|user\/)/;
@@ -62,13 +62,15 @@
       :host{all:initial!important;--ink:var(--myt-ink);--muted:var(--myt-muted);--surface:var(--myt-surface);--soft:var(--myt-soft);--border:var(--myt-border);display:block!important;position:relative!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;color:var(--ink)!important}
       :host::before,:host::after{content:none!important;display:none!important}
       *{box-sizing:border-box}[hidden]{display:none!important}a{color:inherit;text-decoration:none;cursor:pointer}button{font:inherit;cursor:pointer}a:focus-visible,button:focus-visible{outline:2px solid var(--myt-muted);outline-offset:3px}
-      ${globalThis.MinimalYouTubeWatch?.subscriptionStyles||''}
-      .surface.channel-card{grid-template-columns:80px minmax(0,1fr) 20px;width:100%;max-width:none;min-height:128px;padding:20px;gap:6px 16px;border-radius:16px}
+      .surface.channel-card{position:relative;display:grid;grid-template-columns:80px minmax(0,1fr);align-items:center;width:100%;min-height:128px;padding:20px;gap:6px 16px;border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--ink)}
+      .channel-card:is(:hover,:focus-visible){background:var(--soft)}
+      .owner{display:contents}.avatar{position:relative;grid-column:1;grid-row:1 / 3}.owner-text{grid-column:2;grid-row:1;align-self:end;min-width:0}.stats{grid-column:2;grid-row:2;align-self:start;font-size:13px;line-height:1.5}
+      .channel-card:not(:has(.metadata:not([hidden]))) .owner-text{grid-row:1 / 3;align-self:center}
       .avatar{display:grid;place-items:center;width:80px;height:80px;overflow:hidden;border-radius:50%;background:var(--myt-soft);font-size:28px;font-weight:600}
       .owner .avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
       .heading{display:flex;align-items:baseline;gap:5px;min-width:0}.name{font-size:18px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}.verified{flex:none;width:14px;height:14px;align-self:center;color:var(--muted)}
       .metadata{margin:0;overflow-wrap:anywhere;color:var(--muted)}
-      @media(max-width:600px){.surface.channel-card{grid-template-columns:64px minmax(0,1fr) 18px;gap:4px 12px;padding:16px}.avatar{width:64px;height:64px}.name{font-size:17px}}
+      @media(max-width:600px){.surface.channel-card{grid-template-columns:64px minmax(0,1fr);gap:4px 12px;padding:16px}.avatar{width:64px;height:64px}.name{font-size:17px}}
     `;
     const channelText=node=>{
         if(!node)return '';
@@ -82,28 +84,17 @@
             this.source=source;this.queue=queue;this.container=container;this.parts=new Set();
             this.host=document.createElement('div');this.host.dataset.mytSearchChannelCard='';this.host.lang='en';
             this.shadow=this.host.attachShadow({mode:'open'});
-            this.shadow.innerHTML=`<style>${channelStyles}</style><article class="surface channel-card"><button class="subscribe channel-subscribe" type="button" aria-pressed="false" aria-describedby="search-subscription-status" disabled></button><div class="owner"><a class="avatar avatar-link" data-myt-search-avatar-link><span class="initial" aria-hidden="true"></span><img alt="" decoding="async" hidden></a><div class="info owner-text"><div class="heading"><a class="name owner-link owner-name"></a><svg class="verified" role="img" aria-label="Verified" viewBox="0 0 24 24" hidden><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m7 12 3 3 7-7" fill="none" stroke="var(--surface)" stroke-width="2"/></svg></div></div></div><span class="subscription-state" id="search-subscription-status" aria-live="polite"></span><p class="metadata stats" hidden></p></article>`;
+            this.shadow.innerHTML=`<style>${channelStyles}</style><a class="surface channel-card channel-link" data-myt-search-avatar-link><span class="owner"><span class="avatar"><span class="initial" aria-hidden="true"></span><img alt="" decoding="async" hidden></span><span class="info owner-text"><span class="heading"><span class="name owner-name"></span><svg class="verified" role="img" aria-label="Verified" viewBox="0 0 24 24" hidden><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m7 12 3 3 7-7" fill="none" stroke="var(--surface)" stroke-width="2"/></svg></span></span></span><span class="metadata stats" hidden></span></a>`;
             this.q=selector=>this.shadow.querySelector(selector);
-            this.subscription=globalThis.MinimalYouTubeWatch.createSubscriptionController({q:this.q,readState:()=>this.subscriptionState(),prepareAction:button=>this.prepareSubscriptionAction(button)});
+            channelCards.add(this);
             this.q('img').onerror=()=>{const image=this.q('img');this.failedImage=image.getAttribute('src');if(this.fallbackImage&&image.src!==this.fallbackImage){image.src=this.fallbackImage;image.hidden=false;return;}image.hidden=true;this.q('.initial').hidden=false;};
             this.q('img').onload=()=>{if(this.q('img').naturalWidth<=1){this.q('img').onerror();return;}this.q('.initial').hidden=true;};
-            for(const link of [this.q('.avatar'),this.q('.name')])link.addEventListener('click',event=>{
-                if(event.button||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey||!this.link?.isConnected)return;
-                event.preventDefault();event.stopPropagation();this.link.click();
-            });
-            this.q('.subscribe').addEventListener('click',()=>this.subscription.toggleSubscription());
             this.observer=new MutationObserver(records=>{
                 if(this.host.isConnected&&records.every(record=>record.type==='childList'&&[...record.addedNodes,...record.removedNodes].every(node=>node===this.host)))return;
                 queue();
             });
             this.observer.observe(source,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['href','src','srcset','data-src','data-srcset','class','aria-label','title','aria-pressed','aria-disabled','aria-busy','subscribed','is-subscribed','disabled']});
             source.addEventListener('load',queue,true);
-        }
-        subscriptionState(){
-            const state=globalThis.MinimalYouTubeWatch?.readSubscriptionState?.(this.source);
-            if(state?.button)return state;
-            const button=[...this.source.querySelectorAll('button')].find(node=>/^(?:subscribe\b|subscribed\b|подписаться|вы подписаны|abonnieren|abonniert)/iu.test((node.getAttribute('aria-label')||text(node)).trim()));
-            return {button,subscribed:button?.getAttribute('aria-pressed')==='true'||/^(?:subscribed\b|вы подписаны|abonniert)/iu.test(text(button)),disabled:!button||button.matches(':disabled,[aria-disabled="true"],[aria-busy="true"]')};
         }
         update(cache=new Map(),record){
             if(record!==undefined)this.record=record?{...record,name:record.title,url:record.href}:null;
@@ -122,10 +113,10 @@
             const byName=[...cache.values()].filter(item=>item.name===name);
             const cached=this.record||matches[0]||(!path&&!handle&&byName.length===1?byName[0]:null);
             if(cached?.name)name=cached.name;
-            const href=safeURL(cached?.url)?.href||this.link?.href||(handle?safeURL('/'+handle)?.href:'')||'';
-            for(const link of [this.q('.avatar'),this.q('.name')]){if(href){if(link.href!==href)link.href=href;}else link.removeAttribute('href');}
+            const href=channelURL(cached?.url)||channelURL(this.link?.href)||channelURL(handle?'/'+handle:'');
+            const link=this.q('.channel-link');if(href){if(link.href!==href)link.href=href;}else link.removeAttribute('href');
+            link.setAttribute('aria-label','Open channel '+name);
             if(this.q('.name').textContent!==name)this.q('.name').textContent=name;
-            this.q('.avatar').setAttribute('aria-label','Open channel '+name);
             if(this.q('.initial').textContent!==name.slice(0,1))this.q('.initial').textContent=name.slice(0,1);
             const srcset=image?.getAttribute('data-srcset')||image?.getAttribute('srcset')||'';
             this.fallbackImage=cached?.image||'';
@@ -142,69 +133,12 @@
             const metadata=[...new Set(values)].filter(value=>!values.some(other=>other!==value&&other.includes(value))).join(' · ').replace(/(\d[\d.,\s]*(?:[kmb]|тыс\.?|млн\.?|млрд\.?|Tsd\.?|Mio\.?|Mrd\.?)?)\s+(?:подписчик[а-яё]*|Abonnenten)(?=$|[\s·•])/giu,(_,count)=>count.replace(/\s*(тыс\.?|Tsd\.?)$/iu,'K').replace(/\s*(млн\.?|Mio\.?)$/iu,'M').replace(/\s*(млрд\.?|Mrd\.?)$/iu,'B').trim()+' subscribers');
             const metadataNode=this.q('.metadata');if(metadataNode.textContent!==metadata)metadataNode.textContent=metadata;metadataNode.hidden=!metadata;
             this.q('.verified').toggleAttribute('hidden',!source.querySelector('.badge-style-type-verified,.badge-style-type-verified-artist,[aria-label="Verified"],[aria-label="Проверено"],[aria-label="Bestätigt"]'));
-            const state=this.subscriptionState();
-            this.subscription.update({owner:source,name,subscriptionName:name},href||name);
-            if(this.anchor&&(this.anchor.button!==state.button||!this.subscription.subscriptionPending))this.clearAnchor();
             const container=this.container||source;if(this.host.parentElement!==container)container.append(this.host);
             for(const part of this.parts)if(part.parentElement!==source){part.removeAttribute('data-myt-search-channel-source');this.parts.delete(part);}
             for(const part of source.children)if(part!==this.host&&!this.parts.has(part)){part.setAttribute('data-myt-search-channel-source','');this.parts.add(part);}
-            this.positionAnchor();
-        }
-        prepareSubscriptionAction(button){
-            this.clearAnchor();
-            if(typeof button.showPopover==='function'){
-                // Leave the native control in its original DOM. A transparent
-                // popover gives YouTube the visible button's rectangle for menus.
-                this.anchor={button,popover:button.getAttribute('popover'),tabindex:button.getAttribute('tabindex'),aria:button.getAttribute('aria-hidden'),style:button.getAttribute('style'),properties:new Map()};
-                button.setAttribute('popover','manual');
-                button.setAttribute('tabindex','-1');button.setAttribute('aria-hidden','true');
-                this.positionAnchor();
-                try{button.showPopover();}catch{this.clearAnchor();}
-                if(this.anchor){
-                    this.anchor.observer=new MutationObserver(()=>{if(this.anchor&&button.getAttribute('style')!==this.anchor.appliedStyle)this.positionAnchor();});
-                    this.anchor.observer.observe(button,{attributes:true,attributeFilter:['style']});
-                    this.anchorMove=()=>this.positionAnchor();
-                    this.anchorDismiss=event=>{
-                        if(event.type==='keydown'&&event.key!=='Escape')return;
-                        this.clearAnchor();
-                        if(event.type==='keydown')queueMicrotask(()=>{if(this.host.isConnected)this.q('.subscribe').focus({preventScroll:true});});
-                    };
-                    window.addEventListener('resize',this.anchorMove);
-                    document.addEventListener('scroll',this.anchorMove,true);
-                    document.addEventListener('pointerdown',this.anchorDismiss,true);
-                    document.addEventListener('keydown',this.anchorDismiss,true);
-                }
-            }
-        }
-        positionAnchor(){
-            if(!this.anchor)return;
-            const {button,properties}=this.anchor,rect=this.q('.subscribe').getBoundingClientRect();
-            if(this.anchor.appliedStyle!==undefined&&button.getAttribute('style')!==this.anchor.appliedStyle)this.anchor.externalStyle=true;
-            const values={position:'fixed',right:'auto',bottom:'auto',left:rect.x+'px',top:rect.y+'px',width:rect.width+'px',height:rect.height+'px','min-width':'0','max-width':'none','min-height':'0','max-height':'none',margin:'0',padding:'0',display:'inline-flex',visibility:'visible',opacity:'0','pointer-events':'none','box-sizing':'border-box',transform:'none',translate:'none'};
-            for(const[name,value]of Object.entries(values)){
-                const previous=properties.get(name);
-                if(!previous||button.style.getPropertyValue(name)!==previous.applied||button.style.getPropertyPriority(name)!=='important')properties.set(name,{value:button.style.getPropertyValue(name),priority:button.style.getPropertyPriority(name)});
-                if(button.style.getPropertyValue(name)!==value||button.style.getPropertyPriority(name)!=='important')button.style.setProperty(name,value,'important');
-                properties.get(name).applied=button.style.getPropertyValue(name);
-            }
-            this.anchor.appliedStyle=button.getAttribute('style');
-        }
-        clearAnchor(){
-            if(!this.anchor)return;
-            const {button,popover,tabindex,aria,style,properties,appliedStyle,externalStyle,observer}=this.anchor;this.anchor=null;
-            observer?.disconnect();
-            const unchanged=!externalStyle&&button.getAttribute('style')===appliedStyle;
-            if(button.matches(':popover-open'))button.hidePopover();
-            if(button.getAttribute('popover')==='manual'){if(popover===null)button.removeAttribute('popover');else button.setAttribute('popover',popover);}
-            for(const[name,value]of [['tabindex',tabindex],['aria-hidden',aria]]){if(value===null)button.removeAttribute(name);else button.setAttribute(name,value);}
-            for(const[name,state]of properties)if(button.style.getPropertyValue(name)===state.applied&&button.style.getPropertyPriority(name)==='important'){if(state.value)button.style.setProperty(name,state.value,state.priority);else button.style.removeProperty(name);}
-            if(unchanged){if(style===null)button.removeAttribute('style');else button.setAttribute('style',style);}
-            else if(style===null&&!button.style.cssText)button.removeAttribute('style');
-            window.removeEventListener('resize',this.anchorMove);document.removeEventListener('scroll',this.anchorMove,true);
-            document.removeEventListener('pointerdown',this.anchorDismiss,true);document.removeEventListener('keydown',this.anchorDismiss,true);
         }
         destroy(){
-            this.observer.disconnect();this.source.removeEventListener('load',this.queue,true);this.subscription.destroy();this.clearAnchor();
+            channelCards.delete(this);this.observer.disconnect();this.source.removeEventListener('load',this.queue,true);
             this.host.remove();for(const part of this.parts)part.removeAttribute('data-myt-search-channel-source');this.parts.clear();
         }
     }
@@ -216,30 +150,23 @@
     // does not list the newer optional MAIN data adapter yet.
     const youtubeURL=value=>{const url=safeURL(value);return url?.protocol==='https:'&&/(^|\.)youtube\.com$/.test(url.hostname)?url.href:'';};
     const channelURL=value=>{const href=youtubeURL(value);return href&&channelPath.test(new URL(href).pathname)?href:'';};
-    const filterViews=new Set();
-    function routeFilterInput(event){
-        const path=event.composedPath(),keyboard=event.type==='keydown';
+    const filterViews=new Set(),channelCards=new Set();
+    function routeSearchInput(event){
+        const path=event.composedPath(),keyboard=event.type==='keydown'||event.type==='keyup';
+        if(keyboard&&!['Enter',' ','Escape','Tab'].includes(event.key))return;
+        // Leave activation to the browser: real links and popovertarget buttons
+        // also work without a synthetic click on a hidden YouTube controller.
         for(const view of filterViews){
             if(!view.host.isConnected)continue;
-            const toggle=view.q('.filters-toggle'),close=view.q('.close-filters');
-            if(keyboard&&event.key==='Escape'&&view.open&&path.includes(view.host)){
-                event.preventDefault();event.stopImmediatePropagation();view.toggleFilters(false,true);return;
+            const panel=view.q('.filter-panel');
+            if((keyboard&&event.key==='Escape'&&panel.matches(':popover-open'))||path.some(item=>item===view.q('.filters-toggle')||item===panel)){
+                if(event.type==='click'&&panel.matches(':popover-open')&&path.some(item=>item instanceof HTMLAnchorElement&&panel.contains(item)))panel.hidePopover();
+                event.stopImmediatePropagation();return;
             }
-            const control=path.find(item=>item===toggle||item===close||view.filterActions.has(item));
-            if(!control||(!keyboard&&event.button)||control!==toggle&&control!==close&&(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey))continue;
-            if(keyboard&&!(event.key==='Enter'||event.key===' '&&(control===toggle||control===close)))continue;
-            // Handle owned controls before YouTube's ancestor capture handlers
-            // can cancel the click or replace its target during pointer-down.
-            event.stopImmediatePropagation();
-            if(!keyboard&&event.type!=='click')return;
-            event.preventDefault();if(keyboard&&event.repeat)return;
-            if(control===toggle){toggle.focus({preventScroll:true});view.toggleFilters(!view.open);}
-            else if(control===close)view.toggleFilters(false,true);
-            else view.filterActions.get(control)?.();
-            return;
         }
+        for(const card of channelCards)if(card.host.isConnected&&path.includes(card.q('.channel-link'))){event.stopImmediatePropagation();return;}
     }
-    for(const type of ['pointerdown','mousedown','touchstart','click','keydown'])window.addEventListener(type,routeFilterInput,{capture:true,passive:type!=='click'&&type!=='keydown'});
+    for(const type of ['pointerdown','mousedown','touchstart','click','auxclick','keydown','keyup'])window.addEventListener(type,routeSearchInput,{capture:true,passive:true});
     const headingCopy=new Map([
         ['Watch again',['Посмотреть еще раз','Посмотреть ещё раз','Посмотреть снова','Смотреть ещё раз','Erneut ansehen']],
         ['For you',['Для вас','Für dich','Für Sie']],['Previously watched',['Вы уже смотрели','Bereits angesehen']],
@@ -252,7 +179,7 @@
       *{box-sizing:border-box}[hidden]{display:none!important}a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}a:focus-visible,button:focus-visible{outline:2px solid var(--myt-muted);outline-offset:3px}
       .toolbar{display:flex;align-items:center;justify-content:space-between;padding:0 0 16px;margin-bottom:24px;border-bottom:1px solid var(--myt-border)}
       .filters-toggle,.close-filters{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:9px 14px;border:0;border-radius:12px;background:transparent;color:inherit;font-weight:600}
-      .filters-toggle:hover,.close-filters:hover{background:var(--myt-soft)}.filters-toggle svg{width:24px;height:24px}.filter-panel{padding:20px;margin-bottom:24px;border:1px solid var(--myt-border);border-radius:18px;background:var(--myt-surface)}.filter-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.filter-head h2{margin:0;font-size:20px}
+      .filters-toggle:hover,.close-filters:hover{background:var(--myt-soft)}.filters-toggle svg{width:24px;height:24px}.filter-panel{position:fixed;inset:auto;left:var(--filter-left,16px);top:var(--filter-top,100px);width:var(--filter-width,calc(100vw - 32px));max-height:calc(100dvh - var(--filter-top,100px) - 16px);overflow:auto;overscroll-behavior:contain;padding:20px;margin:0;border:1px solid var(--myt-border);border-radius:18px;background:var(--myt-surface);color:inherit;box-shadow:0 16px 60px #0005}.filter-panel::backdrop{background:#0003}.filter-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.filter-head h2{margin:0;font-size:20px}
       .filter-groups{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:20px}.filter-group h3{margin:0 0 12px;font-size:16px}.filter-group a{display:block;padding:8px 0;color:var(--myt-muted);font-size:14px}.filter-group a:is(:hover,:focus-visible),.filter-group a[aria-current=true]{color:var(--myt-ink);text-decoration:underline}
       .channels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:24px}
       .stream,.group-stream{display:flex;flex-direction:column;gap:20px}.row{display:grid;gap:20px;align-items:stretch;min-width:0}
@@ -349,10 +276,16 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
             this.nativeStyle=node('style');this.nativeStyle.id='myt-search-native-style';this.nativeStyle.textContent=nativeStyles;document.documentElement.append(this.nativeStyle);
             this.cards=new Map();this.channels=new Map();this.groups=new Map();this.sources=new Map();this.sequence=0;this.nativeNodes=new Set();this.open=false;
             this.host=node('div');this.host.id='myt-search';this.host.lang='en';this.shadow=this.host.attachShadow({mode:'open'});
-            this.shadow.innerHTML='<style>'+styles+'</style><div class="toolbar"><button class="filters-toggle" aria-expanded="false" aria-controls="search-filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 18h18"/><circle cx="8" cy="6" r="3" fill="var(--myt-bg)"/><circle cx="16" cy="18" r="3" fill="var(--myt-bg)"/></svg>Filters</button></div><section id="search-filters" class="filter-panel" aria-label="Search filters" hidden><div class="filter-head"><h2>Search filters</h2><button class="close-filters">Close</button></div><div class="filter-groups"></div></section><div class="channels" aria-label="Channels"></div><div class="stream"></div><p class="empty" hidden>No results found.</p>';
+            this.shadow.innerHTML='<style>'+styles+'</style><div class="toolbar"><button type="button" class="filters-toggle" popovertarget="search-filters" popovertargetaction="toggle" aria-expanded="false" aria-controls="search-filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 18h18"/><circle cx="8" cy="6" r="3" fill="var(--myt-bg)"/><circle cx="16" cy="18" r="3" fill="var(--myt-bg)"/></svg>Filters</button></div><section id="search-filters" class="filter-panel" popover="auto" aria-label="Search filters"><div class="filter-head"><h2>Search filters</h2><button type="button" class="close-filters" popovertarget="search-filters" popovertargetaction="hide">Close</button></div><div class="filter-groups"></div></section><div class="channels" aria-label="Channels"></div><div class="stream"></div><p class="empty" hidden>No results found.</p>';
             this.q=selector=>this.shadow.querySelector(selector);
-            this.filterActions=new WeakMap();filterViews.add(this);
-            this.shadow.addEventListener('click',routeFilterInput);this.shadow.addEventListener('keydown',routeFilterInput);
+            filterViews.add(this);
+            this.moveFilters=()=>this.positionFilters();
+            this.q('.filter-panel').addEventListener('beforetoggle',event=>{
+                this.open=event.newState==='open';this.q('.filters-toggle').setAttribute('aria-expanded',String(this.open));
+                if(this.open){this.renderFilters();this.positionFilters();window.addEventListener('resize',this.moveFilters);document.addEventListener('scroll',this.moveFilters,{capture:true,passive:true});}
+                else{window.removeEventListener('resize',this.moveFilters);document.removeEventListener('scroll',this.moveFilters,true);}
+            });
+            this.renderFilters();
             this.resize=new ResizeObserver(()=>this.layout());this.resize.observe(this.host);
             this.observer=new MutationObserver(records=>{
                 if(records.every(record=>record.type==='attributes'&&record.attributeName?.startsWith('data-myt-search-')))return;
@@ -377,21 +310,25 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
             this.pendingCards ||=new Set();this.pendingCards.add(source);if(this.cardFrame)return;
             this.cardFrame=requestAnimationFrame(()=>{this.cardFrame=0;for(const source of this.pendingCards){const card=this.cards.get(source);if(card&&source.isConnected){if(Search.isPlaylist(source)!==(card.host.dataset.kind==='playlist')){this.queue();continue;}const data=this.read(source,card.host.dataset.kind,card.record);if(data)card.update(data);else this.queue();}}this.pendingCards.clear();});
         }
-        toggleFilters(open,focus=false){this.open=open;this.q('.filter-panel').hidden=!open;this.q('.filters-toggle').setAttribute('aria-expanded',String(open));if(open)this.renderFilters();if(focus)this.q('.filters-toggle').focus();}
+        positionFilters(){
+            if(!this.open)return;
+            const rect=this.q('.toolbar').getBoundingClientRect(),panel=this.q('.filter-panel'),width=Math.min(rect.width,innerWidth-32);
+            const left=Math.max(16,Math.min(rect.left,innerWidth-width-16)),top=Math.max(16,Math.min(rect.bottom+12,innerHeight-240));
+            for(const [name,value]of Object.entries({left,top,width}))panel.style.setProperty('--filter-'+name,value+'px');
+        }
         renderFilters(){
             const available=new Map();
             for(const option of this.snapshot?.filters||[]){const label=englishFilter(String(option.label||''))||String(option.label||'');if(youtubeURL(option.href))available.set(label,{href:option.href});}
             for(const option of document.querySelectorAll('ytd-search-filter-renderer a[href],ytd-search-filter-group-renderer a[href]')){
-                const label=englishFilter(text(option))||text(option),href=youtubeURL(option.href);if(href)available.set(label,{href,source:option});
+                const label=englishFilter(text(option))||text(option),href=youtubeURL(option.href);if(href)available.set(label,{href});
             }
             const signature=JSON.stringify([location.href,[...available].map(([key,item])=>[key,item.href])]);if(signature===this.filterSignature)return;this.filterSignature=signature;
-            const container=this.q('.filter-groups');container.replaceChildren();this.filterActions=new WeakMap();
+            const container=this.q('.filter-groups');container.replaceChildren();
             for(const [title,options]of filterGroups){
                 const group=node('div','filter-group');group.append(node('h3','',title));
                 for(const [label,field,value]of options){
                     const item=available.get(label),link=node('a','',label);link.href=item?.href||filterURL(field,value);
                     link.setAttribute('aria-current',String(new URL(link.href).searchParams.get('sp')===new URL(location.href).searchParams.get('sp')));
-                    this.filterActions.set(link,()=>{this.toggleFilters(false,true);if(item?.source?.isConnected)item.source.click();else location.assign(link.href);});
                     group.append(link);
                 }
                 container.append(group);
@@ -501,7 +438,8 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-render
             flush(false);container.replaceChildren(...content);
         }
         destroy(){
-            filterViews.delete(this);this.filterActions=new WeakMap();
+            filterViews.delete(this);window.removeEventListener('resize',this.moveFilters);document.removeEventListener('scroll',this.moveFilters,true);
+            if(this.q('.filter-panel').matches(':popover-open'))this.q('.filter-panel').hidePopover();
             this.nativeStyle.remove();
             this.selectionObserver.disconnect();this.selectionNodes.clear();
             document.documentElement.removeAttribute('data-myt-search-ui');

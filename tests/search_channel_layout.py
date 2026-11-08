@@ -1,4 +1,4 @@
-"""Native channel result layouts must keep avatar, copy and actions apart."""
+"""Channel result links cover the complete card across native layouts."""
 import base64
 from playwright.sync_api import sync_playwright, expect
 from smoke import setup, MASTHEAD, assert_stable
@@ -48,17 +48,17 @@ def check_geometry(page):
     metrics = page.evaluate('''() => {
       const shadow=document.querySelector('#myt-search').shadowRoot.querySelector('[data-myt-search-channel-card]').shadowRoot;
       const rect=selector=>{const b=shadow.querySelector(selector==='ytd-channel-renderer'?'.surface':selector).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height,right:b.right,bottom:b.bottom};};
-      return {card:rect('ytd-channel-renderer'),avatar:rect('.avatar img'),title:rect('.name'),stats:rect('.metadata'),button:rect('.subscribe'),bio:!!shadow.querySelector('.description'),overflow:document.documentElement.scrollWidth>innerWidth};
+      return {card:rect('ytd-channel-renderer'),avatar:rect('.avatar img'),title:rect('.name'),stats:rect('.metadata'),link:rect('.channel-link'),bio:!!shadow.querySelector('.description'),subscribe:!!shadow.querySelector('.subscribe'),overflow:document.documentElement.scrollWidth>innerWidth};
     }''')
-    avatar, button, card = (metrics[key] for key in ['avatar', 'button', 'card'])
+    avatar, link, card = (metrics[key] for key in ['avatar', 'link', 'card'])
     assert avatar['width'] == avatar['height'] == (64 if page.viewport_size['width']<=600 else 80), metrics
-    assert not metrics['bio'], metrics
+    assert not metrics['bio'] and not metrics['subscribe'], metrics
     for key in ['title', 'stats']:
         box = metrics[key]
         assert box['x'] >= avatar['right'] + 11, (key, metrics)
         assert box['right'] <= card['right'] + 1, (key, metrics)
-    assert all(abs(button[key]-card[key])<=2 for key in ['x','y','width','height']),metrics
-    for box in [avatar, button]:
+    assert all(abs(link[key]-card[key])<=2 for key in ['x','y','width','height']),metrics
+    for box in [avatar, link]:
         assert box['x'] >= card['x'] and box['right'] <= card['right'] + 1, metrics
         assert box['y'] >= card['y'] and box['bottom'] <= card['bottom'] + 1, metrics
     assert not metrics['overflow'], metrics
@@ -68,6 +68,10 @@ def check_geometry(page):
 def check(browser, layout, dark):
     page = setup(browser, '/results?search_query=mrbeast', fixture(layout), native_dark=dark)
     page.evaluate('''() => {
+      window.__channelVisits=0;
+      navigation.addEventListener('navigate',event=>{
+        if(new URL(event.destination.url).pathname.startsWith('/@')){event.preventDefault();window.__channelVisits++;window.__channelDestination=event.destination.url;}
+      });
       window.__nativeNodes=[...document.querySelectorAll('ytd-channel-renderer *:not([data-myt-search-channel-card])')].map(node=>[node,node.parentElement,node.getAttribute('style')]);
       document.querySelector('ytd-channel-renderer').addEventListener('click',event=>{
         if(event.target.closest('[data-myt-search-avatar-overlay]')){event.preventDefault();window.__channelVisits=(window.__channelVisits||0)+1;}
@@ -93,8 +97,9 @@ def check(browser, layout, dark):
         box=avatar.bounding_box();page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
         assert page.evaluate('__channelVisits>0')
         before = page.evaluate('__channelVisits')
-        page.locator('[data-myt-search-channel-card] .subscribe').click(position={'x':12,'y':12})
-        assert page.evaluate('__subscribed>0&&__channelVisits') == before
+        page.locator('[data-myt-search-channel-card] .channel-link').click(position={'x':12,'y':12})
+        assert page.evaluate('__channelVisits') == before+1
+        assert page.evaluate('!window.__subscribed')
         assert page.evaluate('__nativeNodes.every(([node,parent])=>node.parentElement===parent)')
         assert_stable(page)
         page.screenshot(path=f'/tmp/yt-min-channel-fixed-{layout}-{width}-{dark}.png')
@@ -116,7 +121,7 @@ def check(browser, layout, dark):
     expect(page.locator('[data-myt-search-avatar-link]')).to_have_count(1)
     check_geometry(page)
     page.close()
-    print(f'PASS channel avatar/copy/subscribe geometry, resize, native actions, rerender and restore: {layout}, dark={dark}', flush=True)
+    print(f'PASS channel link/avatar/copy geometry, resize, navigation, rerender and restore: {layout}, dark={dark}', flush=True)
 
 
 def main():
