@@ -16,11 +16,15 @@ def fixture(legacy=False):
     tabs=''.join(f'<yt-tab-shape><div role="tab">{label}</div></yt-tab-shape>'
                  for label in ['Главная','Видео','Трансляции','Плейлисты','Записи','Shorts','Поиск'])
     profile = 'ytd-c4-tabbed-header-renderer' if legacy else 'yt-page-header-view-model'
-    return '<style>ytd-browse,yt-page-header-view-model,ytd-c4-tabbed-header-renderer{display:block}#banner{height:120px;background:#386b65}</style><ytd-app>'+MASTHEAD+f'''
+    return '''<style>ytd-browse,yt-page-header-view-model,ytd-c4-tabbed-header-renderer{display:block}#banner{height:120px;background:#386b65}
+      yt-description-preview-view-model{display:block;position:relative}
+      .ytDescriptionPreviewViewModelTruncatedText{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;overflow:hidden}
+      .ytDescriptionPreviewViewModelMoreButton{position:absolute;right:0;bottom:0;transform:translateY(-8px);font:500 14px/20px Arial}
+      </style><ytd-app>'''+MASTHEAD+f'''
       <ytd-page-manager><ytd-browse page-subtype="channels"><div id="page-header"><div id="banner">Banner</div>
       <{profile}><div id="channel-header-container"><h1>Joe Speen — Мой канал</h1>
       <img id="avatar" width="80" height="80" alt="Joe Speen">{metadata}
-      <yt-description-preview-view-model><span id="author-description" style="font-family:Arial">Пщщ! Я Joe Speen, а это мой канал.</span><button id="description-more" onclick="window.__more=(window.__more||0)+1">...ещё</button></yt-description-preview-view-model>
+      <yt-description-preview-view-model><yt-attributed-string class="ytDescriptionPreviewViewModelTruncatedText"><span id="author-description" style="font-family:Arial">Пщщ! Я Joe Speen, а это мой канал.</span></yt-attributed-string><button id="description-more" class="ytDescriptionPreviewViewModelMoreButton" onclick="window.__more=(window.__more||0)+1"><span id="more-label">...ещё</span></button></yt-description-preview-view-model>
       <yt-channel-external-link-view-model><a href="https://t.me/joe_speen_youtube">t.me/joe_speen_youtube и ещё 5 ссылок</a></yt-channel-external-link-view-model>
       <ytd-subscribe-button-renderer><button id="subscribe" aria-label="Подписаться" onclick="this.textContent='Вы подписаны';window.__subscriptions=(window.__subscriptions||0)+1">Подписаться</button></ytd-subscribe-button-renderer>
       </div></{profile}><div id="tabs"><yt-tab-group-shape>{tabs}</yt-tab-group-shape></div></div>
@@ -133,6 +137,39 @@ def navigation(browser):
     print('PASS real section clicks, native interception, Posts, Unicode channel search and SPA landing redirect',flush=True)
 
 
+def links_and_more(browser):
+    variants=[
+        '<yt-attribution-view-model class="ytAttributionViewModelHost">{link}</yt-attribution-view-model>',
+        '<div class="yt-attribution-view-model-wiz__host">{link}</div>',
+        '<div class="native-link-row">{link}</div>',
+    ]
+    link='<a id="external-link" href="https://www.youtube.com/redirect?event=channel_header&amp;q=https%3A%2F%2Ft.me%2Fjoe_speen_youtube">t.me/joe_speen_youtube</a><button id="more-links">and 5 more links</button>'
+    for width in (1440,900,390):
+        for wrapper in variants:
+            body=fixture().replace('<yt-channel-external-link-view-model><a href="https://t.me/joe_speen_youtube">t.me/joe_speen_youtube и ещё 5 ссылок</a></yt-channel-external-link-view-model>',wrapper.format(link=link))
+            page=setup(browser,'/@JoeSpeen/videos',body,width=width,native_dark=True)
+            expect(page.locator('#external-link')).to_be_hidden()
+            expect(page.locator('#more-links')).to_be_hidden()
+            more=page.locator('#description-more')
+            expect(more).to_be_visible()
+            author=page.locator('#author-description').bounding_box()
+            label=page.locator('#more-label').bounding_box()
+            assert abs(author['y']-label['y'])<1,(width,author,label)
+            assert more.bounding_box()['x']+more.bounding_box()['width']<=width+1
+            more.click()
+            assert page.evaluate('__more')==1
+            expect(page.locator('#subscribe')).to_be_visible()
+            page.locator('#external-link').evaluate('e=>{const row=e.parentElement,copy=row.cloneNode(true);copy.removeAttribute("data-myt-channel-source");row.replaceWith(copy)}')
+            expect(page.locator('#external-link')).to_be_hidden()
+            page.evaluate('__setEnabled(false)')
+            expect(page.locator('#external-link')).to_be_visible()
+            expect(page.locator('#more-links')).to_be_visible()
+            more.click()
+            assert page.evaluate('__more')==2
+            page.close()
+        print(f'PASS all external-link wrappers/restamps hidden, More aligned/clickable, native restoration: {width}px',flush=True)
+
+
 if __name__=='__main__':
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -141,4 +178,5 @@ if __name__=='__main__':
                 header(browser,legacy,width,dark)
         redirects(browser)
         navigation(browser)
+        links_and_more(browser)
         browser.close()

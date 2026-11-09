@@ -84,7 +84,7 @@
             const match=location.pathname.match(basePattern);if(!match)return;
             this.base=match[1];
             const header=browse.querySelector(':scope > #header,:scope > #page-header,ytd-c4-tabbed-header-renderer,yt-page-header-view-model,yt-page-header-renderer');
-            if(header)this.identity(header);
+            if(header){this.identity(header);this.links(header);}
             this.navigation(browse,match[2]?.replace(/\/$/,'')||'videos');
             this.translate(browse);
             for(const node of [...this.hidden])if(!node.isConnected){node.removeAttribute('data-myt-channel-source');this.hidden.delete(node);}
@@ -109,6 +109,22 @@
                 }
                 for(const node of candidates)this.hide(node);
             }else this.stats.remove();
+        }
+        links(header){
+            // Some headers render the external-link row as attribution instead
+            // of a channel-external-link view model. Redirect URLs are links too.
+            const protectedContent='h1,#channel-name,ytd-channel-name,#avatar,yt-avatar-shape,img,yt-content-metadata-view-model,#channel-tagline,#myt-channel-stats,#myt-channel-nav,yt-description-preview-view-model,#description-container,#channel-description,ytd-subscribe-button-renderer,yt-subscribe-button-view-model';
+            for(const anchor of header.querySelectorAll('a[href]')){
+                if(anchor.closest(protectedContent)||anchor.querySelector('img'))continue;
+                let url;try{url=new URL(anchor.href);if(url.pathname==='/redirect'&&/(^|\.)youtube\.com$/.test(url.hostname))url=new URL(url.searchParams.get('q')||url.searchParams.get('url'));}catch{continue;}
+                if(!/^https?:$/.test(url.protocol)||/(^|\.)youtube\.com$/.test(url.hostname))continue;
+                let row=anchor;
+                for(let parent=anchor.parentElement;parent&&parent!==header;parent=parent.parentElement){
+                    if(parent.matches(protectedContent)||parent.querySelector(protectedContent))break;
+                    row=parent;
+                }
+                this.hide(row);
+            }
         }
         navigation(browse,current){
             const tabs=[...browse.querySelectorAll(tabsSelector)].filter(node=>!node.parentElement.closest(tabsSelector));

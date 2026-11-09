@@ -1615,7 +1615,7 @@ html.minimal-youtube [data-myt-playlist-action-anchor]::backdrop { background: t
 /* Channel identity keeps native avatar, subscription and description actions. */
 html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(yt-page-header-view-model h1, yt-page-header-renderer h1, ytd-page-header-renderer h1, ytd-c4-tabbed-header-renderer h1, ytd-channel-name #text, #channel-name #text) {
     font-family: "MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif !important;
-    font-size: 32px !important;
+    font-size: clamp(36px, 4vw, 48px) !important;
     font-weight: 900 !important;
     font-style: italic !important;
     text-transform: uppercase;
@@ -1663,6 +1663,7 @@ html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-source] {
 }
 html.minimal-youtube[data-myt-page="channel"] :is(#header, #page-header, ytd-c4-tabbed-header-renderer, yt-page-header-view-model, yt-page-header-renderer) :is(
     yt-channel-external-link-view-model, .ytChannelExternalLinkViewModelHost,
+    yt-attribution-view-model, .ytAttributionViewModelHost, .yt-attribution-view-model-wiz__host,
     #channel-header-links, #primary-links, #links-holder, #links-container
 ) {
     display: none !important;
@@ -1672,4 +1673,37 @@ html.minimal-youtube[data-myt-page="channel"] :is(#description-container, #chann
     font-family: "SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace !important;
     font-size: 17px !important;
     line-height: 1.75 !important;
+}
+
+/* Native More controls are positioned for YouTube's smaller UI font. Keep the
+   original control/event handler, but let the monospace line set its baseline. */
+html.minimal-youtube[data-myt-page="channel"] yt-description-preview-view-model {
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 0 .35em;
+    min-width: 0;
+    height: auto !important;
+    max-height: none !important;
+}
+html.minimal-youtube[data-myt-page="channel"] yt-description-preview-view-model :is(
+    .ytDescriptionPreviewViewModelTruncatedText, .yt-description-preview-view-model-wiz__truncated-text
+) {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+}
+html.minimal-youtube[data-myt-page="channel"] yt-description-preview-view-model :is(
+    button, [role="button"], .ytDescriptionPreviewViewModelMoreButton, .yt-description-preview-view-model-wiz__more-button
+) {
+    position: relative !important;
+    inset: auto !important;
+    transform: none !important;
+    translate: none !important;
+    align-self: baseline !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font: inherit !important;
+    line-height: inherit !important;
+    white-space: nowrap;
 }
