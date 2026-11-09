@@ -3,6 +3,7 @@
     'use strict';
     const basePattern=/^(\/(?:@[^/]+|(?:channel|c|user)\/[^/]+))(?:\/(.*))?\/?$/;
     const tabsSelector='yt-tab-shape,tp-yt-paper-tab,ytd-expandable-tab-renderer,[role="tab"]';
+    const aboutSelector='ytd-about-channel-renderer,yt-about-channel-renderer,ytd-channel-about-metadata-renderer,yt-about-channel-view-model';
     const compact=new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:2});
     const words=new Map([
         ['Subscribe','Подписаться','Abonnieren'],['Subscribed','Вы подписаны','Подписка оформлена','Abonniert'],
@@ -46,7 +47,7 @@
             const target=new URL(url);target.searchParams.set('hl','en');target.searchParams.set('persist_hl','1');return target.href;
         }
         constructor(){
-            this.hidden=new Set();this.text=new Map();this.attributes=new Map();
+            this.hidden=new Set();this.text=new Map();this.attributes=new Map();this.aboutNodes=new Map();
             this.stats=document.createElement('div');this.stats.id='myt-channel-stats';this.stats.lang='en';
             this.stats.attachShadow({mode:'open'}).innerHTML='<style>:host{display:block;color:var(--myt-muted);font:14px/1.6 Arial,sans-serif}.row{display:flex;align-items:center;flex-wrap:wrap;gap:0 8px}.metric{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}svg{width:15px;height:15px;flex:none}[hidden]{display:none!important}</style><div class="row"></div>';
             this.nav=document.createElement('div');this.nav.id='myt-channel-nav';this.nav.lang='en';
@@ -86,10 +87,12 @@
             const header=browse.querySelector(':scope > #header,:scope > #page-header,ytd-c4-tabbed-header-renderer,yt-page-header-view-model,yt-page-header-renderer');
             if(header){this.identity(header);this.links(header);}
             this.navigation(browse,match[2]?.replace(/\/$/,'')||'videos');
+            this.about();
             this.translate(browse);
             for(const node of [...this.hidden])if(!node.isConnected){node.removeAttribute('data-myt-channel-source');this.hidden.delete(node);}
             for(const node of this.text.keys())if(!node.isConnected)this.text.delete(node);
             for(const node of this.attributes.keys())if(!node.isConnected)this.attributes.delete(node);
+            for(const [node,names]of this.aboutNodes)if(!node.isConnected){for(const name of names)node.removeAttribute(name);this.aboutNodes.delete(node);}
         }
         identity(header){
             const candidates=[...header.querySelectorAll('yt-content-metadata-view-model,#channel-tagline,#channel-handle,#subscriber-count,#subscribers,#videos-count,#video-count')];
@@ -125,6 +128,65 @@
                 }
                 this.hide(row);
             }
+        }
+        markAbout(node,part){
+            if(!node)return;
+            const name='data-myt-channel-about'+(part?'-'+part:'');
+            if(!node.hasAttribute(name))node.setAttribute(name,'');
+            if(!this.nextAboutNodes.has(node))this.nextAboutNodes.set(node,new Set());
+            this.nextAboutNodes.get(node).add(name);
+        }
+        about(){
+            this.nextAboutNodes=new Map();
+            const sources=new Set(document.querySelectorAll(aboutSelector));
+            for(const panel of document.querySelectorAll('[target-id="engagement-panel-channel-about"],[data-target-id="engagement-panel-channel-about"]')){
+                if(!panel.querySelector(aboutSelector)){
+                    const content=panel.querySelector(':scope > #content');
+                    if(content)sources.add(content.firstElementChild||content);
+                }
+            }
+            for(const source of sources){
+                // Decorate the existing dialog; native links, email verification,
+                // focus handling and the close controls retain their DOM nodes.
+                this.markAbout(source,'');
+                let dialog=null,panel=null;
+                for(let parent=source.parentElement;parent&&!parent.matches('ytd-popup-container,body');parent=parent.parentElement){
+                    if(parent.matches('dialog,tp-yt-paper-dialog,[role="dialog"]'))dialog=parent;
+                    if(parent.matches('ytd-engagement-panel-section-list-renderer')){panel=parent;this.markAbout(parent,'frame');}
+                }
+                if(dialog)this.markAbout(dialog,'dialog');
+                const frame=panel||dialog;
+                const scroll=frame?.querySelector(':scope > #content,:scope > #contents,:scope > #contentWrapper')||source;
+                this.markAbout(scroll,'scroll');
+                for(const description of source.querySelectorAll('#description-container,#channel-description,#description,.ytAboutChannelViewModelDescription')){
+                    if(!description.parentElement.closest('[data-myt-channel-about-description]'))this.markAbout(description,'description');
+                }
+                const linkRows=[...source.querySelectorAll('yt-channel-external-link-view-model,yt-channel-external-link-renderer,ytd-channel-external-link-renderer,.ytChannelExternalLinkViewModelHost')];
+                const sections=new Set(source.querySelectorAll('#links-section,#links-container,#primary-links,.ytAboutChannelViewModelLinks'));
+                for(const heading of source.querySelectorAll('h2,h3,[role="heading"]')){
+                    const label=heading.textContent.trim();
+                    if(/^(links|ссылки)$/iu.test(label))sections.add(heading.parentElement===source?heading.nextElementSibling:heading.parentElement);
+                    if(/^(more info|channel details|дополнительная информация|сведения о канале)$/iu.test(label))this.markAbout(heading.parentElement===source?heading.nextElementSibling:heading.parentElement,'info');
+                }
+                for(const section of sections)if(section)this.markAbout(section,'links');
+                for(const row of linkRows){
+                    this.markAbout(row,'link');this.markAbout(row.parentElement,'link-list');
+                    this.markAbout(row.querySelector('#icon,yt-icon,yt-img-shadow,yt-image,img,.ytChannelExternalLinkViewModelIcon,.yt-channel-external-link-view-model-wiz__icon'),'icon');
+                }
+                for(const row of source.querySelectorAll('#primary-links > a')){
+                    this.markAbout(row,'link');this.markAbout(row.parentElement,'link-list');
+                }
+                for(const info of source.querySelectorAll('#additional-info-container,#metadata-container,#more-info,.ytAboutChannelViewModelMoreInfo'))this.markAbout(info,'info');
+                for(const info of source.querySelectorAll('[data-myt-channel-about-info]')){
+                    const rows=[...info.querySelectorAll('tr,yt-about-channel-metadata-view-model,yt-about-channel-info-row-view-model,.ytAboutChannelViewModelMetadataRow,.metadata-row,.info-row')];
+                    for(const row of rows){
+                        this.markAbout(row,'info-row');this.markAbout(row.parentElement,'info-list');
+                        this.markAbout(row.querySelector('yt-icon,yt-img-shadow,yt-image,img,svg'),'icon');
+                    }
+                }
+            }
+            for(const [node,names]of this.aboutNodes)for(const name of names)if(!this.nextAboutNodes.get(node)?.has(name))node.removeAttribute(name);
+            this.aboutNodes=this.nextAboutNodes;this.nextAboutNodes=null;
         }
         navigation(browse,current){
             const tabs=[...browse.querySelectorAll(tabsSelector)].filter(node=>!node.parentElement.closest(tabsSelector));
@@ -191,6 +253,7 @@
         destroy(){
             window.removeEventListener('click',this.click,true);window.removeEventListener('auxclick',this.click,true);this.nav.remove();this.stats.remove();
             for(const node of this.hidden)node.removeAttribute('data-myt-channel-source');this.hidden.clear();
+            for(const [node,names]of this.aboutNodes)for(const name of names)node.removeAttribute(name);this.aboutNodes.clear();
             for(const [node,state]of this.text)if(node.data===state.applied)node.data=state.original;
             for(const [node,attrs]of this.attributes)for(const [name,state]of attrs)if(node.getAttribute(name)===state.applied)node.setAttribute(name,state.original);
             this.text.clear();this.attributes.clear();

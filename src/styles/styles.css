@@ -1707,3 +1707,187 @@ html.minimal-youtube[data-myt-page="channel"] yt-description-preview-view-model 
     line-height: inherit !important;
     white-space: nowrap;
 }
+
+/* Full channel description: a wider native dialog with distinct link/info cards. */
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-dialog] {
+    box-sizing: border-box !important;
+    position: fixed !important;
+    inset: 50% auto auto 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: min(1040px, calc(100vw - 64px)) !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 32px) !important;
+    max-height: calc(100dvh - 64px) !important;
+    margin: 0 !important;
+    border: 1px solid var(--myt-border) !important;
+    border-radius: 24px !important;
+    background: var(--myt-bg) !important;
+    color: var(--myt-ink) !important;
+    overflow: hidden !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-frame] {
+    position: relative !important;
+    inset: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    max-height: inherit !important;
+    background: var(--myt-bg) !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-scroll] {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-height: calc(100dvh - 160px) !important;
+    overflow: auto !important;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-scroll] :is(ytd-section-list-renderer, ytd-item-section-renderer, #contents) {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about] {
+    display: block !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    padding: 28px !important;
+    color: var(--myt-ink) !important;
+    font: 16px/1.55 Arial, sans-serif;
+}
+html.minimal-youtube[data-myt-page="channel"] :is([data-myt-channel-about-description], [data-myt-channel-about-links], [data-myt-channel-about-info]) {
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 0 20px !important;
+    padding: 24px !important;
+    border: 1px solid var(--myt-border);
+    border-radius: 20px;
+    background: var(--myt-surface);
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-description],
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-description] :is(span, a, yt-attributed-string, yt-formatted-string, #description) {
+    font: 400 17px/1.8 "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", ui-monospace, monospace !important;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    -webkit-line-clamp: unset !important;
+    max-height: none !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about] :is(h2, h3, [role="heading"]) {
+    margin: 0 0 18px !important;
+    color: var(--myt-ink) !important;
+    font: italic 900 30px/1.1 "MYT Barlow Condensed", "MYT Cyrillic Condensed", "Arial Narrow", sans-serif !important;
+    text-transform: uppercase;
+}
+html.minimal-youtube[data-myt-page="channel"] :is([data-myt-channel-about-link-list], [data-myt-channel-about-info-list]) {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+html.minimal-youtube[data-myt-page="channel"] :is([data-myt-channel-about-link], [data-myt-channel-about-info-row]) {
+    display: flex !important;
+    align-items: center;
+    gap: 12px;
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 76px;
+    margin: 0 !important;
+    padding: 16px !important;
+    border: 1px solid var(--myt-border);
+    border-radius: 14px;
+    background: var(--myt-bg);
+    color: var(--myt-ink);
+    overflow-wrap: anywhere;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-link] {
+    min-height: 92px;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-link]:is(:hover, :focus-within) {
+    background: var(--myt-soft);
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-link] > :not([data-myt-channel-about-icon]) {
+    min-width: 0;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-link] :is(.ytChannelExternalLinkViewModelTitle, .yt-channel-external-link-view-model-wiz__title, #title) {
+    margin-bottom: 4px;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: var(--myt-ink) !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-link] a {
+    color: var(--myt-muted) !important;
+    font: 400 14px/1.5 "SFMono-Regular", Menlo, Consolas, monospace !important;
+    overflow-wrap: anywhere;
+    white-space: normal !important;
+    text-decoration: none;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-link] a:hover {
+    color: var(--myt-ink) !important;
+    text-decoration: underline;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-icon] {
+    display: inline-flex;
+    flex: 0 0 28px;
+    align-items: center;
+    justify-content: center;
+    width: 28px !important;
+    height: 28px !important;
+    max-width: 28px !important;
+    margin: 0 !important;
+    color: var(--myt-muted);
+    object-fit: contain;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-info-row] td {
+    min-width: 0;
+    padding: 0 !important;
+    font: 400 15px/1.5 Arial, sans-serif !important;
+    color: var(--myt-ink) !important;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-info] table {
+    display: block;
+    width: 100% !important;
+    border-spacing: 0;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-info] button {
+    max-width: 100%;
+    padding: 10px 14px !important;
+    border: 1px solid var(--myt-border) !important;
+    border-radius: 12px !important;
+    background: var(--myt-soft) !important;
+    color: var(--myt-ink) !important;
+    font: 600 14px/1.4 Arial, sans-serif !important;
+    white-space: normal !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about] :is(a, button):focus-visible {
+    outline: 2px solid var(--myt-accent);
+    outline-offset: 3px;
+}
+@media (max-width: 600px) {
+    html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-dialog] {
+        width: calc(100vw - 24px) !important;
+        max-width: calc(100vw - 24px) !important;
+        max-height: calc(100dvh - 24px) !important;
+        border-radius: 20px !important;
+    }
+    html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about] {
+        padding: 16px !important;
+    }
+    html.minimal-youtube[data-myt-page="channel"] :is([data-myt-channel-about-description], [data-myt-channel-about-links], [data-myt-channel-about-info]) {
+        padding: 18px !important;
+        border-radius: 16px;
+    }
+    html.minimal-youtube[data-myt-page="channel"] :is([data-myt-channel-about-link-list], [data-myt-channel-about-info-list]) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

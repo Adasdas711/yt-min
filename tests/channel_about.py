@@ -1,0 +1,108 @@
+"""Full channel-description dialog: responsive cards and native interactions."""
+from pathlib import Path
+from playwright.sync_api import sync_playwright, expect
+from smoke import setup, assert_stable
+from channel_header import fixture
+
+
+def about_dialog(legacy=False):
+    renderer='ytd-channel-about-metadata-renderer' if legacy else 'ytd-about-channel-renderer'
+    links=''.join(f'''<yt-channel-external-link-view-model><yt-icon><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor"/></svg></yt-icon><div>
+        <div class="ytChannelExternalLinkViewModelTitle">{title}</div><a id="social-{i}" href="https://example.com/{i}" onclick="event.preventDefault();window.__aboutLink={i}">{url}</a>
+        </div></yt-channel-external-link-view-model>''' for i,(title,url) in enumerate([
+            ('РЕКЛАМА','vk.com/magic_manager'),('Моё Сообщество!','vk.com/dergdiverofficial'),
+            ('telegram','t.me/dergdiver'),('tik-tok','tiktok.com/@dergdiverihodor')]))
+    values=['<button id="email" onclick="window.__emailChecks=(window.__emailChecks||0)+1">View email address</button>',
+            '<a href="https://www.youtube.com/@DERGIDVER">www.youtube.com/@DERGIDVER</a>',
+            'Russia','Joined Sep 20, 2018','1.98M subscribers','280 videos','491,633,729 views']
+    rows=''.join(f'<tr><td><yt-icon><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor"/></svg></yt-icon></td><td>{value}</td></tr>' for value in values)
+    description=('Описание канала. Текст автора сохраняет переносы строк и исходный язык.\n'*5)+ 'Last line of the full description.'
+    body=f'''<{renderer} style="width:560px"><div id="description-container"><yt-attributed-string id="description">{description}</yt-attributed-string><a id="description-link" href="https://example.com/author">Author source</a></div>
+        <div id="links-section"><h3>Links</h3><div id="link-list-container">{links}</div></div>
+        <div id="additional-info-container"><h3>More info</h3><table id="additional-info-table"><tbody>{rows}</tbody></table></div>
+        </{renderer}>'''
+    if not legacy:
+        body='<ytd-engagement-panel-section-list-renderer target-id="engagement-panel-channel-about" style="width:600px"><div id="header"><h2>About this channel</h2><button id="close-about" aria-label="Close" onclick="document.querySelector(\'#about-dialog\').hidden=true">×</button></div><div id="content">'+body+'</div></ytd-engagement-panel-section-list-renderer>'
+    else:
+        body='<div id="header"><h2>About this channel</h2><button id="close-about" aria-label="Close" onclick="document.querySelector(\'#about-dialog\').hidden=true">×</button></div>'+body
+    return '''<style>
+        ytd-popup-container{position:fixed;inset:0;pointer-events:none;z-index:1000}
+        tp-yt-paper-dialog{display:block;pointer-events:auto;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:600px;max-width:calc(100vw - 32px);max-height:90vh;overflow:auto;background:#202020;color:#eee;font:16px/1.5 Arial,sans-serif}
+        tp-yt-paper-dialog[hidden]{display:none!important}ytd-engagement-panel-section-list-renderer{display:block}
+        #about-dialog #header{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:inherit}
+        #about-dialog #header h2{margin:0;font-size:20px}#close-about{font:24px Arial;border:0;background:none;color:inherit;cursor:pointer}
+        yt-channel-external-link-view-model{display:flex;gap:16px;margin-bottom:16px}yt-icon{display:inline-block;width:28px;height:28px;flex:none}yt-icon svg{width:100%;height:100%}
+        #about-dialog a{color:#3ea6ff;text-decoration:none}#about-dialog td{padding:12px}#link-list-container{display:block}
+        </style><ytd-popup-container><tp-yt-paper-dialog id="about-dialog" role="dialog" aria-label="About this channel">'''+body+'</tp-yt-paper-dialog><tp-yt-paper-dialog id="unrelated-dialog" hidden style="width:420px">Share video</tp-yt-paper-dialog></ytd-popup-container>'
+
+
+def check(browser,width,dark,legacy,fallback=False):
+    page=setup(browser,'/@JoeSpeen/videos',fixture(),width=width,native_dark=dark)
+    markup=about_dialog(legacy)
+    if fallback:markup=markup.replace('ytd-about-channel-renderer','native-about-content')
+    page.locator('#description-more').evaluate('(e,html)=>e.onclick=()=>document.body.insertAdjacentHTML("beforeend",html)',markup)
+    page.locator('#description-more').click()
+    modal=page.get_by_role('dialog',name='About this channel',exact=True)
+    expect(modal).to_be_visible()
+    expect(page.locator('[data-myt-channel-about-link]')).to_have_count(4)
+    expect(page.locator('[data-myt-channel-about-info-row]')).to_have_count(7)
+    bounds=modal.bounding_box()
+    assert bounds['x']>=0 and bounds['x']+bounds['width']<=width, bounds
+    if width>=900:assert bounds['width']>=width-64 if width<1100 else bounds['width']>=1000,bounds
+    else:assert bounds['width']>=width-28,bounds
+    assert bounds['y']>=0 and bounds['y']+bounds['height']<=960,bounds
+    description=page.locator('#about-dialog #description')
+    expect(description).to_contain_text('Last line of the full description.')
+    assert 'Mono' in description.evaluate('e=>getComputedStyle(e).fontFamily')
+    expect(page.locator('#description-link')).to_have_attribute('href','https://example.com/author')
+    cards=page.locator('[data-myt-channel-about-link]')
+    boxes=[card.bounding_box() for card in cards.all()]
+    if width>=900:
+        assert abs(boxes[0]['y']-boxes[1]['y'])<1 and boxes[1]['x']>boxes[0]['x'],boxes
+    else:
+        assert boxes[1]['y']>boxes[0]['y'] and abs(boxes[0]['x']-boxes[1]['x'])<1,boxes
+    for card in cards.all():
+        assert card.evaluate('e=>e.scrollWidth<=e.clientWidth+1')
+    page.locator('#social-2').click()
+    assert page.evaluate('__aboutLink')==2
+    page.locator('#email').click()
+    assert page.evaluate('__emailChecks')==1
+    assert page.evaluate('scrollY')==0
+    expect(page.locator('#close-about')).to_be_in_viewport()
+    assert page.locator('#unrelated-dialog').evaluate('e=>e.hasAttribute("data-myt-channel-about-dialog")') is False
+    page.wait_for_timeout(100)
+    assert_stable(page)
+    # A reused popup host must lose channel styling when it displays another dialog.
+    page.locator('#about-dialog').evaluate('e=>{window.__aboutMarkup=e.innerHTML;e.innerHTML="<button id=share-action>Share</button>"}')
+    expect(page.locator('#about-dialog')).not_to_have_attribute('data-myt-channel-about-dialog')
+    assert page.locator('#about-dialog').evaluate('e=>parseFloat(getComputedStyle(e).width)')==min(600,width-32)
+    page.locator('#about-dialog').evaluate('e=>e.innerHTML=window.__aboutMarkup')
+    expect(page.locator('[data-myt-channel-about-link]')).to_have_count(4)
+    # Verify that cards added by a native renderer update get styled as well.
+    page.locator('#link-list-container').evaluate('e=>{const copy=e.firstElementChild.cloneNode(true);copy.removeAttribute("data-myt-channel-about-link");e.append(copy)}')
+    expect(page.locator('[data-myt-channel-about-link]')).to_have_count(5)
+    page.locator('#email').click()
+    assert page.evaluate('__emailChecks')==2
+    if not legacy:
+        Path('/tmp/yt-min-qa').mkdir(exist_ok=True)
+        page.locator('[data-myt-channel-about-scroll]').evaluate('e=>e.scrollTop=0')
+        page.screenshot(path=f'/tmp/yt-min-qa/about-{width}-{dark}.png')
+        page.locator('#email').scroll_into_view_if_needed()
+        page.screenshot(path=f'/tmp/yt-min-qa/about-info-{width}-{dark}.png')
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('[data-myt-channel-about]')).to_have_count(0)
+    assert modal.evaluate('e=>parseFloat(getComputedStyle(e).width)')==min(600,width-32)
+    page.locator('#close-about').click()
+    expect(modal).to_be_hidden()
+    page.close()
+    print(f'PASS wider about dialog, responsive link/info cards, native links/email/close, restamps and restoration: {width}px, dark={dark}, legacy={legacy}, fallback={fallback}',flush=True)
+
+
+if __name__=='__main__':
+    with sync_playwright() as p:
+        browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
+        for legacy in (False,True):
+            for width,dark in ((1440,True),(900,False),(390,True)):
+                check(browser,width,dark,legacy)
+        check(browser,900,True,False,True)
+        browser.close()
