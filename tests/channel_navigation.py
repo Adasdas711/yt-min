@@ -159,11 +159,19 @@ def search_and_races(browser):
     assert urlparse(page.url).path.endswith('/streams')
     button=nav.get_by_role('button',name='Search',exact=True);button.focus();button.press('Space')
     field=nav.get_by_role('searchbox',name='Search this channel')
+    assert not button.text_content().strip(),'Channel search must use an icon instead of a text tab'
+    expect(button.locator('svg')).to_have_count(1)
+    icon=button.bounding_box();box=field.bounding_box()
+    assert box['x']>=icon['x']+icon['width'],(icon,box)
+    assert abs((box['y']+box['height']/2)-(icon['y']+icon['height']/2))<2,(icon,box)
     query='Поиск & + #';field.fill(query);field.press('Enter')
     expect(nav).to_have_attribute('aria-busy','true')
     assert requests[-1]['query']==query
     finish(pending);page.wait_for_url('**/search?**')
     expect(field).to_have_value(query)
+    expect(nav.get_by_role('link',name='Videos',exact=True)).to_have_attribute('aria-current','page')
+    expect(page.locator('#myt-search').get_by_role('link',name='Regular video 24',exact=True)).to_be_visible()
+    expect(page.locator('html')).to_have_attribute('data-myt-page','channel')
     assert parse_qs(urlparse(page.url).query)=={'query':[query]}
     field.fill('Another query');nav.get_by_role('button',name='Search',exact=True).last.click()
     finish(pending);page.wait_for_url('**query=Another+query')
@@ -173,7 +181,7 @@ def search_and_races(browser):
     assert len(documents)==1
     assert not errors,errors
     context.close()
-    print('PASS rapid out-of-order replies, Unicode channel search, submit button, query history and Escape',flush=True)
+    print('PASS rapid replies, icon search with its field on the right, results under Videos, Unicode, query history and Escape',flush=True)
 
 
 def fallback_and_cleanup(browser):

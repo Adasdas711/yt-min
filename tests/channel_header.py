@@ -163,7 +163,7 @@ def links_and_more(browser):
             expect(more).to_be_visible()
             author=page.locator('#myt-channel-description .summary').bounding_box()
             label=page.locator('#myt-channel-description .more').bounding_box()
-            assert label['y']>=author['y']+author['height']+12,(width,author,label)
+            assert 3<=label['y']-author['y']-author['height']<=5,(width,author,label)
             assert more.bounding_box()['x']+more.bounding_box()['width']<=width+1
             click_more(page)
             assert page.evaluate('__more')==1
@@ -198,7 +198,7 @@ def assert_owned_description(page,width):
     assert not result['clipped'],result
     assert result['mask']=='none' and result['background']=='none',result
     text_box=summary.bounding_box();button_box=button.bounding_box();box=host.bounding_box()
-    assert button_box['y']>=text_box['y']+text_box['height']+12,(text_box,button_box)
+    assert 3<=button_box['y']-text_box['y']-text_box['height']<=5,(text_box,button_box)
     assert box['x']>=-1 and box['x']+box['width']<=width+1,box
     assert button_box['y']+button_box['height']<=box['y']+box['height'],(box,button_box)
 
@@ -260,7 +260,7 @@ def more_text_spacing(browser):
         page=setup(browser,'/@JoeSpeen/videos',body,width=width,native_dark=True)
         author=page.locator('#myt-channel-description .summary').bounding_box()
         more=page.locator('#myt-channel-description .more').bounding_box()
-        assert more['y']>=author['y']+author['height']+12,(width,author,more)
+        assert 3<=more['y']-author['y']-author['height']<=5,(width,author,more)
         click_more(page)
         assert page.evaluate('__more')==1
         page.close()

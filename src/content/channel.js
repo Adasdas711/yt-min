@@ -53,7 +53,7 @@
             this.descriptionHost.attachShadow({mode:'open'}).innerHTML=`<style>
                 :host{all:initial!important;display:block!important;position:relative!important;box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:14px 0!important;color:var(--myt-ink,#18181b)!important}
                 *{box-sizing:border-box}[hidden]{display:none!important}
-                section{display:flex;flex-direction:column;align-items:flex-start;gap:14px;padding:0;border:0;border-radius:0;background:transparent}
+                section{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:0;border:0;border-radius:0;background:transparent}
                 p{display:block;width:100%;margin:0;padding:0;font:400 16px/1.8 "SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace;letter-spacing:normal;text-transform:none;white-space:normal;overflow-wrap:anywhere;color:var(--myt-ink,#18181b)}
                 button{display:inline-block;align-self:flex-start;margin:0;padding:0;border:0;border-radius:0;background:transparent;color:var(--myt-ink,#18181b);font:600 16px/1.8 "SFMono-Regular",Menlo,Consolas,monospace;cursor:pointer}
                 button:hover{text-decoration:underline}button:focus-visible{outline:2px solid var(--myt-muted,#74747d);outline-offset:3px}button:disabled{opacity:.6;cursor:default}svg{width:14px;height:14px;flex:none}
@@ -94,12 +94,14 @@
             this.nav=document.createElement('div');this.nav.id='myt-channel-nav';this.nav.lang='en';
             this.nav.attachShadow({mode:'open'}).innerHTML=`<style>
                 :host{display:block!important;min-width:0;font:600 16px/1.4 Arial,sans-serif;color:var(--myt-ink)}*{box-sizing:border-box}[hidden]{display:none!important}
-                nav{display:flex;justify-content:center;gap:8px;overflow-x:auto;scrollbar-width:thin;padding:4px 0}a,button{flex:none;color:inherit;font:inherit;text-decoration:none;background:none;border:0;border-bottom:2px solid transparent;padding:12px 16px;cursor:pointer;white-space:nowrap}
+                .toolbar{display:flex;align-items:center;justify-content:center;gap:8px;min-width:0}nav{display:flex;flex:0 1 auto;min-width:0;gap:8px;overflow-x:auto;scrollbar-width:thin;padding:4px 0}a,button{flex:none;color:inherit;font:inherit;text-decoration:none;background:none;border:0;border-bottom:2px solid transparent;padding:12px 16px;cursor:pointer;white-space:nowrap}
                 [aria-current=page],button[aria-expanded=true]{border-color:currentColor}a:hover,button:hover{background:var(--myt-soft);border-radius:8px 8px 0 0}a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
                 [data-pending]{opacity:.65;cursor:progress}.navigation-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-                form{display:flex;gap:8px;max-width:520px;margin:8px auto;padding:0 8px}input{min-width:0;flex:1;border:1px solid var(--myt-border);border-radius:8px;background:var(--myt-surface);color:inherit;padding:10px 12px;font:400 16px Arial,sans-serif}
-                @media(max-width:600px){nav{gap:0;justify-content:safe center}a,button{font-size:14px;padding:12px 9px}}
-                </style><nav aria-label="Channel sections"></nav><form role="search" hidden><input name="query" type="search" aria-label="Search this channel" placeholder="Search this channel" autocomplete="off"><button type="submit">Search</button></form><span class="navigation-status" role="status" aria-live="polite"></span>`;
+                .channel-search{display:flex;flex:none;align-items:center;gap:10px;min-width:0}.search-toggle{display:inline-flex;align-items:center;justify-content:center;width:40px;height:44px;padding:0;border:0;border-radius:50%;color:var(--myt-muted)}.search-toggle:hover{border-radius:50%;color:var(--myt-ink)}.search-toggle[aria-expanded=true]{color:var(--myt-ink)}.search-toggle svg{display:block;width:24px;height:24px}
+                form{display:flex;flex:none;width:clamp(160px,20vw,292px);margin:0;padding:0}input{appearance:none;-webkit-appearance:none;display:block;box-sizing:border-box;width:100%;min-width:0;flex:1;border:0;border-bottom:2px solid var(--myt-muted);border-radius:0;background:transparent;color:inherit;padding:6px 0;font:400 16px/1.5 Arial,sans-serif;outline:none}input::placeholder{color:var(--myt-muted)}input:focus,input:focus-visible{border-bottom-color:var(--myt-ink);outline:none}input::-webkit-search-decoration{display:none}
+                @media(max-width:600px){.toolbar{gap:4px}nav{gap:0}nav a{font-size:14px;padding:12px 9px}.channel-search{gap:8px}form{width:clamp(110px,38vw,190px)}}
+                </style><div class="toolbar"><nav aria-label="Channel sections"></nav><div class="channel-search"><button class="search-toggle" data-section="search" type="button" aria-label="Search" title="Search this channel" aria-expanded="false" aria-controls="channel-search-form"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7"/><path d="m16 16 5 5"/></svg></button><form id="channel-search-form" role="search" hidden><input name="query" type="search" aria-label="Search this channel" placeholder="Search" autocomplete="off"></form></div></div><span class="navigation-status" role="status" aria-live="polite"></span>`;
+            this.searchButton=this.nav.shadowRoot.querySelector('.search-toggle');
             this.nav.shadowRoot.querySelector('form').addEventListener('submit',event=>{
                 event.preventDefault();event.stopPropagation();
                 this.submitSearch();
@@ -131,7 +133,7 @@
                 if(path.includes(this.nav.shadowRoot.querySelector('input'))){
                     event.stopImmediatePropagation();
                     if(event.key==='Enter'&&!event.isComposing){event.preventDefault();this.submitSearch();}
-                    else if(event.key==='Escape'){event.preventDefault();const button=this.nav.shadowRoot.querySelector('nav button');this.toggleSearch(button);button?.focus();}
+                    else if(event.key==='Escape'){event.preventDefault();this.closeSearch(true);}
                     return;
                 }
                 if(path.includes(this.nav)){
@@ -275,7 +277,15 @@
             if(this.nativeAboutOpen()){this.restoreDescriptionFocus=false;this.descriptionDialog.close();}
             else this.requestAbout();
         }
-        toggleSearch(button){const form=this.nav.shadowRoot.querySelector('form');form.hidden=!form.hidden;button?.setAttribute('aria-expanded',String(!form.hidden));if(!form.hidden)form.querySelector('input').focus();}
+        toggleSearch(){
+            const form=this.nav.shadowRoot.querySelector('form'),input=form.querySelector('input');
+            if(!form.hidden&&input.value.trim()){this.submitSearch();return;}
+            form.hidden=false;this.searchButton.setAttribute('aria-expanded','true');input.focus({preventScroll:true});
+        }
+        closeSearch(focus=false){
+            this.nav.shadowRoot.querySelector('form').hidden=true;this.searchButton.setAttribute('aria-expanded','false');
+            if(focus)this.searchButton.focus({preventScroll:true});
+        }
         submitSearch(){const query=this.nav.shadowRoot.querySelector('input').value.trim();if(query)this.open(this.url('search',query));}
         navigationKey(href){
             try{
@@ -287,7 +297,7 @@
         renderNavigationState(){
             const pending=this.navigationPending,href=pending?.href||location.href;
             const section=new URL(href,location.href).pathname.replace(/\/$/,'').split('/').pop();
-            const current=section==='community'?'posts':section;
+            const destination=section==='community'?'posts':section,current=destination==='search'?'videos':destination;
             for(const control of this.nav.shadowRoot.querySelectorAll('nav [data-section]')){
                 const active=control.dataset.section===current;
                 if(active)control.setAttribute('aria-current','page');else control.removeAttribute('aria-current');
@@ -295,7 +305,8 @@
             }
             const busy=String(!!pending);if(this.nav.getAttribute('aria-busy')!==busy)this.nav.setAttribute('aria-busy',busy);
             const status=this.nav.shadowRoot.querySelector('.navigation-status');
-            const message=pending?'Loading '+(sections.find(([key])=>key===current)?.[1]||'section')+'…':'';
+            this.searchButton.toggleAttribute('data-pending',!!pending&&destination==='search');
+            const message=pending?'Loading '+(sections.find(([key])=>key===destination)?.[1]||'section')+'…':'';
             if(status.textContent!==message)status.textContent=message;
         }
         cancelNavigation(){
@@ -315,8 +326,7 @@
             const pending={id:(this.navigationSequence||0)+1,href:url.href,key,sourceKey:this.navigationKey(location.href),accepted:false};
             this.navigationSequence=pending.id;this.navigationPending=pending;this.renderNavigationState();
             if(!/\/search\/?$/.test(url.pathname)){
-                this.nav.shadowRoot.querySelector('form').hidden=true;
-                this.nav.shadowRoot.querySelector('nav button')?.setAttribute('aria-expanded','false');
+                this.closeSearch();
             }
             this.nav.setAttribute('data-myt-channel-navigation-request',JSON.stringify({id:pending.id,href:pending.href}));
             this.nav.removeAttribute('data-myt-channel-navigation-result');
@@ -581,10 +591,8 @@
             if(this.nav.dataset.items!==signature){
                 this.nav.dataset.items=signature;const nav=this.nav.shadowRoot.querySelector('nav');nav.replaceChildren();
                 for(const item of items){
-                    const control=document.createElement(item.key==='search'?'button':'a');control.textContent=item.label;control.dataset.section=item.key;
-                    if(item.key==='search'){
-                        control.type='button';control.setAttribute('aria-expanded','false');
-                    }else control.href=this.url(item.slug);
+                    if(item.key==='search')continue;
+                    const control=document.createElement('a');control.textContent=item.label;control.dataset.section=item.key;control.href=this.url(item.slug);
                     nav.append(control);
                 }
             }
@@ -593,11 +601,10 @@
             if(current==='search'&&(this.current!=='search'||this.searchRouteKey!==routeKey)){
                 this.nav.shadowRoot.querySelector('form').hidden=false;
                 this.nav.shadowRoot.querySelector('input').value=new URL(location.href).searchParams.get('query')||'';
-                this.nav.shadowRoot.querySelector('nav button')?.setAttribute('aria-expanded','true');
+                this.searchButton.setAttribute('aria-expanded','true');
                 this.searchRouteKey=routeKey;
             }else if(current!=='search'&&this.current==='search'){
-                this.nav.shadowRoot.querySelector('form').hidden=true;
-                this.nav.shadowRoot.querySelector('nav button')?.setAttribute('aria-expanded','false');
+                this.closeSearch();
                 this.searchRouteKey=null;
             }
             this.current=current;

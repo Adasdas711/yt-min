@@ -203,7 +203,9 @@
       .media.playlist{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:center;gap:20px;padding-bottom:12px}.media.playlist .cover{width:100%}.playlist-badge{position:absolute;right:8px;bottom:8px;padding:4px 8px;border-radius:6px;background:#000b;color:#fff;font-size:13px}
       .group{min-width:0;padding:20px;border-radius:22px;background:var(--myt-soft)}.group h2{margin:0 0 18px;padding-inline-end:.2em;overflow:visible;overflow-wrap:anywhere;font:italic 900 40px/1.05 "MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:-.025em}
       :host([data-channel]) .media.playlist{display:flex;flex-direction:column;gap:14px;padding-bottom:18px}:host([data-channel]) .media.playlist .media-title{font-size:18px}
-      .empty{padding:32px 0;color:var(--myt-muted)}@media(max-width:700px){.channels{grid-template-columns:1fr}.media-title{font-size:18px}.media.video .media-title{font-size:16px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}}
+      /* Keep 20px gaps fixed while reducing channel column widths by 15%. */
+      :host([data-channel]) .row{width:calc(85% + (var(--myt-columns,1) - 1)*3px);margin-inline:auto}
+      .empty{padding:32px 0;color:var(--myt-muted)}@media(max-width:700px){.channels{grid-template-columns:1fr}.media-title{font-size:18px}.media.video .media-title{font-size:16px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}:host([data-channel]) .row{width:calc(85% + (var(--myt-columns,1) - 1)*2.4px)}}
     `;
     class MediaCard{
         constructor(source,kind){
@@ -423,7 +425,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             const signature=items.map(item=>item.host.dataset.kind+':'+(item.host.dataset.href||item.title?.textContent||'')).join('|')+':'+columns;
             if(container.dataset.layout===signature&&items.every(item=>item.host.isConnected))return;
             container.dataset.layout=signature;let row=null,used=0,content=[];
-            const flush=()=>{if(!row)return;row.style.gridTemplateColumns='repeat('+columns+',minmax(0,1fr))';content.push(row);row=null;used=0;};
+            const flush=()=>{if(!row)return;row.style.gridTemplateColumns='repeat('+columns+',minmax(0,1fr))';if(this.channel)row.style.setProperty('--myt-columns',String(columns));content.push(row);row=null;used=0;};
             for(const item of items){
                 if(item.items){flush();content.push(item.host);continue;}
                 const units=Math.min(columns,!this.channel&&item.host.dataset.kind==='playlist'?2:1);
