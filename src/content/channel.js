@@ -128,7 +128,16 @@
             this.descriptionWheel=event=>{
                 if(!this.descriptionDialog.open)return;
                 event.stopImmediatePropagation();
-                if(!event.ctrlKey&&!this.canScrollDescription(event,event.deltaY))event.preventDefault();
+                if(event.ctrlKey||!event.cancelable)return;
+                event.preventDefault();
+                if(!this.canScrollDescription(event,event.deltaY)){this.descriptionWheelRemainder=0;return;}
+                // A page listener may already have canceled the native action.
+                // Move this scrollport directly and retain subpixel trackpad input.
+                const body=this.descriptionBody;
+                const unit=event.deltaMode===WheelEvent.DOM_DELTA_PAGE?body.clientHeight:event.deltaMode===WheelEvent.DOM_DELTA_LINE?parseFloat(getComputedStyle(body.firstElementChild).lineHeight)||16:1;
+                this.descriptionWheelRemainder=(this.descriptionWheelRemainder||0)+event.deltaY*unit;
+                const step=Math.trunc(this.descriptionWheelRemainder);this.descriptionWheelRemainder-=step;
+                if(step)body.scrollBy({top:step,behavior:'instant'});
             };
             this.descriptionTouchStart=event=>{
                 if(!this.descriptionDialog.open)return;
@@ -163,7 +172,7 @@
             // Native controls can be disabled, ignore synthetic events or throw.
             if(!this.descriptionDialog.open){
                 this.descriptionScrollLocked=true;document.documentElement.setAttribute('data-myt-channel-description-open','');
-                this.descriptionBody.scrollTop=0;this.descriptionDialog.showModal();this.descriptionBody.focus({preventScroll:true});
+                this.descriptionWheelRemainder=0;this.descriptionBody.scrollTop=0;this.descriptionDialog.showModal();this.descriptionBody.focus({preventScroll:true});
             }
             const source=this.descriptionSource;
             if(source?.isConnected){

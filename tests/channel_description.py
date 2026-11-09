@@ -10,13 +10,15 @@ def check(browser,width):
     page.route('https://www.youtube.com/**',lambda route:route.fulfill(content_type='text/html; charset=utf-8',body=document(fixture())))
     page.goto('https://www.youtube.com/@JoeSpeen/videos?hl=en')
     page.add_style_tag(path=str(ROOT/'src/styles/styles.css'))
-    full='Full channel description from public MAIN data.\n'+('Readable author text, with original paragraphs.\n'*12)
+    full='Full channel description from public MAIN data.\n'+('Readable author text, with original paragraphs.\n'*80)
     page.evaluate('''full=>{
         const source=document.querySelector('yt-description-preview-view-model');
         source.data={description:{content:'SUBSCRIBE FOR A COOKIE!'},trackingParams:'DO-NOT-COPY-TRACKING'};
         document.querySelector('#author-description').textContent='SUBSCRIBE FOR A COOKIE! SUBSCRIBE FOR A COOKIE!';
         document.querySelector('#description-more').onclick=event=>{window.__nativeAttempts=(window.__nativeAttempts||0)+1;if(!event.isTrusted)return;};
         window.ytInitialData={metadata:{channelMetadataRenderer:{vanityChannelUrl:'https://www.youtube.com/@JoeSpeen',description:full}},privateField:'DO-NOT-COPY-PRIVATE'};
+        document.querySelector('ytd-browse').style.minHeight='4000px';
+        window.addEventListener('wheel',event=>{window.__canceledWheels=(window.__canceledWheels||0)+1;event.preventDefault()},{capture:true,passive:false});
     }''',full)
     page.add_script_tag(path=str(ROOT/'src/content/channel-main.js'))
     session=page.context.new_cdp_session(page)
@@ -46,6 +48,24 @@ def check(browser,width):
     expect(host.locator('.full')).to_be_visible()
     expect(host.locator('.full-text')).to_have_text(full)
     assert page.evaluate('__nativeAttempts')==1
+    # An earlier MAIN-world handler can cancel native scrolling before the
+    # isolated extension receives the event. The modal must still scroll.
+    body=host.locator('.full-body')
+    body.hover()
+    page.mouse.wheel(0,320)
+    page.wait_for_function('document.querySelector("#myt-channel-description").shadowRoot.querySelector(".full-body").scrollTop>=300')
+    assert page.evaluate('__canceledWheels')>0
+    assert page.evaluate('scrollY')==0
+    body.evaluate('e=>e.scrollTop=0')
+    for _ in range(8):page.mouse.wheel(0,.25)
+    page.wait_for_function('document.querySelector("#myt-channel-description").shadowRoot.querySelector(".full-body").scrollTop>=2')
+    # Line/page wheel devices use the description's line/viewport dimensions.
+    for mode,delta in ((1,2),(2,1)):
+        body.evaluate('e=>e.scrollTop=0')
+        expected=body.evaluate('(e,mode)=>mode===1?2*parseFloat(getComputedStyle(e.firstElementChild).lineHeight):e.clientHeight',mode)
+        body.dispatch_event('wheel',{'deltaY':delta,'deltaMode':mode,'bubbles':True,'composed':True,'cancelable':True})
+        assert abs(body.evaluate('e=>e.scrollTop')-expected)<=1
+    assert page.evaluate('scrollY')==0
     host.locator('.close').click()
     expect(host.locator('.more')).to_be_focused()
     # Stale initial data from the previous channel must never supply its bio.
@@ -68,7 +88,7 @@ def check(browser,width):
     expect(page.get_by_role('dialog',name='About this channel',exact=True)).to_have_count(1)
     page.locator('#close-about').click()
     page.close()
-    print(f'PASS transparent UI, single public description across worlds, functional fallback/native dialogs and stale-data isolation: {width}px',flush=True)
+    print(f'PASS cross-world canceled wheel input, fractional/line/page deltas, transparent UI, fallback/native dialogs and stale-data isolation: {width}px',flush=True)
 
 
 def dom_duplicates(browser):
