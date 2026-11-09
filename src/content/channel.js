@@ -58,14 +58,21 @@
                 button:hover{text-decoration:underline}button:focus-visible{outline:2px solid var(--myt-muted,#74747d);outline-offset:3px}button:disabled{opacity:.6;cursor:default}svg{width:14px;height:14px;flex:none}
                 dialog{width:min(1040px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 48px);margin:auto;padding:0;border:1px solid var(--myt-border,#e5e5ea);border-radius:20px;background:var(--myt-bg,#fff);color:var(--myt-ink,#18181b);overflow:hidden}
                 dialog[open]{display:flex;flex-direction:column}dialog::backdrop{background:#0009}dialog header{display:flex;flex:none;align-items:center;justify-content:space-between;gap:20px;padding:20px 24px;border-bottom:1px solid var(--myt-border,#e5e5ea)}h2{margin:0;font:600 20px/1.4 Arial,sans-serif}button.close{font:400 26px/1 Arial,sans-serif;padding:4px;align-self:center}.full-body{min-height:0;overflow:auto;overscroll-behavior:contain;padding:24px}.full-text{white-space:pre-wrap}
+                .detail-section{display:block;margin-top:24px;padding-top:20px;border-top:1px solid var(--myt-border,#e5e5ea)}h3{margin:0 0 14px;font:600 18px/1.4 Arial,sans-serif}
+                .full-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.external-link{display:flex;flex-direction:column;gap:5px;min-width:0;padding:12px;border:1px solid var(--myt-border,#e5e5ea);border-radius:10px;color:inherit;text-decoration:none;overflow-wrap:anywhere}.external-link:hover{background:var(--myt-soft,#f1f1f4)}.link-title{font:600 15px/1.4 Arial,sans-serif}.link-url{font:400 13px/1.5 ui-monospace,monospace;color:var(--myt-muted,#74747d)}
+                .full-info{display:grid;grid-template-columns:minmax(90px,130px) minmax(0,1fr);gap:12px 20px;margin:0;font:400 15px/1.5 Arial,sans-serif}.full-info dt{color:var(--myt-muted,#74747d)}.full-info dd{margin:0;overflow-wrap:anywhere}.full-info a{color:inherit}.details-status{margin-top:20px;font:400 14px/1.5 Arial,sans-serif;color:var(--myt-muted,#74747d)}.retry{margin-top:10px;font:600 14px/1.5 Arial,sans-serif;text-decoration:underline}
+                .full-body{overflow-x:hidden;scrollbar-gutter:stable;scrollbar-color:var(--myt-muted,#74747d) var(--myt-soft,#f1f1f4)}.full-body:focus-visible{outline:2px solid var(--myt-muted,#74747d);outline-offset:-2px}.full-body::-webkit-scrollbar{width:10px}.full-body::-webkit-scrollbar-track{background:var(--myt-soft,#f1f1f4)}.full-body::-webkit-scrollbar-thumb{background:var(--myt-muted,#74747d);border:2px solid var(--myt-soft,#f1f1f4);border-radius:8px}
                 @media(max-width:600px){dialog header,.full-body{padding:16px}}
-                </style><section aria-label="Channel description"><p class="summary"></p><button class="more" type="button" aria-haspopup="dialog">...more</button></section><dialog class="full" aria-label="About this channel"><header><h2>About this channel</h2><button class="close" type="button" aria-label="Close">×</button></header><div class="full-body" tabindex="0" role="region" aria-label="Full channel description"><p class="full-text"></p></div></dialog>`;
+                @media(max-width:600px){.full-links{grid-template-columns:1fr}.full-info{grid-template-columns:90px minmax(0,1fr);gap:12px}}
+                </style><section aria-label="Channel description"><p class="summary"></p><button class="more" type="button" aria-haspopup="dialog">...more</button></section><dialog class="full" aria-label="About this channel"><header><h2>About this channel</h2><button class="close" type="button" aria-label="Close">×</button></header><div class="full-body" tabindex="0" role="region" aria-label="Channel information"><p class="full-text"></p><section class="detail-section links-section" aria-labelledby="channel-links-title" hidden><h3 id="channel-links-title">Links</h3><div class="full-links"></div></section><section class="detail-section info-section" aria-labelledby="channel-info-title" hidden><h3 id="channel-info-title">More info</h3><dl class="full-info"></dl></section><p class="details-status" role="status" hidden></p><button class="retry" type="button" hidden>Retry</button></div></dialog>`;
             this.descriptionText=this.descriptionHost.shadowRoot.querySelector('.summary');
             this.descriptionMore=this.descriptionHost.shadowRoot.querySelector('.more');
             this.descriptionDialog=this.descriptionHost.shadowRoot.querySelector('dialog');
             this.descriptionBody=this.descriptionHost.shadowRoot.querySelector('.full-body');
             this.descriptionClose=this.descriptionHost.shadowRoot.querySelector('.close');
+            this.descriptionRetry=this.descriptionHost.shadowRoot.querySelector('.retry');
             this.descriptionClose.addEventListener('click',()=>this.descriptionDialog.close());
+            this.descriptionRetry.addEventListener('click',()=>this.requestAbout());
             this.descriptionDialog.addEventListener('close',()=>{
                 if(this.descriptionDialog.open)return;
                 this.releaseDescriptionScroll();
@@ -75,6 +82,12 @@
             this.descriptionMore.addEventListener('click',event=>{
                 event.stopPropagation();this.openDescription();
             });
+            this.aboutUpdated=event=>{
+                if(event.target!==this.descriptionSource||!this.descriptionSource.isConnected)return;
+                const browse=this.descriptionSource.closest('ytd-browse[page-subtype="channels"]');
+                if(browse)this.preview(browse.querySelector(':scope > #header,:scope > #page-header,ytd-c4-tabbed-header-renderer,yt-page-header-view-model,yt-page-header-renderer'));
+            };
+            document.addEventListener('minimal-youtube:channel-about-updated',this.aboutUpdated);
             this.stats=document.createElement('div');this.stats.id='myt-channel-stats';this.stats.lang='en';
             this.stats.attachShadow({mode:'open'}).innerHTML='<style>:host{display:block;color:var(--myt-muted);font:14px/1.6 Arial,sans-serif}.row{display:flex;align-items:center;flex-wrap:wrap;gap:0 8px}.metric{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}svg{width:15px;height:15px;flex:none}[hidden]{display:none!important}</style><div class="row"></div>';
             this.nav=document.createElement('div');this.nav.id='myt-channel-nav';this.nav.lang='en';
@@ -91,13 +104,14 @@
             });
             this.click=event=>{
                 const path=event.composedPath();
-                if(path.includes(this.descriptionMore)||path.includes(this.descriptionClose)){
+                if(path.includes(this.descriptionMore)||path.includes(this.descriptionClose)||path.includes(this.descriptionRetry)){
                     if(event.type==='click'&&!event.button){
                         event.preventDefault();event.stopImmediatePropagation();
-                        if(path.includes(this.descriptionMore))this.openDescription();else this.descriptionDialog.close();
+                        if(path.includes(this.descriptionMore))this.openDescription();else if(path.includes(this.descriptionRetry))this.requestAbout();else this.descriptionDialog.close();
                     }
                     return;
                 }
+                if(path.includes(this.descriptionDialog)){event.stopImmediatePropagation();return;}
                 if(!path.includes(this.nav))return;
                 const link=path.find(node=>node instanceof HTMLAnchorElement);
                 if(!link){
@@ -113,9 +127,9 @@
                 const path=event.composedPath();
                 if(event.key==='Escape'&&this.descriptionDialog.open){
                     event.preventDefault();event.stopImmediatePropagation();this.descriptionDialog.close();
-                }else if((event.key==='Enter'||event.key===' ')&&(path.includes(this.descriptionMore)||path.includes(this.descriptionClose))){
+                }else if((event.key==='Enter'||event.key===' ')&&(path.includes(this.descriptionMore)||path.includes(this.descriptionClose)||path.includes(this.descriptionRetry))){
                     event.preventDefault();event.stopImmediatePropagation();
-                    if(!event.repeat){if(path.includes(this.descriptionMore))this.openDescription();else this.descriptionDialog.close();}
+                    if(!event.repeat){if(path.includes(this.descriptionMore))this.openDescription();else if(path.includes(this.descriptionRetry))this.requestAbout();else this.descriptionDialog.close();}
                 }else if(this.descriptionDialog.open&&!event.ctrlKey&&!event.metaKey&&!event.altKey){
                     const body=this.descriptionBody,steps={ArrowUp:-40,ArrowDown:40,PageUp:-body.clientHeight,PageDown:body.clientHeight,Home:-body.scrollHeight,End:body.scrollHeight,' ':body.clientHeight*(event.shiftKey?-1:1)};
                     if(Object.hasOwn(steps,event.key)){
@@ -165,9 +179,48 @@
             if(!this.descriptionScrollLocked)return;
             this.descriptionScrollLocked=false;document.documentElement.removeAttribute('data-myt-channel-description-open');
         }
+        requestAbout(){
+            if(this.descriptionSource?.isConnected)this.descriptionSource.dispatchEvent(new Event('minimal-youtube:channel-about',{bubbles:true}));
+        }
+        renderDescription(){
+            const shadow=this.descriptionHost.shadowRoot,data=this.descriptionDetails||{},text=this.descriptionFullValue||this.descriptionValue||'';
+            const paragraph=shadow.querySelector('.full-text');if(paragraph.textContent!==text)paragraph.textContent=text;
+            const webURL=value=>{try{const url=new URL(value,location.origin);return /^https?:$/.test(url.protocol)?url.href:'';}catch{return '';}};
+            const links=(Array.isArray(data.links)?data.links:[]).filter(link=>typeof link.url==='string'&&webURL(link.url));
+            const linkValue=JSON.stringify(links);
+            if(linkValue!==this.descriptionLinksValue){
+                this.descriptionLinksValue=linkValue;const list=shadow.querySelector('.full-links');list.replaceChildren();
+                for(const link of links){
+                    const anchor=document.createElement('a');anchor.className='external-link';anchor.href=webURL(link.url);anchor.target='_blank';anchor.rel='noopener noreferrer';
+                    const title=document.createElement('span');title.className='link-title';title.textContent=link.title||new URL(anchor.href).hostname;
+                    const url=document.createElement('span');url.className='link-url';url.textContent=anchor.href.replace(/^https?:\/\//,'');
+                    anchor.append(title,url);list.append(anchor);
+                }
+            }
+            shadow.querySelector('.links-section').hidden=!links.length;
+            let stats=[];try{stats=JSON.parse(this.stats.dataset.value||'[]');}catch{}
+            const info={channelUrl:this.base?location.origin+this.base:'',subscribers:stats[1]||'',videos:stats[2]||'',...data.info};
+            const infoValue=JSON.stringify(info);
+            if(infoValue!==this.descriptionInfoValue){
+                this.descriptionInfoValue=infoValue;const list=shadow.querySelector('.full-info');list.replaceChildren();
+                for(const [key,title]of [['channelUrl','Channel'],['country','Country'],['joined','Joined'],['subscribers','Subscribers'],['videos','Videos'],['views','Views']]){
+                    if(typeof info[key]!=='string'||!info[key].trim())continue;
+                    const term=document.createElement('dt');term.textContent=title;const value=document.createElement('dd');
+                    const label=info[key].replace(/^Joined\s+/i,'').replace(/\s+(?:subscribers?|videos?|views)$/i,'');
+                    if(key==='channelUrl'&&webURL(info[key])){const anchor=document.createElement('a');anchor.href=webURL(info[key]);anchor.target='_blank';anchor.rel='noopener noreferrer';anchor.title=anchor.href;const path=new URL(anchor.href).pathname;anchor.textContent=/^\/@[^/]+\/?$/.test(path)?decodeURI(path.slice(1).replace(/\/$/,'')):label.replace(/^https?:\/\//,'');value.append(anchor);}
+                    else value.textContent=label;
+                    list.append(term,value);
+                }
+            }
+            shadow.querySelector('.info-section').hidden=!shadow.querySelector('.full-info').childElementCount;
+            const status=shadow.querySelector('.details-status');
+            const message=data.aboutStatus==='loading'?'Loading channel details…':data.aboutStatus==='error'?'Channel links and details could not be loaded.':'';
+            if(status.textContent!==message)status.textContent=message;
+            status.hidden=!message;this.descriptionRetry.hidden=data.aboutStatus!=='error';
+        }
         openDescription(){
             if(!this.descriptionHost.isConnected||!document.documentElement.classList.contains('minimal-youtube'))return;
-            this.descriptionHost.shadowRoot.querySelector('.full-text').textContent=this.descriptionFullValue||this.descriptionValue||'';
+            this.renderDescription();
             // Show a usable dialog before attempting YouTube's optional opener.
             // Native controls can be disabled, ignore synthetic events or throw.
             if(!this.descriptionDialog.open){
@@ -180,6 +233,7 @@
                 try{if(typeof control.click==='function')control.click();}catch{}
             }
             if(this.nativeAboutOpen()){this.restoreDescriptionFocus=false;this.descriptionDialog.close();}
+            else this.requestAbout();
         }
         toggleSearch(button){const form=this.nav.shadowRoot.querySelector('form');form.hidden=!form.hidden;button.setAttribute('aria-expanded',String(!form.hidden));if(!form.hidden)form.querySelector('input').focus();}
         open(href){location.assign(href);}
@@ -244,6 +298,7 @@
                     for(let copies=4;copies>=2;copies--){if(words.length%copies)continue;const size=words.length/copies,part=words.slice(0,size).join(' ');if(Array.from({length:copies},(_,i)=>words.slice(i*size,(i+1)*size).join(' ')).every(value=>value===part)){raw=part;break;}}
                 }
                 const value=raw.replace(/\s+/gu,' ').trim();
+                this.descriptionDetails=data;
                 this.descriptionFullValue=data.fullDescription||raw;
                 if(this.descriptionValue!==value){
                     this.descriptionValue=value;
@@ -252,6 +307,7 @@
                     if(chars.length>180){excerpt=chars.slice(0,180).join('');const boundary=excerpt.lastIndexOf(' ');if(boundary>120)excerpt=excerpt.slice(0,boundary);excerpt=excerpt.trimEnd()+'…';}
                     this.descriptionText.textContent=excerpt;
                 }
+                this.renderDescription();
                 this.descriptionText.hidden=!value;
                 const control=source.querySelector(controls);
                 const canOpen=!!value||!!this.descriptionFullValue||!!control||source.matches('yt-description-preview-view-model,[role="button"]')||source.hasAttribute('onclick');
@@ -465,6 +521,7 @@
             }
         }
         destroy(){
+            document.removeEventListener('minimal-youtube:channel-about-updated',this.aboutUpdated);
             if(this.descriptionDialog.open)this.descriptionDialog.close();
             this.releaseDescriptionScroll();
             window.removeEventListener('wheel',this.descriptionWheel,true);window.removeEventListener('touchstart',this.descriptionTouchStart,true);window.removeEventListener('touchmove',this.descriptionTouchMove,true);

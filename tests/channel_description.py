@@ -36,7 +36,7 @@ def check(browser,width):
     expect(host.locator('.summary')).to_have_text('SUBSCRIBE FOR A COOKIE!')
     expect(host.locator('.more')).to_have_text('...more')
     expect(host.locator('.more svg')).to_have_count(0)
-    for selector in ('section','.more'):
+    for selector in ('section[aria-label="Channel description"]','.more'):
         style=host.locator(selector).evaluate('e=>({background:getComputedStyle(e).backgroundColor,border:getComputedStyle(e).borderTopWidth})')
         assert style=={'background':'rgba(0, 0, 0, 0)','border':'0px'},style
     snapshot=page.locator('yt-description-preview-view-model').get_attribute('data-myt-channel-description-data')
