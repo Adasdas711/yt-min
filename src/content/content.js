@@ -1358,7 +1358,7 @@
             if (record.type === "attributes" && record.attributeName === "title" && !target.closest(filterScope)) return false;
             if (target.closest("title")) { cleanTitle(); return false; }
             if (stableHome) return record.target === root && record.attributeName === "dark";
-            if (target.closest("#myt-watch, #myt-home, #myt-search, #myt-channel-nav, #myt-channel-stats, #myt-playlist-summary, [data-myt-search-channel-card]")) return false;
+            if (target.closest("#myt-watch, #myt-home, #myt-search, #myt-channel-nav, #myt-channel-stats, #myt-channel-description, #myt-playlist-summary, [data-myt-search-channel-card]")) return false;
             if(record.type==='childList'){
                 const changes=[...record.addedNodes,...record.removedNodes];
                 if(changes.length&&changes.every(node=>node instanceof Element&&node.matches('#myt-watch,#myt-home,#myt-playlist-summary,[data-myt-search-playlist-card],[data-myt-search-channel-card],.myt-masthead-brand'))&&(!changes.some(node=>node.matches('.myt-masthead-brand'))||target.querySelectorAll(':scope > .myt-masthead-brand').length<=1))return false;

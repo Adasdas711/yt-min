@@ -43,11 +43,11 @@ def header(browser,legacy,width,dark):
     expect(stats.locator('[data-kind=subscribers]')).to_have_attribute('aria-label','2.24 M subscribers')
     expect(page.locator('yt-channel-external-link-view-model')).to_be_hidden()
     expect(page.locator('#author-description')).to_have_text('Пщщ! Я Joe Speen, а это мой канал.')
-    assert 'Mono' in page.locator('#author-description').evaluate('e=>getComputedStyle(e).fontFamily')
+    assert 'Mono' in page.locator('#myt-channel-description .summary').evaluate('e=>getComputedStyle(e).fontFamily')
     expect(page.locator('h1')).to_have_text('Joe Speen — Мой канал')
     expect(page.locator('#subscribe')).to_have_text('Subscribe')
     expect(page.locator('#description-more')).to_have_text('More')
-    page.locator('#description-more').click()
+    page.locator('#myt-channel-description .more').click()
     assert page.evaluate('__more')==1
     expect(page.get_by_role('button',name='Latest',exact=True)).to_be_visible()
     expect(page.get_by_role('button',name='Popular',exact=True)).to_be_visible()
@@ -151,10 +151,10 @@ def links_and_more(browser):
             page=setup(browser,'/@JoeSpeen/videos',body,width=width,native_dark=True)
             expect(page.locator('#external-link')).to_be_hidden()
             expect(page.locator('#more-links')).to_be_hidden()
-            more=page.locator('#description-more')
+            more=page.locator('#myt-channel-description .more')
             expect(more).to_be_visible()
-            author=page.locator('#author-description').bounding_box()
-            label=page.locator('#more-label').bounding_box()
+            author=page.locator('#myt-channel-description .summary').bounding_box()
+            label=page.locator('#myt-channel-description .more').bounding_box()
             assert label['y']>=author['y']+author['height']+12,(width,author,label)
             assert more.bounding_box()['x']+more.bounding_box()['width']<=width+1
             more.click()
@@ -165,10 +165,34 @@ def links_and_more(browser):
             page.evaluate('__setEnabled(false)')
             expect(page.locator('#external-link')).to_be_visible()
             expect(page.locator('#more-links')).to_be_visible()
-            more.click()
+            page.locator('#description-more').click()
             assert page.evaluate('__more')==2
             page.close()
         print(f'PASS external-link wrappers hidden, More separated below description/clickable, native restoration: {width}px',flush=True)
+
+
+def assert_owned_description(page,width):
+    host=page.locator('#myt-channel-description')
+    expect(host).to_be_visible()
+    summary=host.locator('.summary')
+    button=host.locator('.more')
+    expect(summary).to_be_visible()
+    expect(button).to_be_visible()
+    result=summary.evaluate("""e=>{
+        const range=document.createRange();range.selectNodeContents(e);
+        const rects=[...range.getClientRects()],clipped=[];
+        for(let parent=e;parent;parent=parent.parentElement||parent.getRootNode().host){
+            const style=getComputedStyle(parent),box=parent.getBoundingClientRect();
+            if(/hidden|clip/.test(style.overflowY)&&rects.some(r=>r.top<box.top-1||r.bottom>box.bottom+1))clipped.push(parent.tagName);
+        }
+        return {clipped,mask:getComputedStyle(e).maskImage,background:getComputedStyle(e).backgroundImage};
+    }""")
+    assert not result['clipped'],result
+    assert result['mask']=='none' and result['background']=='none',result
+    text_box=summary.bounding_box();button_box=button.bounding_box();box=host.bounding_box()
+    assert button_box['y']>=text_box['y']+text_box['height']+12,(text_box,button_box)
+    assert box['x']>=-1 and box['x']+box['width']<=width+1,box
+    assert button_box['y']+button_box['height']<=box['y']+box['height'],(box,button_box)
 
 
 def preview_descenders(browser):
@@ -178,13 +202,9 @@ def preview_descenders(browser):
             body+=f'<style>.{text_class}{{height:16px;max-height:16px;line-height:16px}}</style>'
             page=setup(browser,'/@JoeSpeen/videos',body,width=width,native_dark=True)
             page.locator('#author-description').evaluate('e=>e.textContent="SUBSCRIBE FOR A COOKIE! gypqj_ уфру"')
-            bounds=page.locator('.'+text_class).evaluate('''e=>{
-                const range=document.createRange();range.selectNodeContents(e.querySelector('#author-description'));
-                const glyph=range.getClientRects()[0],clip=e.getBoundingClientRect();
-                return {top:glyph.top,bottom:glyph.bottom,clipTop:clip.top,clipBottom:clip.bottom};
-            }''')
-            assert bounds['top']>=bounds['clipTop']-1 and bounds['bottom']<=bounds['clipBottom']+1,bounds
-            page.locator('#description-more').click()
+            assert_owned_description(page,width)
+            expect(page.locator('.'+text_class)).to_be_hidden()
+            page.locator('#myt-channel-description .more').click()
             assert page.evaluate('__more')==1
             page.close()
         print(f'PASS native preview height cannot clip letter descenders; More remains functional: {width}px',flush=True)
@@ -209,28 +229,12 @@ def nested_preview(browser):
       </style>'''
     for width in (1440,900,390):
         page=setup(browser,'/@JoeSpeen/videos',body,width=width,native_dark=True)
-        # Check the text and the More label against every clipping ancestor,
-        # including the wrappers outside the native description view model.
-        for selector in ('#author-description','#more-label'):
-            result=page.locator(selector).evaluate('''e=>{
-                const range=document.createRange();range.selectNodeContents(e);
-                const glyph=range.getClientRects()[0],clipped=[];
-                for(let parent=e;parent&&parent.id!=='page-header'&&parent.id!=='header';parent=parent.parentElement){
-                    const style=getComputedStyle(parent),box=parent.getBoundingClientRect();
-                    if(/hidden|clip|auto|scroll/.test(style.overflowY)&&(glyph.top<box.top-1||glyph.bottom>box.bottom+1))clipped.push(parent.className||parent.tagName);
-                }
-                return clipped;
-            }''')
-            assert not result,(width,selector,result)
-        for selector in ('yt-description-preview-view-model','.ytDescriptionPreviewViewModelTruncatedText','#more-label','#description-more'):
-            assert page.locator(selector).evaluate('e=>getComputedStyle(e).maskImage')=='none'
-            assert page.locator(selector).evaluate('e=>getComputedStyle(e).backgroundImage')=='none'
-        for selector,pseudo in (('#description-more','::before'),('.ytDescriptionPreviewViewModelTruncatedText','::after'),('.native-preview-shell','::after')):
-            assert page.locator(selector).evaluate('(e,p)=>getComputedStyle(e,p).content',pseudo) in ('none','normal')
-        shell=page.locator('.native-preview-shell').bounding_box()
-        more=page.locator('#description-more').bounding_box()
-        assert more['x']+more['width']<=shell['x']+shell['width']+1,(shell,more)
-        page.locator('#description-more').click()
+        assert_owned_description(page,width)
+        expect(page.locator('.native-preview-shell')).to_be_hidden()
+        # Native masks and clipping remain on hidden source nodes, so the new
+        # block proves it does not depend on patching the old view model.
+        assert page.locator('yt-description-preview-view-model').evaluate('e=>getComputedStyle(e).maskImage')!='none'
+        page.locator('#myt-channel-description .more').click()
         assert page.evaluate('__more')==1
         page.wait_for_timeout(100)
         assert_stable(page)
@@ -238,7 +242,7 @@ def nested_preview(browser):
         page.evaluate('__setEnabled(false)')
         assert page.locator('yt-description-preview-view-model').evaluate('e=>getComputedStyle(e).maskImage')!='none'
         page.close()
-        print(f'PASS nested native wrappers cannot clip text/More; masks and gradient overlays removed: {width}px',flush=True)
+        print(f'PASS independent description bypasses nested native clamps/masks and opens native More: {width}px',flush=True)
 
 
 def more_text_spacing(browser):
@@ -246,13 +250,52 @@ def more_text_spacing(browser):
         body=re.sub(r'<button id="description-more".*?</button>', '<span id="description-more" class="ytDescriptionPreviewViewModelMoreText"><span id="more-label">...more</span></span>',fixture())
         body=body.replace('<yt-description-preview-view-model>', '<yt-description-preview-view-model role="button" onclick="window.__more=(window.__more||0)+1">')
         page=setup(browser,'/@JoeSpeen/videos',body,width=width,native_dark=True)
-        author=page.locator('#author-description').bounding_box()
-        more=page.locator('#more-label').bounding_box()
+        author=page.locator('#myt-channel-description .summary').bounding_box()
+        more=page.locator('#myt-channel-description .more').bounding_box()
         assert more['y']>=author['y']+author['height']+12,(width,author,more)
-        page.locator('#more-label').click()
+        page.locator('#myt-channel-description .more').click()
         assert page.evaluate('__more')==1
         page.close()
     print('PASS explicit description/More spacing for delegated More text controls at desktop/tablet/mobile widths',flush=True)
+
+
+def description_updates(browser):
+    for width,dark in ((1440,False),(390,True)):
+        page=setup(browser,'/@JoeSpeen/videos',fixture(),width=width,native_dark=dark)
+        host=page.locator('#myt-channel-description')
+        expect(host).to_have_count(1)
+        expect(page.locator('yt-description-preview-view-model')).to_be_hidden()
+        text='Текст автора 😀 сохраняется. '+('Длинное описание должно переноситься без обрезания букв. '*12)
+        page.locator('#author-description').evaluate('(e,text)=>e.textContent=text',text)
+        expect(host.locator('.summary')).to_contain_text('Текст автора 😀 сохраняется.')
+        shown=host.locator('.summary').inner_text()
+        assert shown.endswith('…') and len(shown)<len(text),shown
+        assert_owned_description(page,width)
+        host.locator('.more').click()
+        assert page.evaluate('__more')==1
+        # The visible component must use the latest native opener after restamps.
+        for i in range(3):
+            page.locator('yt-description-preview-view-model').evaluate('''e=>{
+                const copy=e.cloneNode(true);copy.removeAttribute('data-myt-channel-description-source');
+                copy.querySelector('button').setAttribute('onclick','window.__more=(window.__more||0)+10');e.replaceWith(copy);
+            }''')
+            expect(host).to_have_count(1)
+            host.locator('.more').click()
+            assert page.evaluate('__more')==1+(i+1)*10
+        page.locator('yt-description-preview-view-model').evaluate('e=>{window.__sourceDescription=e;e.remove()}')
+        expect(host).to_have_count(0)
+        page.locator('#channel-header-container').evaluate('e=>e.append(window.__sourceDescription)')
+        expect(host).to_have_count(1)
+        page.wait_for_timeout(100)
+        assert_stable(page)
+        page.evaluate('__setEnabled(false)')
+        expect(host).to_have_count(0)
+        expect(page.locator('yt-description-preview-view-model')).to_be_visible()
+        page.evaluate('__setEnabled(true)')
+        expect(host).to_have_count(1)
+        expect(page.locator('yt-description-preview-view-model')).to_be_hidden()
+        page.close()
+    print('PASS isolated description updates, Unicode excerpt, native opener restamps, removal and enable/disable restoration',flush=True)
 
 
 if __name__=='__main__':
@@ -267,4 +310,5 @@ if __name__=='__main__':
         preview_descenders(browser)
         nested_preview(browser)
         more_text_spacing(browser)
+        description_updates(browser)
         browser.close()

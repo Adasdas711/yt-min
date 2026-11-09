@@ -48,6 +48,24 @@
         }
         constructor(){
             this.hidden=new Set();this.text=new Map();this.attributes=new Map();this.aboutNodes=new Map();this.previewNodes=new Map();
+            this.descriptionHost=document.createElement('div');this.descriptionHost.id='myt-channel-description';this.descriptionHost.lang='en';
+            this.descriptionHost.attachShadow({mode:'open'}).innerHTML=`<style>
+                :host{all:initial!important;display:block!important;position:relative!important;box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:14px 0!important;color:var(--myt-ink,#18181b)!important}
+                *{box-sizing:border-box}[hidden]{display:none!important}
+                section{display:flex;flex-direction:column;align-items:flex-start;gap:14px;padding:18px 20px;border:1px solid var(--myt-border,#e5e5ea);border-radius:16px;background:var(--myt-surface,#fff)}
+                p{display:block;width:100%;margin:0;padding:0;font:400 16px/1.8 "SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace;letter-spacing:normal;text-transform:none;white-space:normal;overflow-wrap:anywhere;color:var(--myt-ink,#18181b)}
+                button{display:inline-flex;align-items:center;gap:7px;min-height:34px;margin:0;padding:7px 12px;border:1px solid var(--myt-border,#e5e5ea);border-radius:10px;background:var(--myt-soft,#f1f1f4);color:var(--myt-ink,#18181b);font:600 13px/1.4 Arial,sans-serif;cursor:pointer}
+                button:hover{border-color:var(--myt-muted,#74747d)}button:focus-visible{outline:2px solid var(--myt-muted,#74747d);outline-offset:3px}button:disabled{opacity:.6;cursor:default}svg{width:14px;height:14px;flex:none}
+                @media(max-width:600px){section{padding:16px;gap:14px}}
+                </style><section aria-label="Channel description"><p class="summary"></p><button class="more" type="button">More<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></section>`;
+            this.descriptionText=this.descriptionHost.shadowRoot.querySelector('.summary');
+            this.descriptionMore=this.descriptionHost.shadowRoot.querySelector('.more');
+            this.descriptionMore.addEventListener('click',event=>{
+                event.stopPropagation();
+                const source=this.descriptionSource;if(!source?.isConnected)return;
+                const control=source.querySelector('button,[role="button"],.ytDescriptionPreviewViewModelMoreButton,.yt-description-preview-view-model-wiz__more-button,.ytDescriptionPreviewViewModelMoreText,.yt-description-preview-view-model-wiz__more-text')||source;
+                control.click();
+            });
             this.stats=document.createElement('div');this.stats.id='myt-channel-stats';this.stats.lang='en';
             this.stats.attachShadow({mode:'open'}).innerHTML='<style>:host{display:block;color:var(--myt-muted);font:14px/1.6 Arial,sans-serif}.row{display:flex;align-items:center;flex-wrap:wrap;gap:0 8px}.metric{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}svg{width:15px;height:15px;flex:none}[hidden]{display:none!important}</style><div class="row"></div>';
             this.nav=document.createElement('div');this.nav.id='myt-channel-nav';this.nav.lang='en';
@@ -85,8 +103,8 @@
             const match=location.pathname.match(basePattern);if(!match)return;
             this.base=match[1];
             const header=browse.querySelector(':scope > #header,:scope > #page-header,ytd-c4-tabbed-header-renderer,yt-page-header-view-model,yt-page-header-renderer');
-            this.preview(header);
             if(header){this.identity(header);this.links(header);}
+            this.preview(header);
             this.navigation(browse,match[2]?.replace(/\/$/,'')||'videos');
             this.about();
             this.translate(browse);
@@ -98,33 +116,42 @@
         preview(header){
             const next=new Map(),mark=(node,part)=>{
                 if(!node)return;
-                const name='data-myt-channel-preview'+(part?'-'+part:'');
+                const name='data-myt-channel-description-'+part;
                 if(!node.hasAttribute(name))node.setAttribute(name,'');
                 if(!next.has(node))next.set(node,new Set());next.get(node).add(name);
             };
-            for(const model of header?.querySelectorAll('yt-description-preview-view-model')||[]){
-                mark(model,'');
-                // Keep trusted input on the original More control and its native
-                // event path. Only its layout and clipping wrappers are decorated.
-                const control=model.querySelector('button,[role="button"],.ytDescriptionPreviewViewModelMoreButton,.yt-description-preview-view-model-wiz__more-button,.ytDescriptionPreviewViewModelMoreText,.yt-description-preview-view-model-wiz__more-text');
-                const text=[...model.querySelectorAll('.ytDescriptionPreviewViewModelTruncatedText,.yt-description-preview-view-model-wiz__truncated-text,.ytDescriptionPreviewViewModelDescriptionText,.yt-description-preview-view-model-wiz__description-text,yt-attributed-string,yt-formatted-string')].find(node=>!control||!control.contains(node)&&!node.contains(control));
-                if(text&&control){
-                    let row=text.parentElement;while(row&&!row.contains(control))row=row.parentElement;
-                    if(row){
-                        mark(row,'row');
-                        for(const [node,part]of [[text,'text-cell'],[control,'control-cell']]){
-                            let cell=node;while(cell.parentElement!==row&&cell.parentElement)cell=cell.parentElement;
-                            mark(cell,part);
-                        }
-                    }
+            const guard='h1,h2,#channel-name,ytd-channel-name,#avatar,yt-avatar-shape,yt-content-metadata-view-model,#channel-tagline,#myt-channel-stats,ytd-subscribe-button-renderer,yt-subscribe-button-view-model,#subscribe,#subscribe-button,#tabs,#tabs-container,#myt-channel-nav';
+            const models=[...header?.querySelectorAll('yt-description-preview-view-model')||[]];
+            const sources=models.length?models:[...header?.querySelectorAll('#description-container,#channel-description')||[]].filter(node=>!node.querySelector(guard));
+            const source=sources.find(node=>!node.closest('[hidden],[aria-hidden="true"]')&&(node===this.descriptionSource||node.getClientRects().length))||sources[0];
+            this.descriptionSource=source||null;
+            if(source){
+                const controls='button,[role="button"],.ytDescriptionPreviewViewModelMoreButton,.yt-description-preview-view-model-wiz__more-button,.ytDescriptionPreviewViewModelMoreText,.yt-description-preview-view-model-wiz__more-text';
+                const textRoot=source.querySelector('.ytDescriptionPreviewViewModelTruncatedText,.yt-description-preview-view-model-wiz__truncated-text,.ytDescriptionPreviewViewModelDescriptionText,.yt-description-preview-view-model-wiz__description-text')||source;
+                const copy=textRoot.cloneNode(true);
+                copy.querySelectorAll(controls+',script,style,svg,yt-icon,tp-yt-paper-tooltip,yt-tooltip,[hidden]').forEach(node=>node.remove());
+                const value=copy.textContent.replace(/\s+/gu,' ').trim();
+                if(this.descriptionValue!==value){
+                    this.descriptionValue=value;
+                    const chars=typeof Intl.Segmenter==='function'?Array.from(new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(value),part=>part.segment):Array.from(value);
+                    let excerpt=value;
+                    if(chars.length>180){excerpt=chars.slice(0,180).join('');const boundary=excerpt.lastIndexOf(' ');if(boundary>120)excerpt=excerpt.slice(0,boundary);excerpt=excerpt.trimEnd()+'…';}
+                    this.descriptionText.textContent=excerpt;
                 }
-                mark(text,'text');mark(control,'control');
-                for(let parent=model.parentElement;parent&&header.contains(parent);parent=parent.parentElement){
-                    mark(parent,'wrapper');
-                    if(!parent.querySelector('h1,#channel-name,ytd-channel-name,#avatar,yt-avatar-shape,yt-content-metadata-view-model,#channel-tagline,#myt-channel-stats,ytd-subscribe-button-renderer,yt-subscribe-button-view-model,#tabs,#tabs-container,#myt-channel-nav'))mark(parent,'effects');
-                    if(parent===header)break;
-                }
-            }
+                this.descriptionText.hidden=!value;
+                const control=source.querySelector(controls);
+                const canOpen=!!control||source.matches('yt-description-preview-view-model,[role="button"]')||source.hasAttribute('onclick');
+                this.descriptionMore.hidden=!canOpen;
+                this.descriptionMore.disabled=!!control&&(control.hasAttribute('disabled')||control.getAttribute('aria-disabled')==='true');
+                // Insert outside description-only wrappers so their masks and
+                // fixed heights cannot affect the independent shadow component.
+                let slot=source;
+                while(slot.parentElement&&slot.parentElement!==header&&!slot.parentElement.querySelector(guard))slot=slot.parentElement;
+                if(value||canOpen){if(this.descriptionHost.nextElementSibling!==slot)slot.before(this.descriptionHost);}
+                else this.descriptionHost.remove();
+                mark(slot,'source');
+                for(let parent=this.descriptionHost.parentElement;parent&&header.contains(parent);parent=parent.parentElement){mark(parent,'parent');if(parent===header)break;}
+            }else this.descriptionHost.remove();
             for(const [node,names]of this.previewNodes)for(const name of names)if(!next.get(node)?.has(name))node.removeAttribute(name);
             this.previewNodes=next;
         }
@@ -325,7 +352,7 @@
             }
         }
         destroy(){
-            window.removeEventListener('click',this.click,true);window.removeEventListener('auxclick',this.click,true);this.nav.remove();this.stats.remove();
+            window.removeEventListener('click',this.click,true);window.removeEventListener('auxclick',this.click,true);this.nav.remove();this.stats.remove();this.descriptionHost.remove();
             for(const node of this.hidden)node.removeAttribute('data-myt-channel-source');this.hidden.clear();
             for(const [node,names]of this.previewNodes)for(const name of names)node.removeAttribute(name);this.previewNodes.clear();
             for(const [node,names]of this.aboutNodes)for(const name of names)node.removeAttribute(name);this.aboutNodes.clear();

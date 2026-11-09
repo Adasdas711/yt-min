@@ -20,7 +20,7 @@ if __name__ == '__main__':
             page.locator('#subscribe').click()
             expect(page.locator('#subscribe')).to_have_text('Subscribed')
             assert page.locator('h1').evaluate("e=>getComputedStyle(e).fontStyle")=='italic'
-            assert 'Mono' in page.locator('#description-container').evaluate("e=>getComputedStyle(e).fontFamily")
+            assert 'Mono' in page.locator('#myt-channel-description .summary').evaluate("e=>getComputedStyle(e).fontFamily")
             result=page.locator('#myt-search').evaluate('''host=>{const q=s=>host.shadowRoot.querySelector(s),a=q('.video').getBoundingClientRect(),b=q('.playlist').getBoundingClientRect();return {video:a.width,playlist:b.width,display:getComputedStyle(q('.playlist')).display,width:host.getBoundingClientRect().width}}''')
             assert abs(result['video']-result['playlist'])<2,result
             assert result['display']=='flex',result

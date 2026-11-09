@@ -1624,11 +1624,6 @@ html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(yt-page-header-view
     white-space: normal !important;
     overflow-wrap: anywhere;
 }
-html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#description-container, #channel-description, .ytDescriptionPreviewViewModelDescriptionText, .yt-description-preview-view-model-wiz__description-text, yt-description-preview-view-model) {
-    font-family: "SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace !important;
-    font-size: 17px !important;
-    line-height: var(--myt-channel-description-leading, 1.75) !important;
-}
 html.minimal-youtube [data-myt-channel-tab-hidden] { display: none !important; }
 html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(yt-tab-group-shape, tp-yt-paper-tabs) {
     display: flex !important;
@@ -1668,129 +1663,18 @@ html.minimal-youtube[data-myt-page="channel"] :is(#header, #page-header, ytd-c4-
 ) {
     display: none !important;
 }
-html.minimal-youtube[data-myt-page="channel"] :is(#description-container, #channel-description, yt-description-preview-view-model),
-html.minimal-youtube[data-myt-page="channel"] :is(#description-container, #channel-description, yt-description-preview-view-model) :is(span, a, yt-attributed-string, yt-formatted-string) {
-    font-family: "SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace !important;
-    font-size: 17px !important;
-    line-height: var(--myt-channel-description-leading, 1.75) !important;
+/* The channel summary owns its layout; native preview wrappers are hidden. */
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-description-source] {
+    display: none !important;
 }
-
-/* Native More controls are positioned for YouTube's smaller UI font. Keep the
-   original control/event handler, but let the monospace line set its baseline. */
-html.minimal-youtube[data-myt-page="channel"] yt-description-preview-view-model {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 0 .35em;
-    min-width: 0;
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-description-parent] {
     height: auto !important;
-    max-height: none !important;
-}
-html.minimal-youtube[data-myt-page="channel"] yt-description-preview-view-model :is(
-    .ytDescriptionPreviewViewModelTruncatedText, .yt-description-preview-view-model-wiz__truncated-text
-) {
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-    margin: 0 !important;
-    height: auto !important;
-    max-height: none !important;
-    line-height: inherit !important;
-}
-html.minimal-youtube[data-myt-page="channel"] yt-description-preview-view-model :is(
-    button, [role="button"], .ytDescriptionPreviewViewModelMoreButton, .yt-description-preview-view-model-wiz__more-button
-) {
-    position: relative !important;
-    inset: auto !important;
-    transform: none !important;
-    translate: none !important;
-    align-self: baseline !important;
-    flex: 0 0 auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    font: inherit !important;
-    line-height: inherit !important;
-    white-space: nowrap;
-}
-
-/* A native preview can wrap More in additional fixed-height containers. Free
-   the complete native path, and use ordinary ellipsis instead of fade masks. */
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] {
-    --myt-channel-description-leading: 2.2;
-}
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-wrapper],
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview],
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] :is(div, span, yt-attributed-string, yt-formatted-string, button, a) {
-    box-sizing: border-box !important;
-    min-width: 0 !important;
-    height: auto !important;
-    min-height: 0 !important;
     max-height: none !important;
     overflow: visible !important;
     contain: none !important;
     clip-path: none !important;
-}
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview],
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-effects],
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] * {
     mask-image: none !important;
     -webkit-mask-image: none !important;
-    background-image: none !important;
-    -webkit-text-fill-color: currentColor !important;
-}
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-wrapper] {
-    mask-image: none !important;
-    -webkit-mask-image: none !important;
-}
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] *,
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-control-cell] {
-    line-height: inherit !important;
-}
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview]::before,
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview]::after,
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-effects]::before,
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-effects]::after,
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] *::before,
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] *::after {
-    content: none !important;
-    display: none !important;
-}
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-row] {
-    display: flex !important;
-    flex-direction: column !important;
-    flex-wrap: nowrap !important;
-    align-items: stretch !important;
-    gap: 0 .35em;
-    min-width: 0 !important;
-}
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-text-cell] {
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-}
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-control-cell] {
-    flex: 0 0 auto !important;
-    align-self: flex-start !important;
-}
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] [data-myt-channel-preview-text] {
-    display: block !important;
-    overflow: hidden !important;
-    white-space: nowrap !important;
-    text-overflow: ellipsis !important;
-    -webkit-line-clamp: unset !important;
-}
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-text] * {
-    white-space: inherit !important;
-}
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] [data-myt-channel-preview-control] {
-    display: block !important;
-    position: relative !important;
-    inset: auto !important;
-    transform: none !important;
-    translate: none !important;
-    align-self: flex-start !important;
-    width: max-content !important;
-    max-width: 100% !important;
-    margin-block-start: 12px !important;
-    background: transparent !important;
 }
 
 /* Full channel description: a wider native dialog with distinct link/info cards. */
