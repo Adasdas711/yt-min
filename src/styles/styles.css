@@ -1627,7 +1627,7 @@ html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(yt-page-header-view
 html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#description-container, #channel-description, .ytDescriptionPreviewViewModelDescriptionText, .yt-description-preview-view-model-wiz__description-text, yt-description-preview-view-model) {
     font-family: "SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace !important;
     font-size: 17px !important;
-    line-height: 1.75 !important;
+    line-height: var(--myt-channel-description-leading, 1.75) !important;
 }
 html.minimal-youtube [data-myt-channel-tab-hidden] { display: none !important; }
 html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(yt-tab-group-shape, tp-yt-paper-tabs) {
@@ -1672,7 +1672,7 @@ html.minimal-youtube[data-myt-page="channel"] :is(#description-container, #chann
 html.minimal-youtube[data-myt-page="channel"] :is(#description-container, #channel-description, yt-description-preview-view-model) :is(span, a, yt-attributed-string, yt-formatted-string) {
     font-family: "SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace !important;
     font-size: 17px !important;
-    line-height: 1.75 !important;
+    line-height: var(--myt-channel-description-leading, 1.75) !important;
 }
 
 /* Native More controls are positioned for YouTube's smaller UI font. Keep the
@@ -1713,6 +1713,9 @@ html.minimal-youtube[data-myt-page="channel"] yt-description-preview-view-model 
 
 /* A native preview can wrap More in additional fixed-height containers. Free
    the complete native path, and use ordinary ellipsis instead of fade masks. */
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] {
+    --myt-channel-description-leading: 2.2;
+}
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-wrapper],
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview],
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] :is(div, span, yt-attributed-string, yt-formatted-string, button, a) {
