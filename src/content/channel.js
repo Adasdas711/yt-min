@@ -55,6 +55,7 @@
                 *{box-sizing:border-box}[hidden]{display:none!important}
                 section{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:0;border:0;border-radius:0;background:transparent}
                 p{display:block;width:100%;margin:0;padding:0;font:400 16px/1.8 "SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace;letter-spacing:normal;text-transform:none;white-space:normal;overflow-wrap:anywhere;color:var(--myt-ink,#18181b)}
+                .summary{min-width:0;overflow:hidden;white-space:nowrap;overflow-wrap:normal;text-overflow:ellipsis}
                 button{display:inline-block;align-self:flex-start;margin:0;padding:0;border:0;border-radius:0;background:transparent;color:var(--myt-ink,#18181b);font:600 16px/1.8 "SFMono-Regular",Menlo,Consolas,monospace;cursor:pointer}
                 button:hover{text-decoration:underline}button:focus-visible{outline:2px solid var(--myt-muted,#74747d);outline-offset:3px}button:disabled{opacity:.6;cursor:default}svg{width:14px;height:14px;flex:none}
                 dialog{width:min(1040px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 48px);margin:auto;padding:0;border:1px solid var(--myt-border,#e5e5ea);border-radius:20px;background:var(--myt-bg,#fff);color:var(--myt-ink,#18181b);overflow:hidden}
@@ -434,10 +435,7 @@
                 this.descriptionFullValue=data.fullDescription||raw;
                 if(this.descriptionValue!==value){
                     this.descriptionValue=value;
-                    const chars=typeof Intl.Segmenter==='function'?Array.from(new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(value),part=>part.segment):Array.from(value);
-                    let excerpt=value;
-                    if(chars.length>180){excerpt=chars.slice(0,180).join('');const boundary=excerpt.lastIndexOf(' ');if(boundary>120)excerpt=excerpt.slice(0,boundary);excerpt=excerpt.trimEnd()+'…';}
-                    this.descriptionText.textContent=excerpt;
+                    this.descriptionText.textContent=value;
                 }
                 this.renderDescription();
                 this.descriptionText.hidden=!value;

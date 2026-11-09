@@ -278,7 +278,8 @@ def description_updates(browser):
         page.locator('#author-description').evaluate('(e,text)=>e.textContent=text',text)
         expect(host.locator('.summary')).to_contain_text('Текст автора 😀 сохраняется.')
         shown=host.locator('.summary').inner_text()
-        assert shown.endswith('…') and len(shown)<len(text),shown
+        assert shown==text.strip(),shown
+        assert host.locator('.summary').evaluate('e=>getComputedStyle(e).textOverflow==="ellipsis"&&getComputedStyle(e).whiteSpace==="nowrap"&&e.scrollWidth>e.clientWidth&&e.getBoundingClientRect().height<=parseFloat(getComputedStyle(e).lineHeight)+1')
         assert_owned_description(page,width)
         click_more(page)
         assert page.evaluate('__more')==1
