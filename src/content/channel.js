@@ -52,19 +52,34 @@
             this.descriptionHost.attachShadow({mode:'open'}).innerHTML=`<style>
                 :host{all:initial!important;display:block!important;position:relative!important;box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:14px 0!important;color:var(--myt-ink,#18181b)!important}
                 *{box-sizing:border-box}[hidden]{display:none!important}
-                section{display:flex;flex-direction:column;align-items:flex-start;gap:14px;padding:18px 20px;border:1px solid var(--myt-border,#e5e5ea);border-radius:16px;background:var(--myt-surface,#fff)}
+                section{display:flex;flex-direction:column;align-items:flex-start;gap:14px;padding:0;border:0;border-radius:0;background:transparent}
                 p{display:block;width:100%;margin:0;padding:0;font:400 16px/1.8 "SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace;letter-spacing:normal;text-transform:none;white-space:normal;overflow-wrap:anywhere;color:var(--myt-ink,#18181b)}
-                button{display:inline-flex;align-items:center;gap:7px;min-height:34px;margin:0;padding:7px 12px;border:1px solid var(--myt-border,#e5e5ea);border-radius:10px;background:var(--myt-soft,#f1f1f4);color:var(--myt-ink,#18181b);font:600 13px/1.4 Arial,sans-serif;cursor:pointer}
-                button:hover{border-color:var(--myt-muted,#74747d)}button:focus-visible{outline:2px solid var(--myt-muted,#74747d);outline-offset:3px}button:disabled{opacity:.6;cursor:default}svg{width:14px;height:14px;flex:none}
-                @media(max-width:600px){section{padding:16px;gap:14px}}
-                </style><section aria-label="Channel description"><p class="summary"></p><button class="more" type="button">More<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></section>`;
+                button{display:inline-block;align-self:flex-start;margin:0;padding:0;border:0;border-radius:0;background:transparent;color:var(--myt-ink,#18181b);font:600 16px/1.8 "SFMono-Regular",Menlo,Consolas,monospace;cursor:pointer}
+                button:hover{text-decoration:underline}button:focus-visible{outline:2px solid var(--myt-muted,#74747d);outline-offset:3px}button:disabled{opacity:.6;cursor:default}svg{width:14px;height:14px;flex:none}
+                dialog{width:min(1040px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 48px);margin:auto;padding:0;border:1px solid var(--myt-border,#e5e5ea);border-radius:20px;background:var(--myt-bg,#fff);color:var(--myt-ink,#18181b);overflow:hidden}
+                dialog::backdrop{background:#0009}dialog header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 24px;border-bottom:1px solid var(--myt-border,#e5e5ea)}h2{margin:0;font:600 20px/1.4 Arial,sans-serif}button.close{font:400 26px/1 Arial,sans-serif;padding:4px;align-self:center}.full-body{max-height:calc(100dvh - 160px);overflow:auto;overscroll-behavior:contain;padding:24px}.full-text{white-space:pre-wrap}
+                @media(max-width:600px){dialog header,.full-body{padding:16px}}
+                </style><section aria-label="Channel description"><p class="summary"></p><button class="more" type="button">...more</button></section><dialog class="full" aria-label="About this channel"><header><h2>About this channel</h2><button class="close" type="button" aria-label="Close">×</button></header><div class="full-body"><p class="full-text"></p></div></dialog>`;
             this.descriptionText=this.descriptionHost.shadowRoot.querySelector('.summary');
             this.descriptionMore=this.descriptionHost.shadowRoot.querySelector('.more');
+            this.descriptionDialog=this.descriptionHost.shadowRoot.querySelector('dialog');
+            this.descriptionHost.shadowRoot.querySelector('.close').addEventListener('click',()=>this.descriptionDialog.close());
+            this.descriptionDialog.addEventListener('close',()=>{
+                if(this.restoreDescriptionFocus!==false&&this.descriptionMore.isConnected)this.descriptionMore.focus({preventScroll:true});
+                this.restoreDescriptionFocus=true;
+            });
             this.descriptionMore.addEventListener('click',event=>{
-                event.stopPropagation();
-                const source=this.descriptionSource;if(!source?.isConnected)return;
-                const control=source.querySelector('button,[role="button"],.ytDescriptionPreviewViewModelMoreButton,.yt-description-preview-view-model-wiz__more-button,.ytDescriptionPreviewViewModelMoreText,.yt-description-preview-view-model-wiz__more-text')||source;
-                control.click();
+                event.stopPropagation();clearTimeout(this.descriptionOpenTimer);
+                const source=this.descriptionSource;
+                if(source?.isConnected){
+                    const control=source.querySelector('button,[role="button"],.ytDescriptionPreviewViewModelMoreButton,.yt-description-preview-view-model-wiz__more-button,.ytDescriptionPreviewViewModelMoreText,.yt-description-preview-view-model-wiz__more-text')||source;
+                    control.click();
+                }
+                this.descriptionOpenTimer=setTimeout(()=>{
+                    if(!this.descriptionHost.isConnected||!document.documentElement.classList.contains('minimal-youtube')||this.nativeAboutOpen())return;
+                    this.descriptionHost.shadowRoot.querySelector('.full-text').textContent=this.descriptionFullValue||this.descriptionValue||'';
+                    if(!this.descriptionDialog.open)this.descriptionDialog.showModal();
+                },180);
             });
             this.stats=document.createElement('div');this.stats.id='myt-channel-stats';this.stats.lang='en';
             this.stats.attachShadow({mode:'open'}).innerHTML='<style>:host{display:block;color:var(--myt-muted);font:14px/1.6 Arial,sans-serif}.row{display:flex;align-items:center;flex-wrap:wrap;gap:0 8px}.metric{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}svg{width:15px;height:15px;flex:none}[hidden]{display:none!important}</style><div class="row"></div>';
@@ -107,11 +122,26 @@
             this.preview(header);
             this.navigation(browse,match[2]?.replace(/\/$/,'')||'videos');
             this.about();
+            if(this.descriptionDialog.open&&this.nativeAboutOpen()){this.restoreDescriptionFocus=false;this.descriptionDialog.close();}
             this.translate(browse);
             for(const node of [...this.hidden])if(!node.isConnected){node.removeAttribute('data-myt-channel-source');this.hidden.delete(node);}
             for(const node of this.text.keys())if(!node.isConnected)this.text.delete(node);
             for(const node of this.attributes.keys())if(!node.isConnected)this.attributes.delete(node);
             for(const [node,names]of this.aboutNodes)if(!node.isConnected){for(const name of names)node.removeAttribute(name);this.aboutNodes.delete(node);}
+        }
+        nativeAboutOpen(){
+            return [...document.querySelectorAll(aboutSelector+',[target-id="engagement-panel-channel-about"],[data-target-id="engagement-panel-channel-about"]')].some(node=>{
+                if(node.closest('[hidden],[aria-hidden="true"],[visibility="ENGAGEMENT_PANEL_VISIBILITY_HIDDEN"]'))return false;
+                const bounds=node.getBoundingClientRect();
+                for(let parent=node;parent;parent=parent.parentElement){
+                    const style=getComputedStyle(parent),clip=parent.getBoundingClientRect();
+                    if(Number(style.opacity)===0||style.visibility==='hidden'||style.display==='none')return false;
+                    if(/hidden|clip|auto|scroll/.test(style.overflowY)&&Math.min(bounds.bottom,clip.bottom)<=Math.max(bounds.top,clip.top))return false;
+                    if(/hidden|clip|auto|scroll/.test(style.overflowX)&&Math.min(bounds.right,clip.right)<=Math.max(bounds.left,clip.left))return false;
+                }
+                const box=node.getBoundingClientRect(),style=getComputedStyle(node);
+                return style.visibility!=='hidden'&&box.width>0&&box.height>0&&box.bottom>0&&box.top<innerHeight&&box.right>0&&box.left<innerWidth;
+            });
         }
         preview(header){
             const next=new Map(),mark=(node,part)=>{
@@ -130,7 +160,19 @@
                 const textRoot=source.querySelector('.ytDescriptionPreviewViewModelTruncatedText,.yt-description-preview-view-model-wiz__truncated-text,.ytDescriptionPreviewViewModelDescriptionText,.yt-description-preview-view-model-wiz__description-text')||source;
                 const copy=textRoot.cloneNode(true);
                 copy.querySelectorAll(controls+',script,style,svg,yt-icon,tp-yt-paper-tooltip,yt-tooltip,[hidden]').forEach(node=>node.remove());
-                const value=copy.textContent.replace(/\s+/gu,' ').trim();
+                source.dispatchEvent(new Event('minimal-youtube:channel-description',{bubbles:true}));
+                let data={};try{data=JSON.parse(source.getAttribute('data-myt-channel-description-data')||'{}');}catch{}
+                if(data.base!==this.base.toLowerCase())data={};
+                // DOM renderers can contain the same visual and accessibility
+                // text. Prefer the single public data value; dedupe complete
+                // repeated DOM copies only when that data is unavailable.
+                let raw=data.description||copy.textContent;
+                if(!data.description){
+                    raw=raw.replace(/\s+/gu,' ').trim();const words=raw.split(' ');
+                    for(let copies=4;copies>=2;copies--){if(words.length%copies)continue;const size=words.length/copies,part=words.slice(0,size).join(' ');if(Array.from({length:copies},(_,i)=>words.slice(i*size,(i+1)*size).join(' ')).every(value=>value===part)){raw=part;break;}}
+                }
+                const value=raw.replace(/\s+/gu,' ').trim();
+                this.descriptionFullValue=data.fullDescription||raw;
                 if(this.descriptionValue!==value){
                     this.descriptionValue=value;
                     const chars=typeof Intl.Segmenter==='function'?Array.from(new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(value),part=>part.segment):Array.from(value);
@@ -352,6 +394,7 @@
             }
         }
         destroy(){
+            clearTimeout(this.descriptionOpenTimer);if(this.descriptionDialog.open)this.descriptionDialog.close();
             window.removeEventListener('click',this.click,true);window.removeEventListener('auxclick',this.click,true);this.nav.remove();this.stats.remove();this.descriptionHost.remove();
             for(const node of this.hidden)node.removeAttribute('data-myt-channel-source');this.hidden.clear();
             for(const [node,names]of this.previewNodes)for(const name of names)node.removeAttribute(name);this.previewNodes.clear();

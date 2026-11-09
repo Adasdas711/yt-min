@@ -34,6 +34,14 @@ def fixture(legacy=False):
       </ytd-browse></ytd-page-manager></ytd-app>'''
 
 
+def click_more(page):
+    page.locator('#myt-channel-description .more').click()
+    dialog=page.locator('#myt-channel-description .full')
+    expect(dialog).to_be_visible()
+    expect(dialog.locator('.full-text')).not_to_be_empty()
+    dialog.locator('.close').click()
+
+
 def header(browser,legacy,width,dark):
     page=setup(browser,'/@JoeSpeen/videos',fixture(legacy),width=width,native_dark=dark)
     stats=page.locator('#myt-channel-stats')
@@ -47,7 +55,7 @@ def header(browser,legacy,width,dark):
     expect(page.locator('h1')).to_have_text('Joe Speen — Мой канал')
     expect(page.locator('#subscribe')).to_have_text('Subscribe')
     expect(page.locator('#description-more')).to_have_text('More')
-    page.locator('#myt-channel-description .more').click()
+    click_more(page)
     assert page.evaluate('__more')==1
     expect(page.get_by_role('button',name='Latest',exact=True)).to_be_visible()
     expect(page.get_by_role('button',name='Popular',exact=True)).to_be_visible()
@@ -157,7 +165,7 @@ def links_and_more(browser):
             label=page.locator('#myt-channel-description .more').bounding_box()
             assert label['y']>=author['y']+author['height']+12,(width,author,label)
             assert more.bounding_box()['x']+more.bounding_box()['width']<=width+1
-            more.click()
+            click_more(page)
             assert page.evaluate('__more')==1
             expect(page.locator('#subscribe')).to_be_visible()
             page.locator('#external-link').evaluate('e=>{const row=e.parentElement,copy=row.cloneNode(true);copy.removeAttribute("data-myt-channel-source");row.replaceWith(copy)}')
@@ -204,7 +212,7 @@ def preview_descenders(browser):
             page.locator('#author-description').evaluate('e=>e.textContent="SUBSCRIBE FOR A COOKIE! gypqj_ уфру"')
             assert_owned_description(page,width)
             expect(page.locator('.'+text_class)).to_be_hidden()
-            page.locator('#myt-channel-description .more').click()
+            click_more(page)
             assert page.evaluate('__more')==1
             page.close()
         print(f'PASS native preview height cannot clip letter descenders; More remains functional: {width}px',flush=True)
@@ -234,7 +242,7 @@ def nested_preview(browser):
         # Native masks and clipping remain on hidden source nodes, so the new
         # block proves it does not depend on patching the old view model.
         assert page.locator('yt-description-preview-view-model').evaluate('e=>getComputedStyle(e).maskImage')!='none'
-        page.locator('#myt-channel-description .more').click()
+        click_more(page)
         assert page.evaluate('__more')==1
         page.wait_for_timeout(100)
         assert_stable(page)
@@ -253,7 +261,7 @@ def more_text_spacing(browser):
         author=page.locator('#myt-channel-description .summary').bounding_box()
         more=page.locator('#myt-channel-description .more').bounding_box()
         assert more['y']>=author['y']+author['height']+12,(width,author,more)
-        page.locator('#myt-channel-description .more').click()
+        click_more(page)
         assert page.evaluate('__more')==1
         page.close()
     print('PASS explicit description/More spacing for delegated More text controls at desktop/tablet/mobile widths',flush=True)
@@ -271,7 +279,7 @@ def description_updates(browser):
         shown=host.locator('.summary').inner_text()
         assert shown.endswith('…') and len(shown)<len(text),shown
         assert_owned_description(page,width)
-        host.locator('.more').click()
+        click_more(page)
         assert page.evaluate('__more')==1
         # The visible component must use the latest native opener after restamps.
         for i in range(3):
@@ -280,7 +288,7 @@ def description_updates(browser):
                 copy.querySelector('button').setAttribute('onclick','window.__more=(window.__more||0)+10');e.replaceWith(copy);
             }''')
             expect(host).to_have_count(1)
-            host.locator('.more').click()
+            click_more(page)
             assert page.evaluate('__more')==1+(i+1)*10
         page.locator('yt-description-preview-view-model').evaluate('e=>{window.__sourceDescription=e;e.remove()}')
         expect(host).to_have_count(0)
