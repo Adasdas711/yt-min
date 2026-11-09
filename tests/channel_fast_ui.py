@@ -52,7 +52,8 @@ def active_and_empty(browser,width):
     expect(active).to_have_attribute('aria-current','page')
     assert active.evaluate('e=>getComputedStyle(e).backgroundColor')!=inactive.evaluate('e=>getComputedStyle(e).backgroundColor')
     assert int(active.evaluate('e=>getComputedStyle(e).fontWeight'))>=700
-    assert active.evaluate('e=>getComputedStyle(e).boxShadow')!='none'
+    assert active.evaluate('e=>getComputedStyle(e).boxShadow')=='none'
+    assert active.evaluate('e=>getComputedStyle(e).borderBottomColor')=='rgba(0, 0, 0, 0)'
     field=nav.get_by_role('searchbox',name='Search this channel');field.fill('')
     expect(own.locator('.empty')).to_be_hidden();expect(page.locator('ytd-message-renderer')).to_be_hidden()
     assert page.get_by_text('No results found.',exact=True).evaluate_all('nodes=>nodes.filter(node=>node.getClientRects().length&&getComputedStyle(node).visibility!=="hidden"&&getComputedStyle(node).display!=="none").length')==0

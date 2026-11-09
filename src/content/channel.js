@@ -95,7 +95,7 @@
             this.nav.attachShadow({mode:'open'}).innerHTML=`<style>
                 :host{display:block!important;min-width:0;font:600 16px/1.4 Arial,sans-serif;color:var(--myt-ink)}*{box-sizing:border-box}[hidden]{display:none!important}
                 .toolbar{display:flex;align-items:center;justify-content:center;gap:8px;min-width:0}nav{display:flex;flex:0 1 auto;min-width:0;gap:8px;overflow-x:auto;scrollbar-width:thin;padding:4px 0}a,button{flex:none;color:inherit;font:inherit;text-decoration:none;background:none;border:0;border-bottom:2px solid transparent;padding:12px 16px;cursor:pointer;white-space:nowrap}
-                nav a{color:var(--myt-muted);border-radius:10px}nav a[aria-current=page]{color:var(--myt-ink);background:var(--myt-soft);border-bottom-color:currentColor;box-shadow:inset 0 -2px currentColor;font-weight:800}button[aria-expanded=true]{border-color:currentColor}a:hover,button:hover{background:var(--myt-soft);border-radius:10px}a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
+                nav a{color:var(--myt-muted);border-radius:10px}nav a[aria-current=page]{color:var(--myt-ink);background:var(--myt-soft);border-color:transparent;box-shadow:none;font-weight:800}button[aria-expanded=true]{border-color:currentColor}a:hover,button:hover{background:var(--myt-soft);border-radius:10px}a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
                 [data-pending]{opacity:.65;cursor:progress}.navigation-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
                 .channel-search{display:flex;flex:none;align-items:center;gap:10px;min-width:0}.search-toggle{display:inline-flex;align-items:center;justify-content:center;width:40px;height:44px;padding:0;border:0;border-radius:50%;color:var(--myt-muted)}.search-toggle:hover{border-radius:50%;color:var(--myt-ink)}.search-toggle[aria-expanded=true]{color:var(--myt-ink)}.search-toggle svg{display:block;width:24px;height:24px}
                 form{display:flex;flex:none;width:clamp(160px,20vw,292px);margin:0;padding:0}input{appearance:none;-webkit-appearance:none;display:block;box-sizing:border-box;width:100%;min-width:0;flex:1;border:0;border-bottom:2px solid var(--myt-muted);border-radius:0;background:transparent;color:inherit;padding:6px 0;font:400 16px/1.5 Arial,sans-serif;outline:none}input::placeholder{color:var(--myt-muted)}input:focus,input:focus-visible{border-bottom-color:var(--myt-ink);outline:none}input::-webkit-search-decoration{display:none}
@@ -369,9 +369,11 @@
         hide(node){if(node&&!this.hidden.has(node)){node.setAttribute('data-myt-channel-source','');this.hidden.add(node);}}
         sync(browse){
             const match=location.pathname.match(basePattern);if(!match)return;
-            if(this.browse!==browse){this.browse?.removeAttribute('data-myt-channel-ready');this.browse=browse;}
+            if(this.browse!==browse){this.browse?.removeAttribute('data-myt-channel-ready');this.browse?.removeAttribute('data-myt-channel-section');this.browse=browse;}
             if(this.base&&this.base!==match[1])this.cancelNavigation();
             this.base=match[1];
+            const section=match[2]?.replace(/\/$/,'')||'videos',layout=section==='community'?'posts':section;
+            if(browse.getAttribute('data-myt-channel-section')!==layout)browse.setAttribute('data-myt-channel-section',layout);
             const header=browse.querySelector(':scope > #header,:scope > #page-header,ytd-c4-tabbed-header-renderer,yt-page-header-view-model,yt-page-header-renderer');
             if(header){this.identity(header);this.links(header);}
             this.preview(header);
@@ -659,6 +661,7 @@
         destroy(){
             this.cancelNavigation();
             this.browse?.removeAttribute('data-myt-channel-ready');
+            this.browse?.removeAttribute('data-myt-channel-section');
             document.documentElement.removeAttribute('data-myt-channel-search-empty');
             for(const name of navigationEvents)window.removeEventListener(name,this.nativeNavigation,true);
             window.removeEventListener('popstate',this.historyNavigation);

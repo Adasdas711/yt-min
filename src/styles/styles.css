@@ -231,6 +231,29 @@ html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="chan
     margin-inline: auto !important;
 }
 
+/* Posts keep native interactions inside a centered, single-column feed. */
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-section="posts"] ytd-two-column-browse-results-renderer {
+    display: block !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-section="posts"] :is(ytd-section-list-renderer, ytd-item-section-renderer):has(ytd-backstage-post-thread-renderer, ytd-backstage-post-renderer),
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-section="posts"] :is(ytd-backstage-post-thread-renderer, ytd-backstage-post-renderer) {
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 852px !important;
+    margin-inline: auto !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-section="posts"] :is(ytd-section-list-renderer, ytd-item-section-renderer):has(ytd-backstage-post-thread-renderer, ytd-backstage-post-renderer) {
+    padding-inline: 0 !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-section="posts"] :is(ytd-section-list-renderer, ytd-item-section-renderer):has(ytd-backstage-post-thread-renderer, ytd-backstage-post-renderer) > #contents {
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: none !important;
+    margin-inline: auto !important;
+    padding-inline: 0 !important;
+}
+
 /* Rounded shell clips only the navigation; native horizontal tab scrolling stays. */
 html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-browse > #tabs,
 html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-browse > #tabs-container,
