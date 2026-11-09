@@ -1711,6 +1711,74 @@ html.minimal-youtube[data-myt-page="channel"] yt-description-preview-view-model 
     white-space: nowrap;
 }
 
+/* A native preview can wrap More in additional fixed-height containers. Free
+   the complete native path, and use ordinary ellipsis instead of fade masks. */
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-wrapper],
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview],
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] :is(div, span, yt-attributed-string, yt-formatted-string, button, a) {
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    contain: none !important;
+    clip-path: none !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview],
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-effects],
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] * {
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+    background-image: none !important;
+    -webkit-text-fill-color: currentColor !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-wrapper] {
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] *,
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-control-cell] {
+    line-height: inherit !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview]::before,
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview]::after,
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-effects]::before,
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-effects]::after,
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] *::before,
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] *::after {
+    content: none !important;
+    display: none !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-row] {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: baseline !important;
+    gap: 0 .35em;
+    min-width: 0 !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-text-cell] {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-control-cell] {
+    flex: 0 0 auto !important;
+    align-self: baseline !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] [data-myt-channel-preview-text] {
+    display: block !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+    -webkit-line-clamp: unset !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-text] * {
+    white-space: inherit !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-control] {
+    background: transparent !important;
+}
+
 /* Full channel description: a wider native dialog with distinct link/info cards. */
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-dialog] {
     box-sizing: border-box !important;

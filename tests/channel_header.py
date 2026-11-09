@@ -189,6 +189,57 @@ def preview_descenders(browser):
         print(f'PASS native preview height cannot clip letter descenders; More remains functional: {width}px',flush=True)
 
 
+def nested_preview(browser):
+    preview='''<div class="native-preview-shell" style="width:calc(100% - 48px);height:22px;max-height:22px;overflow:hidden">
+      <yt-description-preview-view-model style="overflow:hidden;mask-image:linear-gradient(to right,black 60%,transparent)">
+      <div class="native-preview-inner" style="height:22px;max-height:22px;overflow:clip">
+      <div class="native-preview-line">
+        <yt-attributed-string class="ytDescriptionPreviewViewModelTruncatedText" style="height:16px;max-height:16px;overflow:hidden;mask-image:linear-gradient(to right,black,transparent)"><span id="author-description">SUBSCRIBE FOR A COOKIE! gypq_</span></yt-attributed-string>
+        <span class="native-more-shell" style="display:block;height:18px;max-height:18px;overflow:hidden"><button id="description-more" class="ytDescriptionPreviewViewModelMoreButton" style="height:18px;max-height:18px;overflow:hidden;background-image:linear-gradient(to right,transparent,#111)" onclick="window.__more=(window.__more||0)+1"><span id="more-label" style="mask-image:linear-gradient(to right,black,transparent)">...more</span></button></span>
+      </div></div></yt-description-preview-view-model></div>'''
+    body=fixture()
+    start=body.index('<yt-description-preview-view-model>')
+    end=body.index('</yt-description-preview-view-model>',start)+len('</yt-description-preview-view-model>')
+    body=body[:start]+preview+body[end:]
+    body+='''<style>
+      .ytDescriptionPreviewViewModelMoreButton::before{content:"";position:absolute;inset:0;background:linear-gradient(to right,transparent,#111)}
+      .ytDescriptionPreviewViewModelTruncatedText::after{content:"";position:absolute;inset:0;background:linear-gradient(to right,transparent,#111)}
+      .native-preview-shell::after{content:"";position:absolute;inset:0;background:linear-gradient(to right,transparent,#111);pointer-events:none}
+      </style>'''
+    for width in (1440,900,390):
+        page=setup(browser,'/@JoeSpeen/videos',body,width=width,native_dark=True)
+        # Check the text and the More label against every clipping ancestor,
+        # including the wrappers outside the native description view model.
+        for selector in ('#author-description','#more-label'):
+            result=page.locator(selector).evaluate('''e=>{
+                const range=document.createRange();range.selectNodeContents(e);
+                const glyph=range.getClientRects()[0],clipped=[];
+                for(let parent=e;parent&&parent.id!=='page-header'&&parent.id!=='header';parent=parent.parentElement){
+                    const style=getComputedStyle(parent),box=parent.getBoundingClientRect();
+                    if(/hidden|clip|auto|scroll/.test(style.overflowY)&&(glyph.top<box.top-1||glyph.bottom>box.bottom+1))clipped.push(parent.className||parent.tagName);
+                }
+                return clipped;
+            }''')
+            assert not result,(width,selector,result)
+        for selector in ('yt-description-preview-view-model','.ytDescriptionPreviewViewModelTruncatedText','#more-label','#description-more'):
+            assert page.locator(selector).evaluate('e=>getComputedStyle(e).maskImage')=='none'
+            assert page.locator(selector).evaluate('e=>getComputedStyle(e).backgroundImage')=='none'
+        for selector,pseudo in (('#description-more','::before'),('.ytDescriptionPreviewViewModelTruncatedText','::after'),('.native-preview-shell','::after')):
+            assert page.locator(selector).evaluate('(e,p)=>getComputedStyle(e,p).content',pseudo) in ('none','normal')
+        shell=page.locator('.native-preview-shell').bounding_box()
+        more=page.locator('#description-more').bounding_box()
+        assert more['x']+more['width']<=shell['x']+shell['width']+1,(shell,more)
+        page.locator('#description-more').click()
+        assert page.evaluate('__more')==1
+        page.wait_for_timeout(100)
+        assert_stable(page)
+        page.screenshot(path=f'/tmp/yt-min-preview-{width}.png')
+        page.evaluate('__setEnabled(false)')
+        assert page.locator('yt-description-preview-view-model').evaluate('e=>getComputedStyle(e).maskImage')!='none'
+        page.close()
+        print(f'PASS nested native wrappers cannot clip text/More; masks and gradient overlays removed: {width}px',flush=True)
+
+
 if __name__=='__main__':
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -199,4 +250,5 @@ if __name__=='__main__':
         navigation(browser)
         links_and_more(browser)
         preview_descenders(browser)
+        nested_preview(browser)
         browser.close()

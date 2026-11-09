@@ -47,7 +47,7 @@
             const target=new URL(url);target.searchParams.set('hl','en');target.searchParams.set('persist_hl','1');return target.href;
         }
         constructor(){
-            this.hidden=new Set();this.text=new Map();this.attributes=new Map();this.aboutNodes=new Map();
+            this.hidden=new Set();this.text=new Map();this.attributes=new Map();this.aboutNodes=new Map();this.previewNodes=new Map();
             this.stats=document.createElement('div');this.stats.id='myt-channel-stats';this.stats.lang='en';
             this.stats.attachShadow({mode:'open'}).innerHTML='<style>:host{display:block;color:var(--myt-muted);font:14px/1.6 Arial,sans-serif}.row{display:flex;align-items:center;flex-wrap:wrap;gap:0 8px}.metric{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}svg{width:15px;height:15px;flex:none}[hidden]{display:none!important}</style><div class="row"></div>';
             this.nav=document.createElement('div');this.nav.id='myt-channel-nav';this.nav.lang='en';
@@ -85,6 +85,7 @@
             const match=location.pathname.match(basePattern);if(!match)return;
             this.base=match[1];
             const header=browse.querySelector(':scope > #header,:scope > #page-header,ytd-c4-tabbed-header-renderer,yt-page-header-view-model,yt-page-header-renderer');
+            this.preview(header);
             if(header){this.identity(header);this.links(header);}
             this.navigation(browse,match[2]?.replace(/\/$/,'')||'videos');
             this.about();
@@ -93,6 +94,39 @@
             for(const node of this.text.keys())if(!node.isConnected)this.text.delete(node);
             for(const node of this.attributes.keys())if(!node.isConnected)this.attributes.delete(node);
             for(const [node,names]of this.aboutNodes)if(!node.isConnected){for(const name of names)node.removeAttribute(name);this.aboutNodes.delete(node);}
+        }
+        preview(header){
+            const next=new Map(),mark=(node,part)=>{
+                if(!node)return;
+                const name='data-myt-channel-preview'+(part?'-'+part:'');
+                if(!node.hasAttribute(name))node.setAttribute(name,'');
+                if(!next.has(node))next.set(node,new Set());next.get(node).add(name);
+            };
+            for(const model of header?.querySelectorAll('yt-description-preview-view-model')||[]){
+                mark(model,'');
+                // Keep trusted input on the original More control and its native
+                // event path. Only its layout and clipping wrappers are decorated.
+                const control=model.querySelector('button,[role="button"],.ytDescriptionPreviewViewModelMoreButton,.yt-description-preview-view-model-wiz__more-button');
+                const text=[...model.querySelectorAll('.ytDescriptionPreviewViewModelTruncatedText,.yt-description-preview-view-model-wiz__truncated-text,.ytDescriptionPreviewViewModelDescriptionText,.yt-description-preview-view-model-wiz__description-text,yt-attributed-string,yt-formatted-string')].find(node=>!control||!control.contains(node)&&!node.contains(control));
+                if(text&&control){
+                    let row=text.parentElement;while(row&&!row.contains(control))row=row.parentElement;
+                    if(row){
+                        mark(row,'row');
+                        for(const [node,part]of [[text,'text-cell'],[control,'control-cell']]){
+                            let cell=node;while(cell.parentElement!==row&&cell.parentElement)cell=cell.parentElement;
+                            mark(cell,part);
+                        }
+                    }
+                }
+                mark(text,'text');mark(control,'control');
+                for(let parent=model.parentElement;parent&&header.contains(parent);parent=parent.parentElement){
+                    mark(parent,'wrapper');
+                    if(!parent.querySelector('h1,#channel-name,ytd-channel-name,#avatar,yt-avatar-shape,yt-content-metadata-view-model,#channel-tagline,#myt-channel-stats,ytd-subscribe-button-renderer,yt-subscribe-button-view-model,#tabs,#tabs-container,#myt-channel-nav'))mark(parent,'effects');
+                    if(parent===header)break;
+                }
+            }
+            for(const [node,names]of this.previewNodes)for(const name of names)if(!next.get(node)?.has(name))node.removeAttribute(name);
+            this.previewNodes=next;
         }
         identity(header){
             const candidates=[...header.querySelectorAll('yt-content-metadata-view-model,#channel-tagline,#channel-handle,#subscriber-count,#subscribers,#videos-count,#video-count')];
@@ -293,6 +327,7 @@
         destroy(){
             window.removeEventListener('click',this.click,true);window.removeEventListener('auxclick',this.click,true);this.nav.remove();this.stats.remove();
             for(const node of this.hidden)node.removeAttribute('data-myt-channel-source');this.hidden.clear();
+            for(const [node,names]of this.previewNodes)for(const name of names)node.removeAttribute(name);this.previewNodes.clear();
             for(const [node,names]of this.aboutNodes)for(const name of names)node.removeAttribute(name);this.aboutNodes.clear();
             for(const [node,state]of this.text)if(node.data===state.applied)node.data=state.original;
             for(const [node,attrs]of this.attributes)for(const [name,state]of attrs)if(node.getAttribute(name)===state.applied)node.setAttribute(name,state.original);
