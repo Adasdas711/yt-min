@@ -59,27 +59,18 @@
                 dialog{width:min(1040px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 48px);margin:auto;padding:0;border:1px solid var(--myt-border,#e5e5ea);border-radius:20px;background:var(--myt-bg,#fff);color:var(--myt-ink,#18181b);overflow:hidden}
                 dialog::backdrop{background:#0009}dialog header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 24px;border-bottom:1px solid var(--myt-border,#e5e5ea)}h2{margin:0;font:600 20px/1.4 Arial,sans-serif}button.close{font:400 26px/1 Arial,sans-serif;padding:4px;align-self:center}.full-body{max-height:calc(100dvh - 160px);overflow:auto;overscroll-behavior:contain;padding:24px}.full-text{white-space:pre-wrap}
                 @media(max-width:600px){dialog header,.full-body{padding:16px}}
-                </style><section aria-label="Channel description"><p class="summary"></p><button class="more" type="button">...more</button></section><dialog class="full" aria-label="About this channel"><header><h2>About this channel</h2><button class="close" type="button" aria-label="Close">×</button></header><div class="full-body"><p class="full-text"></p></div></dialog>`;
+                </style><section aria-label="Channel description"><p class="summary"></p><button class="more" type="button" aria-haspopup="dialog">...more</button></section><dialog class="full" aria-label="About this channel"><header><h2>About this channel</h2><button class="close" type="button" aria-label="Close">×</button></header><div class="full-body"><p class="full-text"></p></div></dialog>`;
             this.descriptionText=this.descriptionHost.shadowRoot.querySelector('.summary');
             this.descriptionMore=this.descriptionHost.shadowRoot.querySelector('.more');
             this.descriptionDialog=this.descriptionHost.shadowRoot.querySelector('dialog');
-            this.descriptionHost.shadowRoot.querySelector('.close').addEventListener('click',()=>this.descriptionDialog.close());
+            this.descriptionClose=this.descriptionHost.shadowRoot.querySelector('.close');
+            this.descriptionClose.addEventListener('click',()=>this.descriptionDialog.close());
             this.descriptionDialog.addEventListener('close',()=>{
                 if(this.restoreDescriptionFocus!==false&&this.descriptionMore.isConnected)this.descriptionMore.focus({preventScroll:true});
                 this.restoreDescriptionFocus=true;
             });
             this.descriptionMore.addEventListener('click',event=>{
-                event.stopPropagation();clearTimeout(this.descriptionOpenTimer);
-                const source=this.descriptionSource;
-                if(source?.isConnected){
-                    const control=source.querySelector('button,[role="button"],.ytDescriptionPreviewViewModelMoreButton,.yt-description-preview-view-model-wiz__more-button,.ytDescriptionPreviewViewModelMoreText,.yt-description-preview-view-model-wiz__more-text')||source;
-                    control.click();
-                }
-                this.descriptionOpenTimer=setTimeout(()=>{
-                    if(!this.descriptionHost.isConnected||!document.documentElement.classList.contains('minimal-youtube')||this.nativeAboutOpen())return;
-                    this.descriptionHost.shadowRoot.querySelector('.full-text').textContent=this.descriptionFullValue||this.descriptionValue||'';
-                    if(!this.descriptionDialog.open)this.descriptionDialog.showModal();
-                },180);
+                event.stopPropagation();this.openDescription();
             });
             this.stats=document.createElement('div');this.stats.id='myt-channel-stats';this.stats.lang='en';
             this.stats.attachShadow({mode:'open'}).innerHTML='<style>:host{display:block;color:var(--myt-muted);font:14px/1.6 Arial,sans-serif}.row{display:flex;align-items:center;flex-wrap:wrap;gap:0 8px}.metric{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}svg{width:15px;height:15px;flex:none}[hidden]{display:none!important}</style><div class="row"></div>';
@@ -96,10 +87,18 @@
                 const query=this.nav.shadowRoot.querySelector('input').value.trim();if(query)this.open(this.url('search',query));
             });
             this.click=event=>{
-                if(!event.composedPath().includes(this.nav))return;
-                const link=event.composedPath().find(node=>node instanceof HTMLAnchorElement);
+                const path=event.composedPath();
+                if(path.includes(this.descriptionMore)||path.includes(this.descriptionClose)){
+                    if(event.type==='click'&&!event.button){
+                        event.preventDefault();event.stopImmediatePropagation();
+                        if(path.includes(this.descriptionMore))this.openDescription();else this.descriptionDialog.close();
+                    }
+                    return;
+                }
+                if(!path.includes(this.nav))return;
+                const link=path.find(node=>node instanceof HTMLAnchorElement);
                 if(!link){
-                    const button=event.composedPath().find(node=>node instanceof HTMLButtonElement);
+                    const button=path.find(node=>node instanceof HTMLButtonElement);
                     if(button){event.stopImmediatePropagation();if(button.dataset.section==='search'){event.preventDefault();this.toggleSearch(button);}}
                     return;
                 }
@@ -107,8 +106,31 @@
                 event.stopImmediatePropagation();
                 if(!event.button&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){event.preventDefault();this.open(link.href);}
             };
+            this.keydown=event=>{
+                const path=event.composedPath();
+                if(event.key==='Escape'&&this.descriptionDialog.open){
+                    event.preventDefault();event.stopImmediatePropagation();this.descriptionDialog.close();
+                }else if((event.key==='Enter'||event.key===' ')&&(path.includes(this.descriptionMore)||path.includes(this.descriptionClose))){
+                    event.preventDefault();event.stopImmediatePropagation();
+                    if(!event.repeat){if(path.includes(this.descriptionMore))this.openDescription();else this.descriptionDialog.close();}
+                }
+            };
             window.addEventListener('click',this.click,true);
             window.addEventListener('auxclick',this.click,true);
+            window.addEventListener('keydown',this.keydown,true);
+        }
+        openDescription(){
+            if(!this.descriptionHost.isConnected||!document.documentElement.classList.contains('minimal-youtube'))return;
+            this.descriptionHost.shadowRoot.querySelector('.full-text').textContent=this.descriptionFullValue||this.descriptionValue||'';
+            // Show a usable dialog before attempting YouTube's optional opener.
+            // Native controls can be disabled, ignore synthetic events or throw.
+            if(!this.descriptionDialog.open)this.descriptionDialog.showModal();
+            const source=this.descriptionSource;
+            if(source?.isConnected){
+                const control=source.querySelector('button,[role="button"],.ytDescriptionPreviewViewModelMoreButton,.yt-description-preview-view-model-wiz__more-button,.ytDescriptionPreviewViewModelMoreText,.yt-description-preview-view-model-wiz__more-text')||source;
+                try{if(typeof control.click==='function')control.click();}catch{}
+            }
+            if(this.nativeAboutOpen()){this.restoreDescriptionFocus=false;this.descriptionDialog.close();}
         }
         toggleSearch(button){const form=this.nav.shadowRoot.querySelector('form');form.hidden=!form.hidden;button.setAttribute('aria-expanded',String(!form.hidden));if(!form.hidden)form.querySelector('input').focus();}
         open(href){location.assign(href);}
@@ -131,6 +153,7 @@
         }
         nativeAboutOpen(){
             return [...document.querySelectorAll(aboutSelector+',[target-id="engagement-panel-channel-about"],[data-target-id="engagement-panel-channel-about"]')].some(node=>{
+                if(!node.closest('dialog[open],tp-yt-paper-dialog,[role="dialog"],[target-id="engagement-panel-channel-about"][visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED"],[data-target-id="engagement-panel-channel-about"][visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED"]'))return false;
                 if(node.closest('[hidden],[aria-hidden="true"],[visibility="ENGAGEMENT_PANEL_VISIBILITY_HIDDEN"]'))return false;
                 const bounds=node.getBoundingClientRect();
                 for(let parent=node;parent;parent=parent.parentElement){
@@ -182,9 +205,8 @@
                 }
                 this.descriptionText.hidden=!value;
                 const control=source.querySelector(controls);
-                const canOpen=!!control||source.matches('yt-description-preview-view-model,[role="button"]')||source.hasAttribute('onclick');
+                const canOpen=!!value||!!this.descriptionFullValue||!!control||source.matches('yt-description-preview-view-model,[role="button"]')||source.hasAttribute('onclick');
                 this.descriptionMore.hidden=!canOpen;
-                this.descriptionMore.disabled=!!control&&(control.hasAttribute('disabled')||control.getAttribute('aria-disabled')==='true');
                 // Insert outside description-only wrappers so their masks and
                 // fixed heights cannot affect the independent shadow component.
                 let slot=source;
@@ -394,8 +416,8 @@
             }
         }
         destroy(){
-            clearTimeout(this.descriptionOpenTimer);if(this.descriptionDialog.open)this.descriptionDialog.close();
-            window.removeEventListener('click',this.click,true);window.removeEventListener('auxclick',this.click,true);this.nav.remove();this.stats.remove();this.descriptionHost.remove();
+            if(this.descriptionDialog.open)this.descriptionDialog.close();
+            window.removeEventListener('click',this.click,true);window.removeEventListener('auxclick',this.click,true);window.removeEventListener('keydown',this.keydown,true);this.nav.remove();this.stats.remove();this.descriptionHost.remove();
             for(const node of this.hidden)node.removeAttribute('data-myt-channel-source');this.hidden.clear();
             for(const [node,names]of this.previewNodes)for(const name of names)node.removeAttribute(name);this.previewNodes.clear();
             for(const [node,names]of this.aboutNodes)for(const name of names)node.removeAttribute(name);this.aboutNodes.clear();

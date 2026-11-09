@@ -80,9 +80,56 @@ def dom_duplicates(browser):
     print('PASS duplicate DOM copies collapse when the public data bridge is unavailable',flush=True)
 
 
+def blocked_input(browser,width):
+    from smoke import setup
+    page=setup(browser,'/@JoeSpeen/videos',fixture(),width=width)
+    host=page.locator('#myt-channel-description')
+    page.evaluate('''()=>{
+        document.body.insertAdjacentHTML('beforeend','<ytd-about-channel-renderer style="position:fixed;top:180px;left:20px;height:150px">Cached content outside an active dialog</ytd-about-channel-renderer>');
+    }''')
+    host.locator('.more').click()
+    expect(host.locator('.full')).to_be_visible()
+    expect(host.locator('.full-text')).to_contain_text('Пщщ! Я Joe Speen')
+    page.wait_for_timeout(250)
+    expect(host.locator('.full')).to_be_visible()
+    host.locator('.close').click()
+    expect(host.locator('.full')).not_to_be_visible()
+    # Native controls cannot disable or break the independent description.
+    page.locator('#description-more').evaluate('''e=>{
+        e.disabled=true;e.click=()=>{throw new Error('Native description opener failed')};
+    }''')
+    expect(host.locator('.more')).to_be_enabled()
+    host.locator('.more').click()
+    expect(host.locator('.full')).to_be_visible()
+    host.locator('.close').click()
+    page.locator('#description-more').evaluate('''e=>{
+        const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.id=e.id;svg.setAttribute('role','button');e.replaceWith(svg);
+    }''')
+    host.locator('.more').click()
+    expect(host.locator('.full')).to_be_visible()
+    host.locator('.close').click()
+    # Page capture handlers must not swallow mouse or keyboard activation.
+    page.evaluate('''()=>{
+        for(const type of ['click','keydown'])document.addEventListener(type,event=>{event.preventDefault();event.stopImmediatePropagation()},true);
+    }''')
+    host.locator('.more').click()
+    expect(host.locator('.full')).to_be_visible()
+    host.locator('.close').click()
+    for key in ('Enter','Space'):
+        host.locator('.more').focus()
+        host.locator('.more').press(key)
+        expect(host.locator('.full')).to_be_visible()
+        page.keyboard.press('Escape')
+        expect(host.locator('.full')).not_to_be_visible()
+        expect(host.locator('.more')).to_be_focused()
+    page.close()
+    print(f'PASS document capture blockers, inactive about caches, disabled/throwing/non-clickable native targets and mouse/Enter/Space/Escape: {width}px',flush=True)
+
+
 if __name__=='__main__':
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         for width in (1440,390):check(browser,width)
         dom_duplicates(browser)
+        for width in (1440,390):blocked_input(browser,width)
         browser.close()
