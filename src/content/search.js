@@ -42,6 +42,13 @@
     const safeURL=value=>{if(typeof value!=='string'||!value.trim())return null;try{const url=new URL(value,location.href);return /^https?:$/.test(url.protocol)?url:null;}catch{return null;}};
     const titleSelector='a#video-title,a#video-title-link,h3 a[href],.yt-lockup-metadata-view-model__title,.yt-lockup-metadata-view-model-wiz__title,.ytLockupMetadataViewModelTitle';
     const playlistSelector='ytd-playlist-renderer,ytd-grid-playlist-renderer,yt-lockup-view-model';
+    // Native visibility identifies cached SPA feeds. Our isolation deliberately
+    // gives original cards zero size and hidden visibility, so geometry cannot
+    // distinguish them from an inactive YouTube feed after the first render.
+    const nativeAvailable=(node,boundary)=>{
+        for(let parent=node;parent&&parent!==boundary;parent=parent.parentElement)if(parent.hasAttribute('hidden')||parent.getAttribute('aria-hidden')==='true'||parent.style.display==='none'||parent.style.visibility==='hidden')return false;
+        return true;
+    };
     const countSelector='#video-count-text,#video-count,#playlist-video-count,.formatted-video-count-label,yt-collection-thumbnail-overlay-view-model,ytd-thumbnail-overlay-side-panel-renderer,yt-thumbnail-overlay-badge-view-model,yt-thumbnail-bottom-overlay-view-model,yt-badge-shape,.ytBadgeShapeText,.yt-badge-shape__text,.badge-shape-wiz__text,[data-video-count]';
     const countNumber=value=>{
         const input=String(value??'').replace(/[\u00a0\u202f]/g,' ').trim();
@@ -293,6 +300,17 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             this.changed=()=>this.queue();document.addEventListener('yt-page-data-updated',this.changed);document.addEventListener('yt-rendererstamper-finished',this.changed);
         }
         static isPlaylist(card){return card.matches('ytd-playlist-renderer,ytd-grid-playlist-renderer,ytd-radio-renderer,[is-playlist],[content-type="playlist"],[data-content-type="playlist"]')||!!card.querySelector('yt-collection-thumbnail-view-model,yt-collections-stack,ytd-thumbnail-overlay-side-panel-renderer')||safeURL(card.querySelector(titleSelector)?.href)?.pathname==='/playlist';}
+        static channelResults(browse){
+            // Videos usually has a direct #contents; channel search also uses
+            // section lists inside a two-column primary pane. Choose the active
+            // pane without mixing it with a retained, hidden Videos feed.
+            const candidates=[...browse.querySelectorAll(':scope > #contents,:scope > #primary,ytd-two-column-browse-results-renderer > #primary,ytd-section-list-renderer,ytd-rich-grid-renderer')].filter(node=>{
+                if(node.closest('#header,#page-header,#secondary,ytd-popup-container,[role="dialog"]')||!nativeAvailable(node,browse.parentElement))return false;
+                for(let parent=node;parent&&parent!==browse;parent=parent.parentElement)if(getComputedStyle(parent).display==='none')return false;
+                return true;
+            });
+            return candidates.find(node=>[...node.querySelectorAll(sourceSelector)].some(source=>nativeAvailable(source,node)))||candidates[0]||null;
+        }
         queue(){if(this.frame)return;this.frame=requestAnimationFrame(()=>{this.frame=0;const searches=document.querySelectorAll(this.channel?'[data-myt-channel-results]':'ytd-search');if(searches.length)this.sync(searches);});}
         queueCard(source){
             if(!this.cards.has(source)){this.queue();return;}
@@ -343,12 +361,13 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             const search=candidates.find(item=>!item.closest('[hidden],[aria-hidden="true"]')&&item.getClientRects().length&&getComputedStyle(item).visibility!=='hidden')||candidates[0];if(!search)return;
             if(this.search!==search){
                 this.search?.removeEventListener('load',this.changed,true);
+                this.restoreNative();
                 this.observer.disconnect();this.search=search;
-                this.observer.observe(search,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['href','src','srcset','data-src','data-srcset','data-video-count','class','hidden','aria-label','aria-pressed','subscribed','is-subscribed','disabled']});
+                this.observer.observe(search,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['href','src','srcset','data-src','data-srcset','data-video-count','class','hidden','aria-hidden','style','aria-label','aria-pressed','subscribed','is-subscribed','disabled']});
                 search.addEventListener('load',this.changed,true);
             }
             if(this.host.parentElement!==search)search.prepend(this.host);
-            const sources=[...search.querySelectorAll(sourceSelector)].filter(source=>!source.parentElement.closest(sourceSelector)&&!source.closest('[data-myt-hidden],[data-myt-hidden-section],ytd-reel-shelf-renderer')&&!/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(text(source.closest(shelfSelector)?.querySelector('#title-container,#header,h2'))));
+            const sources=[...search.querySelectorAll(sourceSelector)].filter(source=>(!this.channel||nativeAvailable(source,search))&&!source.parentElement.closest(sourceSelector)&&!source.closest('[data-myt-hidden],[data-myt-hidden-section],ytd-reel-shelf-renderer')&&!/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(text(source.closest(shelfSelector)?.querySelector('#title-container,#header,h2'))));
             const wanted=new Set(sources);
             for(const source of sources){
                 let kind=source.matches('ytd-channel-renderer,[content-type="channel"],[data-content-type="channel"]')?'channel':Search.isPlaylist(source)?'playlist':'video';
@@ -396,12 +415,12 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             for(const child of search.children)if(child!==this.host){child.setAttribute('data-myt-search-native-root','');this.nativeNodes.add(child);}
             // Reveal the original toolbar in place. Browser-trusted input and
             // YouTube's delegated handlers keep their original DOM event path.
-            const available=node=>{for(let parent=node;parent&&parent!==search;parent=parent.parentElement)if(parent.hasAttribute('hidden')||parent.style.display==='none')return false;return true;};
+            const available=node=>nativeAvailable(node,search);
             const paths=new Set(),toolbar=[...search.querySelectorAll(nativeToolbarSelector)].find(available)||[...search.querySelectorAll('button,[role="button"],tp-yt-paper-button')].slice(0,200).find(node=>available(node)&&/^(?:filters|filter|фильтры)$/iu.test(node.getAttribute('aria-label')||text(node)));
             const nativeUI=new Set(toolbar?[toolbar]:[]);
-            if(this.channel)for(const control of search.querySelectorAll('ytd-feed-filter-chip-bar-renderer,yt-chip-cloud-renderer'))nativeUI.add(control);
+            if(this.channel)for(const control of search.querySelectorAll('ytd-feed-filter-chip-bar-renderer,yt-chip-cloud-renderer'))if(available(control))nativeUI.add(control);
             for(const panel of search.querySelectorAll('ytd-search-filter-dialog-renderer,yt-search-filter-dialog-view-model'))if(!toolbar?.contains(panel))nativeUI.add(panel.closest('dialog,tp-yt-paper-dialog,tp-yt-iron-dropdown,[role="dialog"]')||panel);
-            for(const endpoint of [...search.querySelectorAll('ytd-continuation-item-renderer'),...nativeUI])for(let parent=endpoint;parent&&parent!==search;parent=parent.parentElement)paths.add(parent);
+            for(const endpoint of [...search.querySelectorAll('ytd-continuation-item-renderer'),...nativeUI])if(!this.channel||available(endpoint))for(let parent=endpoint;parent&&parent!==search;parent=parent.parentElement)paths.add(parent);
             for(const source of this.nativeNodes){
                 if(source.hasAttribute('data-myt-search-layout-path')&&!paths.has(source))source.removeAttribute('data-myt-search-layout-path');
                 if(source.hasAttribute('data-myt-search-toolbar')&&source!==toolbar)source.removeAttribute('data-myt-search-toolbar');
@@ -411,6 +430,11 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             for(const element of nativeUI)element.setAttribute('data-myt-search-native-ui','');
             if(toolbar)toolbar.setAttribute('data-myt-search-toolbar','');
             if(this.channel)for(const control of nativeUI)control.setAttribute('data-myt-search-toolbar','');
+        }
+
+        restoreNative(){
+            for(const native of this.nativeNodes){native.removeAttribute('data-myt-search-native-root');native.removeAttribute('data-myt-search-layout-path');native.removeAttribute('data-myt-search-toolbar');native.removeAttribute('data-myt-search-native-ui');}
+            this.nativeNodes.clear();
         }
 
         layout(){
@@ -447,7 +471,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             document.removeEventListener('yt-page-data-updated',this.changed);document.removeEventListener('yt-rendererstamper-finished',this.changed);
             for(const card of [...this.cards.values(),...this.channels.values()])card.destroy();
             for(const source of this.sources.keys()){source.removeAttribute('data-myt-search-source-key');source.removeAttribute('data-myt-search-source-kind');}
-            for(const native of this.nativeNodes){native.removeAttribute('data-myt-search-native-root');native.removeAttribute('data-myt-search-layout-path');native.removeAttribute('data-myt-search-toolbar');native.removeAttribute('data-myt-search-native-ui');}
+            this.restoreNative();
             this.host.remove();this.cards.clear();this.channels.clear();this.sources.clear();
         }
     }

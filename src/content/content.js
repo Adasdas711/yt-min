@@ -719,7 +719,7 @@
         if(title)globalThis.MinimalYouTubeWatch?.loadTitleFonts?.(title.textContent);
         // Posts retain their native interactions and layout.
         if(/\/(community|posts)\/?$/.test(location.pathname))return null;
-        const contents=browse.querySelector(':scope > #contents');
+        const contents=globalThis.MinimalYouTubeSearch?.channelResults?globalThis.MinimalYouTubeSearch.channelResults(browse):browse.querySelector(':scope > #contents');
         if(contents&&!contents.hasAttribute('data-myt-channel-results'))contents.setAttribute('data-myt-channel-results','');
         return contents;
     }

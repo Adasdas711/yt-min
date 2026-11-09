@@ -199,6 +199,10 @@ html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="chan
     border-radius: 0 !important;
 }
 
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-results]:is([hidden], [aria-hidden="true"]) {
+    display: none !important;
+}
+
 /* Target profile content, not its outer header or the circular channel avatar. */
 html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) :is(yt-page-header-content-view-model, .page-header-view-model-wiz__page-header-content, .yt-page-header-view-model-wiz__page-header-content, .ytPageHeaderViewModelPageHeaderContent),
 html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-c4-tabbed-header-renderer #channel-header-container,
