@@ -298,6 +298,7 @@ def check_gutter_document_scroll(browser, path, renderer):
       <div id="left-gutter" style="position:fixed;left:0;top:0;width:80px;height:100vh;overflow:hidden;overscroll-behavior:contain"></div>
       <div id="right-gutter" style="position:fixed;right:0;top:0;width:80px;height:100vh;overflow:hidden;overscroll-behavior:contain"></div>'''
     page = setup(browser, path, fixture, width=2016)
+    expect(page.locator(renderer)).to_have_css('visibility','visible')
     page.evaluate("""() => {
       for (const id of ['left-gutter', 'right-gutter']) {
         document.getElementById(id).addEventListener('wheel', event => event.preventDefault(), {passive:false});
@@ -604,6 +605,7 @@ def check_full_width_background_scroll(browser):
     # Independent native controls belong outside the replaced video results.
     fixture=fixture.replace('<div id="contents" style=', '<div id="header" style=')
     page=setup(browser,'/@creator/videos',fixture,width=2016)
+    expect(page.locator('#independent-scroll')).to_have_css('visibility','visible')
     page.evaluate("document.documentElement.style.overflow='hidden'; for (const id of ['empty-left','empty-right']) document.getElementById(id).addEventListener('wheel',event=>event.preventDefault(),{passive:false})")
     for x in [26,1990]:
         page.evaluate('window.scrollTo(0,0)')
@@ -2632,6 +2634,7 @@ def main():
                 expect(page.locator('#myt-search .media')).to_have_count(12)
                 assert page.locator('#myt-search').evaluate('node=>node.getClientRects().length>0')
             page.evaluate("document.documentElement.style.cssText='height:100%;overflow:hidden'; document.body.style.cssText='height:100%;overflow:hidden'")
+            if renderer=='ytd-browse':expect(page.locator('#inner-scroll')).to_have_css('visibility','visible')
             page.mouse.move(10, 400)
             page.mouse.wheel(0, 300)
             page.wait_for_function('scrollY>=250' if renderer=='ytd-search' else "document.querySelector('#inner-scroll').scrollTop >= 250")

@@ -6,6 +6,7 @@
     const base=path=>path.match(/^(\/(?:@[^/]+|(?:channel|c|user)\/[^/]+))/)?.[1]?.toLowerCase()||'';
     const section=path=>{const value=path.replace(/\/$/,'').split('/').pop();return value==='community'?'posts':value;};
     const allowed=new Set(['videos','streams','playlists','posts','search']);
+    const endpointCache=new Map();
     const titles=[
         ['videos',/^(videos|видео)$/iu],['streams',/^(live|streams|трансляции|livestreams)$/iu],
         ['playlists',/^(playlists|плейлисты)$/iu],['posts',/^(posts|community|посты|записи|сообщество|beiträge)$/iu],
@@ -25,15 +26,16 @@
         }
         return '';
     }
-    function endpoint(browse,target){
+    function resolveEndpoint(browse,target){
         const current=base(location.pathname),wanted=section(target.pathname),data=responses(browse),id=channelId(data,current),stack=[];
+        // Canonical response tabs precede DOM controllers, which YouTube reuses.
+        for(const response of data){
+            for(const tabs of [response.contents?.twoColumnBrowseResultsRenderer?.tabs,response.contents?.singleColumnBrowseResultsRenderer?.tabs,response.tabs])if(Array.isArray(tabs))for(const tab of tabs)stack.push({value:tab,hint:{}});
+        }
         for(const node of browse.querySelectorAll('yt-tab-shape,tp-yt-paper-tab,ytd-tab-renderer,ytd-expandable-tab-renderer,[role="tab"]')){
             const anchor=node.matches('a[href]')?node:node.querySelector('a[href]');
             const hint={title:node.textContent.trim()||node.getAttribute('aria-label')||'',url:anchor?.href||'',native:true};
             for(const owner of [node,anchor])for(const value of [owner?.data,owner?.viewModel,owner?.__data?.data,owner?.polymerController?.data,owner?.endpoint,owner?.navigationEndpoint])if(value)stack.push({value,hint});
-        }
-        for(const response of data){
-            for(const tabs of [response.contents?.twoColumnBrowseResultsRenderer?.tabs,response.contents?.singleColumnBrowseResultsRenderer?.tabs,response.tabs])if(tabs)stack.push({value:tabs,hint:{}});
         }
         const seen=new Set();let scans=0,index=0;
         while(index<stack.length&&scans++<2500){
@@ -72,6 +74,22 @@
             }
         }
         return null;
+    }
+    function endpoint(browse,target){
+        const current=base(location.pathname),id=channelId(responses(browse),current),key=current+'|'+id;
+        let cache=endpointCache.get(key);
+        if(!cache){cache=new Map();endpointCache.set(key,cache);if(endpointCache.size>8)endpointCache.delete(endpointCache.keys().next().value);}
+        // Snapshot all original tab commands before the first transition can
+        // replace their models. Never retain a query in a section's command.
+        for(const name of allowed)if(!cache.has(name)){
+            const url=new URL(current+'/'+name,location.origin),command=resolveEndpoint(browse,url);
+            if(command){delete command.browseEndpoint.query;cache.set(name,command);}
+        }
+        const wanted=section(target.pathname),command=cache.get(wanted);if(!command)return null;
+        const browseEndpoint={...command.browseEndpoint};
+        if(wanted==='search')browseEndpoint.query=target.searchParams.get('query')||'';
+        const route=new URL(target.href);route.searchParams.delete('hl');route.searchParams.delete('persist_hl');
+        return {browseEndpoint,commandMetadata:{webCommandMetadata:{...command.commandMetadata.webCommandMetadata,url:route.pathname+route.search+route.hash}},...(command.clickTrackingParams?{clickTrackingParams:command.clickTrackingParams}:{})};
     }
     document.addEventListener('minimal-youtube:channel-navigate',event=>{
         const nav=event.target;

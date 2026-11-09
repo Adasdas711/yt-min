@@ -693,6 +693,7 @@
     }
 
     let channelResizeFrame=0;
+    let channelBootTimer=0;
     let channelView=null;
     window.addEventListener('resize',()=>{
         if(channelResizeFrame||!enabled||root.dataset.mytPage!=='channel')return;
@@ -722,7 +723,10 @@
         const title=browse.querySelector('yt-page-header-view-model h1,yt-page-header-renderer h1,ytd-page-header-renderer h1,ytd-c4-tabbed-header-renderer h1,ytd-channel-name #text,#channel-name #text');
         if(title)globalThis.MinimalYouTubeWatch?.loadTitleFonts?.(title.textContent);
         // Posts retain their native interactions and layout.
-        if(/\/(community|posts)\/?$/.test(location.pathname))return null;
+        if(/\/(community|posts)\/?$/.test(location.pathname)){
+            if(channelView?.nav.isConnected){browse.setAttribute('data-myt-channel-ready','');root.removeAttribute('data-myt-channel-boot');}
+            return null;
+        }
         const contents=globalThis.MinimalYouTubeSearch?.channelResults?globalThis.MinimalYouTubeSearch.channelResults(browse):browse.querySelector(':scope > #contents');
         if(contents&&!contents.hasAttribute('data-myt-channel-results'))contents.setAttribute('data-myt-channel-results','');
         return contents;
@@ -736,7 +740,9 @@
         if(!active||searchView&&searchView.channel!==channel){searchView?.destroy();searchView=null;}
         for(const node of document.querySelectorAll('[data-myt-channel-results]'))if(node!==contents)node.removeAttribute('data-myt-channel-results');
         if(!active)return;
-        if(globalThis.MinimalYouTubeSearch){searchView ||= new globalThis.MinimalYouTubeSearch(channel);if(channel)searchView.prepareChannelRoute?.(location.href);searchView.sync(channel?[contents]:document.querySelectorAll('ytd-search'));}
+        if(globalThis.MinimalYouTubeSearch){searchView ||= new globalThis.MinimalYouTubeSearch(channel);if(channel)searchView.prepareChannelRoute?.(location.href);searchView.sync(channel?[contents]:document.querySelectorAll('ytd-search'));
+            if(channel&&channelView?.nav.isConnected&&searchView.host.isConnected){channelView.browse.setAttribute('data-myt-channel-ready','');root.removeAttribute('data-myt-channel-boot');}
+        }
     }
 
     function syncChatFrames() {
@@ -1243,6 +1249,10 @@
             return;
         }
         const previous = root.dataset.mytPage;
+        if(nextPage==='channel'&&previous!=='channel'){
+            root.setAttribute('data-myt-channel-boot','');clearTimeout(channelBootTimer);
+            channelBootTimer=setTimeout(()=>root.removeAttribute('data-myt-channel-boot'),2000);
+        }else if(nextPage!=='channel')root.removeAttribute('data-myt-channel-boot');
         if (previous && previous !== nextPage && previous !== "home" && !root.dataset.mytPreviousPage) {
             root.dataset.mytPreviousPage = previous;
         }
@@ -1469,6 +1479,8 @@
             syncSearchDecorations();
             cleanTitle();
         } else {
+            root.removeAttribute('data-myt-channel-boot');
+            clearTimeout(channelBootTimer);
             classObserver.disconnect();
             observer.disconnect();
             cancelAnimationFrame(frame);

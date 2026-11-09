@@ -149,6 +149,11 @@ html.minimal-youtube ytd-app ytd-page-manager.ytd-app {
     margin-right: 0 !important;
 }
 
+/* The first channel script applies this before native content can paint. */
+html.minimal-youtube[data-myt-channel-boot] ytd-browse { visibility: hidden !important; }
+/* The owned renderer supplies the only empty state, including sibling feeds. */
+html.minimal-youtube[data-myt-page="channel"][data-myt-search-ui] [data-myt-channel-ready] :is(ytd-message-renderer,yt-message-view-model,ytd-background-promo-renderer) { display: none !important; }
+
 /* Channel: a viewport-wide cover, centered profile, and a separate content rail. */
 html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-app,
 html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-page-manager,

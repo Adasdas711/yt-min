@@ -95,7 +95,7 @@
             this.nav.attachShadow({mode:'open'}).innerHTML=`<style>
                 :host{display:block!important;min-width:0;font:600 16px/1.4 Arial,sans-serif;color:var(--myt-ink)}*{box-sizing:border-box}[hidden]{display:none!important}
                 .toolbar{display:flex;align-items:center;justify-content:center;gap:8px;min-width:0}nav{display:flex;flex:0 1 auto;min-width:0;gap:8px;overflow-x:auto;scrollbar-width:thin;padding:4px 0}a,button{flex:none;color:inherit;font:inherit;text-decoration:none;background:none;border:0;border-bottom:2px solid transparent;padding:12px 16px;cursor:pointer;white-space:nowrap}
-                [aria-current=page],button[aria-expanded=true]{border-color:currentColor}a:hover,button:hover{background:var(--myt-soft);border-radius:8px 8px 0 0}a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
+                nav a{color:var(--myt-muted);border-radius:10px}nav a[aria-current=page]{color:var(--myt-ink);background:var(--myt-soft);border-bottom-color:currentColor;box-shadow:inset 0 -2px currentColor;font-weight:800}button[aria-expanded=true]{border-color:currentColor}a:hover,button:hover{background:var(--myt-soft);border-radius:10px}a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
                 [data-pending]{opacity:.65;cursor:progress}.navigation-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
                 .channel-search{display:flex;flex:none;align-items:center;gap:10px;min-width:0}.search-toggle{display:inline-flex;align-items:center;justify-content:center;width:40px;height:44px;padding:0;border:0;border-radius:50%;color:var(--myt-muted)}.search-toggle:hover{border-radius:50%;color:var(--myt-ink)}.search-toggle[aria-expanded=true]{color:var(--myt-ink)}.search-toggle svg{display:block;width:24px;height:24px}
                 form{display:flex;flex:none;width:clamp(160px,20vw,292px);margin:0;padding:0}input{appearance:none;-webkit-appearance:none;display:block;box-sizing:border-box;width:100%;min-width:0;flex:1;border:0;border-bottom:2px solid var(--myt-muted);border-radius:0;background:transparent;color:inherit;padding:6px 0;font:400 16px/1.5 Arial,sans-serif;outline:none}input::placeholder{color:var(--myt-muted)}input:focus,input:focus-visible{border-bottom-color:var(--myt-ink);outline:none}input::-webkit-search-decoration{display:none}
@@ -197,7 +197,19 @@
                 const href=event.detail?.url||event.detail?.endpoint?.commandMetadata?.webCommandMetadata?.url;
                 const matches=typeof href==='string'?this.navigationKey(href)===pending.key:this.navigationKey(location.href)===pending.key;
                 if(event.type==='yt-navigate-start'&&(matches||!href)){pending.accepted=true;clearTimeout(pending.acceptTimer);}
-                else if(matches&&(event.type==='yt-navigate-finish'||event.type==='yt-page-data-updated'))this.cancelNavigation();
+                else if(matches&&(event.type==='yt-navigate-finish'||event.type==='yt-page-data-updated')){
+                    this.cancelNavigation();
+                    if(!/\/search\/?$/.test(new URL(pending.href).pathname))this.verifyTimer=setTimeout(()=>{
+                        if(this.navigationPending||this.navigationKey(location.href)!==pending.key)return;
+                        const messages=[...this.browse?.querySelectorAll('ytd-message-renderer,yt-message-view-model')||[]];
+                        if(messages.some(node=>{
+                            if(node.hidden||node.getAttribute('aria-hidden')==='true')return false;
+                            if(!/no results found|ничего не найдено|результатов нет/iu.test(node.textContent))return false;
+                            for(let parent=node.parentElement;parent&&parent!==this.browse;parent=parent.parentElement)if(parent.hidden||parent.getAttribute('aria-hidden')==='true'||getComputedStyle(parent).display==='none')return false;
+                            return true;
+                        }))location.assign(pending.href);
+                    },350);
+                }
                 else if((event.type==='yt-navigate-error'&&(matches||!href&&pending.accepted))||(event.type==='yt-navigate-cancel'&&href&&matches))this.fallbackNavigation(pending);
             };
             this.historyNavigation=()=>{this.emptySearch=false;document.documentElement.removeAttribute('data-myt-channel-search-empty');this.cancelNavigation();};
@@ -319,6 +331,7 @@
             if(status.textContent!==message)status.textContent=message;
         }
         cancelNavigation(){
+            clearTimeout(this.verifyTimer);
             const pending=this.navigationPending;
             if(pending){clearTimeout(pending.acceptTimer);clearTimeout(pending.completeTimer);}
             this.navigationPending=null;this.renderNavigationState();
@@ -331,16 +344,16 @@
         open(href){
             const url=new URL(href,location.href),search=/\/search\/?$/.test(url.pathname);
             if(!search)url.searchParams.delete('query');
-            const key=this.navigationKey(url.href);
+            const key=this.navigationKey(url.href),fromSearch=/\/search\/?$/.test(location.pathname)||!!this.navigationPending&&/\/search\/?$/.test(new URL(this.navigationPending.href).pathname);
             this.emptySearch=false;document.documentElement.removeAttribute('data-myt-channel-search-empty');
             if(!search){this.closeSearch();this.nav.shadowRoot.querySelector('input').value='';}
             if(this.navigationPending?.key===key||!this.navigationPending&&key===this.navigationKey(location.href))return;
             this.cancelNavigation();
             const pending={id:(this.navigationSequence||0)+1,href:url.href,key,sourceKey:this.navigationKey(location.href),accepted:false};
             this.navigationSequence=pending.id;this.navigationPending=pending;this.renderNavigationState();
-            // Regular sections use their own document, so repeated tab changes
-            // never accumulate stale YouTube controllers or command state.
-            if(!search){this.fallbackNavigation(pending);return;}
+            // Exit the search controller cleanly; ordinary tabs use cached
+            // native endpoints and keep the current document and header.
+            if(fromSearch&&!search){this.fallbackNavigation(pending);return;}
             this.nav.setAttribute('data-myt-channel-navigation-request',JSON.stringify({id:pending.id,href:pending.href}));
             this.nav.removeAttribute('data-myt-channel-navigation-result');
             this.nav.dispatchEvent(new Event('minimal-youtube:channel-navigate',{bubbles:true}));
@@ -350,12 +363,13 @@
             pending.acceptTimer=setTimeout(()=>{
                 if(this.navigationPending===pending&&!pending.accepted&&this.navigationKey(location.href)!==pending.key)this.fallbackNavigation(pending);
             },700);
-            pending.completeTimer=setTimeout(()=>this.fallbackNavigation(pending),12000);
+            pending.completeTimer=setTimeout(()=>this.fallbackNavigation(pending),search?12000:4000);
         }
         url(section,query){const url=new URL(this.base+'/'+section,location.origin);url.searchParams.set('hl','en');url.searchParams.set('persist_hl','1');if(query)url.searchParams.set('query',query);return url.href;}
         hide(node){if(node&&!this.hidden.has(node)){node.setAttribute('data-myt-channel-source','');this.hidden.add(node);}}
         sync(browse){
             const match=location.pathname.match(basePattern);if(!match)return;
+            if(this.browse!==browse){this.browse?.removeAttribute('data-myt-channel-ready');this.browse=browse;}
             if(this.base&&this.base!==match[1])this.cancelNavigation();
             this.base=match[1];
             const header=browse.querySelector(':scope > #header,:scope > #page-header,ytd-c4-tabbed-header-renderer,yt-page-header-view-model,yt-page-header-renderer');
@@ -644,6 +658,7 @@
         }
         destroy(){
             this.cancelNavigation();
+            this.browse?.removeAttribute('data-myt-channel-ready');
             document.documentElement.removeAttribute('data-myt-channel-search-empty');
             for(const name of navigationEvents)window.removeEventListener(name,this.nativeNavigation,true);
             window.removeEventListener('popstate',this.historyNavigation);

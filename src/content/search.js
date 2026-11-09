@@ -171,6 +171,7 @@
 
 
     const sourceSelector='ytd-rich-item-renderer,ytd-rich-grid-media,ytd-video-renderer,ytd-grid-video-renderer,ytd-compact-video-renderer,ytd-playlist-renderer,ytd-grid-playlist-renderer,ytd-radio-renderer,ytd-channel-renderer,yt-lockup-view-model';
+    const emptySelector='ytd-message-renderer,yt-message-view-model,ytd-background-promo-renderer';
     const channelHeaderSelector='#myt-channel-nav,#myt-channel-description,yt-page-header-view-model,yt-page-header-renderer,ytd-page-header-renderer,ytd-c4-tabbed-header-renderer';
     const channelExcludedSelector=channelHeaderSelector+',#header,#page-header,#tabs,#tabs-container,#secondary,ytd-popup-container,[role="dialog"]';
     const shelfSelector='ytd-shelf-renderer,grid-shelf-view-model,ytd-rich-section-renderer';
@@ -324,7 +325,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
                 for(let parent=node;parent&&parent!==browse;parent=parent.parentElement)if(getComputedStyle(parent).display==='none')return false;
                 return true;
             };
-            const source=[...browse.querySelectorAll(sourceSelector)].find(available);
+            const source=[...browse.querySelectorAll(sourceSelector)].find(available)||[...browse.querySelectorAll(emptySelector)].find(node=>!node.closest(channelExcludedSelector)&&nativeAvailable(node,browse.parentElement));
             if(source){
                 let contents=source.parentElement;
                 while(contents.parentElement&&contents.parentElement!==browse&&!contents.parentElement.querySelector(channelHeaderSelector+',#tabs,#tabs-container'))contents=contents.parentElement;

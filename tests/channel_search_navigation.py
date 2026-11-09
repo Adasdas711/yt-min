@@ -49,12 +49,14 @@ def empty_queries(browser,width):
     context,page,nav,documents,requests,pending,errors=setup(browser,width)
     field=nav.get_by_role('searchbox',name='Search this channel')
     for title,section in [('Live','streams'),('Playlists','playlists'),('Posts','posts')]:
-        nav.get_by_role('link',name=title,exact=True).click();wait_section(page,section)
-        count=len(documents)
+        nav.get_by_role('link',name=title,exact=True).click()
+        page.wait_for_function('section=>__native.events.at(-1)?.browseEndpoint.params==="native-"+section',arg=section)
+        finish(pending);wait_section(page,section)
+        count=len(documents);request_count=len(requests)
         nav.get_by_role('button',name='Search',exact=True).click();field.press('Enter')
         expect(field).to_be_visible();expect(field).to_have_value('')
         page.wait_for_timeout(50)
-        assert len(documents)==count and not requests and not pending
+        assert len(documents)==count and len(requests)==request_count and not pending
         assert urlparse(page.url).path.endswith('/'+section)
     field.fill('cookie');field.press('Enter');finish(pending);page.wait_for_url('**/search?**')
     host=page.locator('#myt-search')

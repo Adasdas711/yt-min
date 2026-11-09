@@ -23,6 +23,7 @@ ROUTER=r'''(() => {
             return name==='search'?{expandableTabRenderer:tab}:{tabRenderer:tab};
         });
         const model=()=>{
+            if(window.__nativeOptions.dirtyTabs&&state.serial>=3)for(const record of records)(record.tabRenderer||record.expandableTabRenderer).endpoint.browseEndpoint.params='native-search';
             browse.data={metadata:{channelMetadataRenderer:{externalId:id,vanityChannelUrl:'https://www.youtube.com'+base,description:'Channel biography'}},contents:window.__nativeOptions.domOnly?{}:{twoColumnBrowseResultsRenderer:{tabs:records}}};
             window.ytInitialData=browse.data;
             for(const node of browse.querySelectorAll('yt-tab-shape')){
@@ -66,7 +67,7 @@ ROUTER=r'''(() => {
 })();'''
 
 
-def setup(browser,width=1440,dom_only=False,bridge=True,search_context_bug=False):
+def setup(browser,width=1440,dom_only=False,bridge=True,search_context_bug=False,dirty_tabs=False):
     context=browser.new_context(viewport={'width':width,'height':960})
     page=context.new_page();documents=[];requests=[];pending=[];errors=[]
     def route(route):
@@ -97,7 +98,7 @@ def setup(browser,width=1440,dom_only=False,bridge=True,search_context_bug=False
         document.dispatchEvent(new CustomEvent('yt-navigate-finish',{detail:{endpoint,url}}));
       },true);
     '''
-    main+='\nwindow.__nativeOptions='+json.dumps({'domOnly':dom_only})+';\n'+ROUTER
+    main+='\nwindow.__nativeOptions='+json.dumps({'domOnly':dom_only,'dirtyTabs':dirty_tabs})+';\n'+ROUTER
     page.add_init_script(main)
     isolated='('+MOCK+')({enabled:true});chrome.runtime.id="channel-navigation";\n'
     isolated+='\n'.join((ROOT/'src/content'/f'{module}.js').read_text() for module in ['ads','watch','playlist','search-data','search','channel','content'])
@@ -125,23 +126,23 @@ def wait_section(page,section):
 
 
 def transitions(browser,width,dom_only):
-    context,page,nav,documents,requests,pending,errors=setup(browser,width,dom_only)
+    context,page,nav,documents,requests,pending,errors=setup(browser,width,dom_only,dirty_tabs=True)
     for cycle in range(5):
         for title,section in [('Live','streams'),('Playlists','playlists'),('Posts','posts'),('Videos','videos')]:
             token=page.evaluate('__native.token')
-            # Tab controls must work even if the old SPA controller stops accepting commands.
-            page.evaluate('__native.mode="hang"')
             link=nav.get_by_role('link',name=title,exact=True)
             if title=='Posts':link.focus();link.press('Enter')
             else:link.click()
+            assert requests[-1]['params']=='native-'+section,requests[-1]
+            assert finish(pending)==section
             wait_section(page,section)
             expect(link).to_have_attribute('aria-current','page')
             expect(nav).to_have_attribute('aria-busy','false')
-            assert page.evaluate('__native.token')!=token
-            assert not requests and not pending
+            assert page.evaluate('__native.token')==token
+            assert not pending
             if section=='posts':expect(page.locator('ytd-backstage-post-renderer')).to_have_text('Channel post')
             else:expect(page.locator('#myt-search .media-title')).to_have_text(['Playlist 22' if section=='playlists' else 'Regular video 21' if section=='streams' else 'Regular video 20'])
-    assert len(documents)==21,documents
+    assert len(documents)==1 and len(requests)==20,(documents,requests)
     count=len(documents);nav.get_by_role('link',name='Videos',exact=True).click();page.wait_for_timeout(50)
     assert len(documents)==count,'The active section must not reload'
     page.go_back();wait_section(page,'posts')
@@ -150,7 +151,7 @@ def transitions(browser,width,dom_only):
     expect(nav.get_by_role('link',name='Videos',exact=True)).to_have_attribute('aria-current','page')
     assert not errors,errors
     context.close()
-    print(f'PASS 20 consecutive section changes, keyboard, active-tab deduplication and history with an unusable SPA controller: {width}px, DOM models={dom_only}',flush=True)
+    print(f'PASS 20 fast section changes without document reload, including corrupted native tab models after the third switch: {width}px, DOM models={dom_only}',flush=True)
 
 
 def search_and_races(browser):
