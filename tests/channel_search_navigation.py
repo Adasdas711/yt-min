@@ -36,6 +36,7 @@ def labels_and_sections(browser,width):
         wait_section(page,section)
         assert len(requests)==count and not pending
         expect(root.locator('.media-title')).to_have_text([expected])
+        expect(root.locator('.media-channel')).to_be_visible()
         expect(root.get_by_role('heading',name='Результаты поиска',exact=True)).to_be_hidden()
         expect(root.locator('.empty')).to_be_hidden()
         expect(nav.get_by_role('link',name=title,exact=True)).to_have_attribute('aria-current','page')
@@ -48,30 +49,47 @@ def empty_queries(browser,width):
     context,page,nav,documents,requests,pending,errors=setup(browser,width)
     field=nav.get_by_role('searchbox',name='Search this channel')
     for title,section in [('Live','streams'),('Playlists','playlists'),('Posts','posts')]:
-        nav.get_by_role('link',name=title,exact=True).click();finish(pending);page.wait_for_url('**/'+section)
-        nav.get_by_role('button',name='Search',exact=True).click()
+        nav.get_by_role('link',name=title,exact=True).click();wait_section(page,section)
+        count=len(documents)
+        nav.get_by_role('button',name='Search',exact=True).click();field.press('Enter')
         expect(field).to_be_visible();expect(field).to_have_value('')
-        assert requests[-1]['params']=='native-videos','Opening an empty channel search must load Videos'
-        assert finish(pending)=='videos';wait_section(page,'videos')
-        expect(field).to_be_visible();expect(field).to_be_focused()
-    count=len(requests);field.press('Enter');page.wait_for_timeout(50)
-    assert len(requests)==count,'Empty Enter on Videos must not start another request'
+        page.wait_for_timeout(50)
+        assert len(documents)==count and not requests and not pending
+        assert urlparse(page.url).path.endswith('/'+section)
     field.fill('cookie');field.press('Enter');finish(pending);page.wait_for_url('**/search?**')
-    expect(page.locator('#myt-search .results-heading')).to_be_visible()
-    count=len(requests);field.fill('');wait_section(page,'videos')
-    assert len(requests)==count and not pending
-    expect(page.locator('#myt-search .media-title')).to_have_text(['Regular video 20'])
-    expect(field).to_be_visible();expect(field).to_have_value('');expect(field).to_be_focused()
-    expect(page.locator('#myt-search .results-heading')).to_be_hidden()
-    field.fill('cookie');field.press('Enter');finish(pending);page.wait_for_url('**/search?**')
-    count=len(requests);field.fill('   ');wait_section(page,'videos')
-    assert len(requests)==count and not pending
-    expect(page.locator('#myt-search .media-title')).to_have_text(['Regular video 20'])
-    expect(field).to_be_visible();expect(field).to_have_value('')
-    assert all(request.get('query','valid').strip() for request in requests),'An empty query reached YouTube'
-    assert len(documents)==3 and not errors,(documents,errors)
+    host=page.locator('#myt-search')
+    expect(host.locator('.results-heading')).to_be_visible()
+    expect(host.locator('.media-channel')).to_be_hidden()
+    assert host.locator('.media-channel').text_content()==''
+    count=len(documents);request_count=len(requests);query_url=page.url
+    for value in ('','   '):
+        field.fill(value);field.press('Enter')
+        expect(host.locator('.stream')).to_be_hidden()
+        expect(host.locator('.results-heading')).to_be_hidden()
+        expect(host.locator('.empty')).to_be_hidden()
+        assert page.url==query_url and len(documents)==count and len(requests)==request_count
+    field.fill('another query');field.press('Enter');finish(pending);page.wait_for_url('**query=another+query')
+    expect(host.locator('.stream')).to_be_visible();expect(host.locator('.results-heading')).to_be_visible()
+    expect(host.locator('.media-channel')).to_be_hidden()
+    # A late response after clearing the input must remain invisible.
+    field.fill('still loading');field.press('Enter');field.fill('')
+    expect(host.locator('.stream')).to_be_hidden()
+    finish(pending);page.wait_for_url('**query=still+loading')
+    expect(host.locator('.stream')).to_be_hidden();expect(host.locator('.results-heading')).to_be_hidden()
+    expect(host.locator('.empty')).to_be_hidden();expect(field).to_have_value('')
+    page.evaluate('''()=>{
+        const tabs=document.querySelector('yt-tab-group-shape');window.__savedTabs=tabs.innerHTML;tabs.replaceChildren();
+        document.dispatchEvent(new Event('yt-page-data-updated'));
+    }''')
+    expect(host.locator('.stream')).to_be_hidden();expect(host.locator('.empty')).to_be_hidden()
+    page.evaluate('''()=>{
+        document.querySelector('yt-tab-group-shape').innerHTML=__savedTabs;
+        document.dispatchEvent(new Event('yt-page-data-updated'));
+    }''')
+    expect(field).to_be_visible();expect(field).to_have_value('');expect(host.locator('.stream')).to_be_hidden()
+    assert len(documents)==count and not errors,(documents,errors)
     context.close()
-    print(f'PASS opening/clearing/whitespace/empty Enter keeps Videos and an editable search field: {width}px',flush=True)
+    print(f'PASS empty input submits nothing, clearing and late replies show no results, and channel search cards omit owners: {width}px',flush=True)
 
 
 def cached_search(browser,section):
@@ -116,10 +134,12 @@ def empty_search_loading(browser):
 def blank_urls(browser):
     for path in ('/@JoeSpeen/search','/@JoeSpeen/search?query=','/@JoeSpeen/search?query=%20%20','/channel/UCfixture/search?query='):
         page,requests=startup(browser,path)
-        page.wait_for_url('**/videos?**')
-        assert 'query=' not in page.url and len(requests)==2,(page.url,requests)
+        expect(page.locator('#myt-search .stream')).to_be_hidden()
+        expect(page.locator('#myt-search .results-heading')).to_be_hidden()
+        expect(page.locator('#myt-search .empty')).to_be_hidden()
+        assert urlparse(page.url).path.endswith('/search') and len(requests)<=2 and all(urlparse(url).path.endswith('/search') for url in requests),(page.url,requests)
         page.close()
-    print('PASS blank channel-search URLs redirect once to Videos',flush=True)
+    print('PASS blank search URLs display no results and never redirect to Videos',flush=True)
 
 
 if __name__=='__main__':

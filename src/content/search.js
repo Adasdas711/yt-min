@@ -370,7 +370,8 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             let image=coverImage(source)||record?.image||cached?.image;
             if(!image&&parsed.searchParams.get('v')?.match(/^[-\w]{11}$/))image='https://i.ytimg.com/vi/'+parsed.searchParams.get('v')+'/hqdefault.jpg';
             const count=kind==='playlist'?([...source.querySelectorAll(countSelector)].map(node=>countNumber(node.getAttribute('data-video-count')||node.getAttribute('aria-label')||text(node))).find(Boolean)||countNumber(record?.count)||countNumber(cached?.count)):'';
-            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,count,channel:{name:text(owner)||record?.channel?.name||'',href:channelURL(owner?.href||record?.channel?.href)}};
+            const hideChannel=this.channel&&/\/search\/?$/.test(location.pathname);
+            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,count,channel:hideChannel?{name:'',href:''}:{name:text(owner)||record?.channel?.name||'',href:channelURL(owner?.href||record?.channel?.href)}};
         }
         sync(searches){
             if(!this.nativeStyle.isConnected)document.documentElement.append(this.nativeStyle);
@@ -378,10 +379,10 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             const candidates=[...searches],selectionNodes=new Set();
             for(const item of candidates)for(let parent=item;parent&&parent!==document.body;parent=parent.parentElement)selectionNodes.add(parent);
             for(const item of candidates)for(const toolbar of item.querySelectorAll(nativeToolbarSelector))selectionNodes.add(toolbar);
-            if(this.channel){const nav=document.querySelector('#myt-channel-nav');if(nav)selectionNodes.add(nav);}
+            if(this.channel){selectionNodes.add(document.documentElement);const nav=document.querySelector('#myt-channel-nav');if(nav)selectionNodes.add(nav);}
             if(selectionNodes.size!==this.selectionNodes.size||[...selectionNodes].some(item=>!this.selectionNodes.has(item))){
                 this.selectionObserver.disconnect();this.selectionNodes=selectionNodes;
-                for(const item of selectionNodes)this.selectionObserver.observe(item,{attributes:true,attributeFilter:['hidden','aria-hidden','class','style','aria-busy']});
+                for(const item of selectionNodes)this.selectionObserver.observe(item,{attributes:true,attributeFilter:['hidden','aria-hidden','class','style','aria-busy','data-myt-channel-search-empty']});
             }
             const search=candidates.find(item=>!item.closest('[hidden],[aria-hidden="true"]')&&item.getClientRects().length&&getComputedStyle(item).visibility!=='hidden')||candidates[0];if(!search)return;
             if(this.search!==search){
@@ -431,11 +432,12 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             const channelContainer=this.q('.channels');let index=0;
             for(const source of sources){const card=this.channels.get(source);if(card){if(channelContainer.children[index]!==card.host)channelContainer.insertBefore(card.host,channelContainer.children[index]||null);index++;}}
             const url=new URL(location.href),query=this.channel&&/\/search\/?$/.test(url.pathname)&&Boolean(url.searchParams.get('query')?.trim());
-            this.q('.results-heading').hidden=!query;
+            const blank=this.channel&&/\/search\/?$/.test(url.pathname)&&(!query||document.documentElement.hasAttribute('data-myt-channel-search-empty'));
+            this.q('.results-heading').hidden=!query||blank;this.q('.stream').hidden=blank;
             const busy=this.channel&&document.querySelector('#myt-channel-nav')?.getAttribute('aria-busy')==='true';
             const confirmedEmpty=this.channel&&[...search.querySelectorAll('ytd-message-renderer,yt-message-view-model,ytd-background-promo-renderer')].some(node=>nativeAvailable(node,search));
             this.q('.empty').textContent=this.channel&&!query?(/\/playlists\/?$/.test(url.pathname)?'No playlists yet.':'No videos yet.'):'No results found.';
-            this.q('.channels').hidden=!this.channels.size;this.q('.empty').hidden=Boolean(this.channels.size||stream.length||busy||this.channel&&!query&&!confirmedEmpty);
+            this.q('.channels').hidden=!this.channels.size||blank;this.q('.empty').hidden=Boolean(blank||this.channels.size||stream.length||busy||this.channel&&!query&&!confirmedEmpty);
             this.prepareNative(search);this.translateFilters();this.layout();
         }
         prepareNative(search){

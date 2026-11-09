@@ -1,4 +1,4 @@
-"""Channel SPA navigation across MAIN/ISOLATED worlds, delayed replies and history."""
+"""Repeated section navigation, isolated search, delayed replies and history."""
 import json
 from urllib.parse import urlparse, parse_qs
 from playwright.sync_api import sync_playwright, expect
@@ -120,113 +120,87 @@ def finish(pending,index=0):
     return section
 
 
+def wait_section(page,section):
+    page.wait_for_url(lambda url:urlparse(str(url)).path.rstrip('/').endswith('/'+section),timeout=4000)
+
+
 def transitions(browser,width,dom_only):
     context,page,nav,documents,requests,pending,errors=setup(browser,width,dom_only)
-    token=page.evaluate('__native.token')
-    for title,section in [('Live','streams'),('Playlists','playlists'),('Posts','posts'),('Videos','videos')]:
-        link=nav.get_by_role('link',name=title,exact=True)
-        if title=='Posts':link.focus();link.press('Enter')
-        else:link.click()
-        expect(nav).to_have_attribute('aria-busy','true')
-        expect(link).to_have_attribute('aria-current','page')
-        expect(link).to_have_attribute('data-pending','')
-        assert page.evaluate('__native.events.at(-1).clickTrackingParams')=='native-tracking-'+section
-        count=len(requests);link.click();assert len(requests)==count
-        if title=='Live':
-            page.wait_for_timeout(800)
-            assert len(documents)==1,'An accepted slow SPA request must not cause a reload'
-            page.evaluate('''()=>{
-                const group=document.querySelector('yt-tab-group-shape');
-                window.__nativeTabMarkup=group.innerHTML;group.replaceChildren();
-            }''')
-            expect(nav).to_be_visible()
-            expect(nav.get_by_role('link',name='Playlists',exact=True)).to_be_visible()
-            page.evaluate('document.querySelector("yt-tab-group-shape").innerHTML=__nativeTabMarkup')
-        finish(pending)
-        page.wait_for_url('**/'+section)
-        expect(nav).to_have_attribute('aria-busy','false')
-        expect(page.locator('#section-result')).to_have_text(section+':')
-        assert page.evaluate('__native.token')==token
-        assert page.evaluate('document.querySelector("#myt-channel-nav")===__originalChannelNav')
-        assert len(documents)==1
-    count=len(requests)
-    nav.get_by_role('link',name='Videos',exact=True).click()
-    assert len(requests)==count,'The active section must not be requested again'
-    page.go_back();page.wait_for_url('**/posts')
+    for cycle in range(5):
+        for title,section in [('Live','streams'),('Playlists','playlists'),('Posts','posts'),('Videos','videos')]:
+            token=page.evaluate('__native.token')
+            # Tab controls must work even if the old SPA controller stops accepting commands.
+            page.evaluate('__native.mode="hang"')
+            link=nav.get_by_role('link',name=title,exact=True)
+            if title=='Posts':link.focus();link.press('Enter')
+            else:link.click()
+            wait_section(page,section)
+            expect(link).to_have_attribute('aria-current','page')
+            expect(nav).to_have_attribute('aria-busy','false')
+            assert page.evaluate('__native.token')!=token
+            assert not requests and not pending
+            if section=='posts':expect(page.locator('ytd-backstage-post-renderer')).to_have_text('Channel post')
+            else:expect(page.locator('#myt-search .media-title')).to_have_text(['Playlist 22' if section=='playlists' else 'Regular video 21' if section=='streams' else 'Regular video 20'])
+    assert len(documents)==21,documents
+    count=len(documents);nav.get_by_role('link',name='Videos',exact=True).click();page.wait_for_timeout(50)
+    assert len(documents)==count,'The active section must not reload'
+    page.go_back();wait_section(page,'posts')
     expect(nav.get_by_role('link',name='Posts',exact=True)).to_have_attribute('aria-current','page')
-    page.go_forward();page.wait_for_url('**/videos')
+    page.go_forward();wait_section(page,'videos')
     expect(nav.get_by_role('link',name='Videos',exact=True)).to_have_attribute('aria-current','page')
-    assert len(documents)==1
-    assert page.evaluate('__native.contentReads')==0
     assert not errors,errors
     context.close()
-    print(f'PASS instant pending state, native SPA sections, duplicates, keyboard and history without document reload: {width}px, DOM models={dom_only}',flush=True)
+    print(f'PASS 20 consecutive section changes, keyboard, active-tab deduplication and history with an unusable SPA controller: {width}px, DOM models={dom_only}',flush=True)
 
 
 def search_and_races(browser):
     context,page,nav,documents,requests,pending,errors=setup(browser,390)
-    nav.get_by_role('link',name='Playlists',exact=True).click()
-    nav.get_by_role('link',name='Live',exact=True).click()
-    finish(pending,1)
-    page.wait_for_url('**/streams')
-    finish(pending)
-    expect(nav.get_by_role('link',name='Live',exact=True)).to_have_attribute('aria-current','page')
-    assert urlparse(page.url).path.endswith('/streams')
     button=nav.get_by_role('button',name='Search',exact=True);button.focus();button.press('Space')
-    assert requests[-1]['params']=='native-videos','Opening empty search from Live must request Videos'
     field=nav.get_by_role('searchbox',name='Search this channel')
-    assert not button.text_content().strip(),'Channel search must use an icon instead of a text tab'
+    assert not requests and len(documents)==1
     expect(button.locator('svg')).to_have_count(1)
     icon=button.bounding_box();box=field.bounding_box()
     assert box['x']>=icon['x']+icon['width'],(icon,box)
-    assert abs((box['y']+box['height']/2)-(icon['y']+icon['height']/2))<2,(icon,box)
-    query='Поиск & + #';field.fill(query);field.press('Enter')
-    expect(nav).to_have_attribute('aria-busy','true')
-    assert requests[-1]['query']==query
+    query='Поиск & + #';field.fill('First query');field.press('Enter')
+    field.fill(query);field.press('Enter')
     finish(pending,1);page.wait_for_url('**/search?**');finish(pending)
     expect(field).to_have_value(query)
-    expect(nav.get_by_role('link',name='Videos',exact=True)).to_have_attribute('aria-current','page')
-    expect(page.locator('#myt-search').get_by_role('link',name='Regular video 24',exact=True)).to_be_visible()
-    expect(page.locator('html')).to_have_attribute('data-myt-page','channel')
+    expect(page.locator('#myt-search .media-title')).to_have_text(['Regular video 24'])
+    expect(page.locator('#myt-search .media-channel')).to_be_hidden()
     assert parse_qs(urlparse(page.url).query)=={'query':[query]}
-    field.fill('Another query');nav.get_by_role('button',name='Search',exact=True).last.click()
-    finish(pending);page.wait_for_url('**query=Another+query')
+    field.fill('Another query');button.click();finish(pending);page.wait_for_url('**query=Another+query')
     page.go_back();expect(field).to_have_value(query)
-    field.press('Escape');expect(field).to_be_hidden()
-    expect(button).to_be_focused()
-    assert len(documents)==1
-    assert not errors,errors
+    page.go_forward();expect(field).to_have_value('Another query')
+    field.press('Escape');expect(field).to_be_hidden();expect(button).to_be_focused()
+    assert len(documents)==1 and not errors,(documents,errors)
     context.close()
-    print('PASS rapid replies, icon search with its field on the right, results under Videos, Unicode, query history and Escape',flush=True)
+    print('PASS empty icon is inert, field on the right, rapid query replies, hidden channel names, Unicode, history and Escape',flush=True)
 
 
 def fallback_and_cleanup(browser):
-    for mode in ('silent','error','hang','no-bridge','no-models'):
+    for mode in ('silent','error','no-bridge','no-models'):
         context,page,nav,documents,requests,pending,errors=setup(browser,bridge=mode!='no-bridge')
         if mode!='no-bridge':page.evaluate('mode=>__native.mode=mode',mode)
         if mode=='no-models':page.evaluate('delete document.querySelector("ytd-browse").data.contents')
-        if mode=='hang':page.clock.install()
-        nav.get_by_role('link',name='Playlists',exact=True).click()
-        if mode=='hang':page.clock.fast_forward(12050)
-        page.wait_for_url('**/playlists?**')
-        assert len(documents)==2,(mode,documents)
-        assert not requests
-        assert not errors,errors
+        nav.get_by_role('button',name='Search',exact=True).click()
+        field=nav.get_by_role('searchbox',name='Search this channel');field.fill('fallback');field.press('Enter')
+        page.wait_for_url('**/search?**')
+        expect(page.locator('#myt-search .media-title')).to_have_text(['Regular video 24'])
+        assert len(documents)==2 and not errors,(mode,documents,errors)
         context.close()
     context,page,nav,documents,requests,pending,errors=setup(browser)
-    nav.get_by_role('link',name='Playlists',exact=True).click()
+    nav.get_by_role('button',name='Search',exact=True).click()
+    field=nav.get_by_role('searchbox',name='Search this channel');field.fill('pending');field.press('Enter')
     session=context.new_cdp_session(page)
     frame=session.send('Page.getFrameTree')['frameTree']['frame']['id']
     world=session.send('Page.createIsolatedWorld',{'frameId':frame,'worldName':'channel-navigation-extension'})['executionContextId']
     result=session.send('Runtime.evaluate',{'expression':'__setEnabled(false)','contextId':world})
     assert not result.get('exceptionDetails'),result
     expect(nav).to_have_count(0)
-    page.clock.install();page.clock.fast_forward(12500)
-    assert len(documents)==1,'Disabling must cancel compatibility timers'
-    finish(pending);page.wait_for_url('**/playlists')
-    assert len(documents)==1
+    finish(pending);page.wait_for_url('**/search?**')
+    assert len(documents)==1 and not errors,(documents,errors)
     context.close()
-    print('PASS single compatibility fallback for missing/silent/failed native routing and timer cleanup on disable',flush=True)
+    print('PASS search compatibility fallbacks and removal of pending navigation on disable',flush=True)
 
 
 def modified_clicks(browser):
