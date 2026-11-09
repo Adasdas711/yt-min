@@ -1691,6 +1691,9 @@ html.minimal-youtube[data-myt-page="channel"] yt-description-preview-view-model 
     flex: 1 1 auto !important;
     min-width: 0 !important;
     margin: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    line-height: inherit !important;
 }
 html.minimal-youtube[data-myt-page="channel"] yt-description-preview-view-model :is(
     button, [role="button"], .ytDescriptionPreviewViewModelMoreButton, .yt-description-preview-view-model-wiz__more-button
@@ -1759,7 +1762,6 @@ html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about] {
     font: 16px/1.55 Arial, sans-serif;
 }
 html.minimal-youtube[data-myt-page="channel"] :is([data-myt-channel-about-description], [data-myt-channel-about-links], [data-myt-channel-about-info]) {
-    display: block !important;
     box-sizing: border-box;
     width: 100% !important;
     min-width: 0 !important;
@@ -1769,6 +1771,9 @@ html.minimal-youtube[data-myt-page="channel"] :is([data-myt-channel-about-descri
     border: 1px solid var(--myt-border);
     border-radius: 20px;
     background: var(--myt-surface);
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-description] {
+    display: block !important;
 }
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-description],
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-description] :is(span, a, yt-attributed-string, yt-formatted-string, #description) {

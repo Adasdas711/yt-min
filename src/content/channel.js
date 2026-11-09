@@ -142,8 +142,51 @@
             if(content.textContent.trim())return true;
             return !!row.querySelector('a[href^="mailto:"],a[href^="tel:"]')||[...row.querySelectorAll('button,[role="button"]')].some(button=>/e-?mail|почт|anzeigen|reveal/iu.test(button.getAttribute('aria-label')||''));
         }
+        aboutLinks(source,scope){
+            const rowSelector='yt-channel-external-link-view-model,yt-channel-external-link-renderer,ytd-channel-external-link-renderer,.ytChannelExternalLinkViewModelHost';
+            const rows=[...source.querySelectorAll(rowSelector+',#primary-links > a')].filter(row=>!row.parentElement.closest(rowSelector));
+            const sections=new Set(source.querySelectorAll('#links-section,#links-container,#primary-links,.ytAboutChannelViewModelLinks'));
+            const headings=new Map();
+            for(const heading of source.querySelectorAll('h2,h3,[role="heading"]')){
+                if(!/^(links|ссылки)$/iu.test(heading.textContent.trim()))continue;
+                const section=heading.parentElement===source?heading.nextElementSibling:heading.parentElement;
+                if(!section||section.matches('h2,h3,[role="heading"]')){this.markAbout(heading,'empty');continue;}
+                sections.add(section);headings.set(section,heading);
+            }
+            if(!this.aboutLinkSignatures.has(scope))this.aboutLinkSignatures.set(scope,new Map());
+            const seen=this.aboutLinkSignatures.get(scope);
+            const destination=row=>{
+                const anchor=row.matches('a[href]')?row:row.querySelector('a[href]');if(!anchor)return '';
+                try{
+                    let url=new URL(anchor.href);
+                    if(/(^|\.)youtube\.com$/.test(url.hostname)&&url.pathname==='/redirect')url=new URL(url.searchParams.get('q')||url.searchParams.get('url'));
+                    return /^(https?|mailto|tel):$/.test(url.protocol)?url.href:'';
+                }catch{return '';}
+            };
+            // A native fallback can keep another Links heading and an empty
+            // list, or a second hydrated copy with different redirect tokens.
+            for(const section of sections){
+                if([...sections].some(parent=>parent!==section&&parent.contains(section)))continue;
+                this.markAbout(section,'links');
+                const items=rows.filter(row=>section.contains(row));
+                const keys=[...new Set(items.map(destination).filter(Boolean))].sort();
+                const nativeHidden=section.closest('[hidden],[aria-hidden="true"]')||section.style.display==='none';
+                const signature=keys.length?JSON.stringify(keys):'';
+                const previous=signature&&seen.get(signature);
+                const empty=!items.some(row=>destination(row)||row.textContent.trim());
+                if(nativeHidden||empty||previous&&previous!==section){
+                    this.markAbout(section,'empty');
+                    const heading=headings.get(section);if(heading&&!section.contains(heading))this.markAbout(heading,'empty');
+                }else if(signature)seen.set(signature,section);
+            }
+            for(const row of rows){
+                this.markAbout(row,'link');this.markAbout(row.parentElement,'link-list');
+                this.markAbout(row.querySelector('#icon,yt-icon,yt-img-shadow,yt-image,img,.ytChannelExternalLinkViewModelIcon,.yt-channel-external-link-view-model-wiz__icon'),'icon');
+            }
+        }
         about(){
             this.nextAboutNodes=new Map();
+            this.aboutLinkSignatures=new Map();
             const sources=new Set(document.querySelectorAll(aboutSelector));
             for(const panel of document.querySelectorAll('[target-id="engagement-panel-channel-about"],[data-target-id="engagement-panel-channel-about"]')){
                 if(!panel.querySelector(aboutSelector)){
@@ -167,20 +210,10 @@
                 for(const description of source.querySelectorAll('#description-container,#channel-description,#description,.ytAboutChannelViewModelDescription')){
                     if(!description.parentElement.closest('[data-myt-channel-about-description]'))this.markAbout(description,'description');
                 }
-                const linkRows=[...source.querySelectorAll('yt-channel-external-link-view-model,yt-channel-external-link-renderer,ytd-channel-external-link-renderer,.ytChannelExternalLinkViewModelHost')];
-                const sections=new Set(source.querySelectorAll('#links-section,#links-container,#primary-links,.ytAboutChannelViewModelLinks'));
+                this.aboutLinks(source,dialog||panel||source);
                 for(const heading of source.querySelectorAll('h2,h3,[role="heading"]')){
                     const label=heading.textContent.trim();
-                    if(/^(links|ссылки)$/iu.test(label))sections.add(heading.parentElement===source?heading.nextElementSibling:heading.parentElement);
                     if(/^(more info|channel details|дополнительная информация|сведения о канале)$/iu.test(label))this.markAbout(heading.parentElement===source?heading.nextElementSibling:heading.parentElement,'info');
-                }
-                for(const section of sections)if(section)this.markAbout(section,'links');
-                for(const row of linkRows){
-                    this.markAbout(row,'link');this.markAbout(row.parentElement,'link-list');
-                    this.markAbout(row.querySelector('#icon,yt-icon,yt-img-shadow,yt-image,img,.ytChannelExternalLinkViewModelIcon,.yt-channel-external-link-view-model-wiz__icon'),'icon');
-                }
-                for(const row of source.querySelectorAll('#primary-links > a')){
-                    this.markAbout(row,'link');this.markAbout(row.parentElement,'link-list');
                 }
                 for(const info of source.querySelectorAll('#additional-info-container,#metadata-container,#more-info,.ytAboutChannelViewModelMoreInfo'))this.markAbout(info,'info');
                 for(const info of source.querySelectorAll('[data-myt-channel-about-info]')){
@@ -193,7 +226,7 @@
                 }
             }
             for(const [node,names]of this.aboutNodes)for(const name of names)if(!this.nextAboutNodes.get(node)?.has(name))node.removeAttribute(name);
-            this.aboutNodes=this.nextAboutNodes;this.nextAboutNodes=null;
+            this.aboutNodes=this.nextAboutNodes;this.nextAboutNodes=null;this.aboutLinkSignatures=null;
         }
         navigation(browse,current){
             const tabs=[...browse.querySelectorAll(tabsSelector)].filter(node=>!node.parentElement.closest(tabsSelector));

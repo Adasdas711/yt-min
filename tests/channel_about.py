@@ -156,6 +156,57 @@ def readable_description_and_info(browser,width,dark):
     print(f'PASS inline attributed description remains readable, compact info list, empty/loading rows and native actions: {width}px, dark={dark}',flush=True)
 
 
+def unique_links(browser,width):
+    markup=about_dialog()
+    empty='<div id="reserve-links"><h3>Links</h3><div id="links-container"><div></div></div></div>'
+    markup=markup.replace('<div id="additional-info-container">',empty+'<div id="additional-info-container">',1)
+    page=setup(browser,'/@JoeSpeen/videos',fixture(),width=width,native_dark=True)
+    page.locator('#description-more').evaluate('(e,html)=>e.onclick=()=>document.body.insertAdjacentHTML("beforeend",html)',markup)
+    page.locator('#description-more').click()
+    heading=page.get_by_role('heading',name='Links',exact=True)
+    expect(heading).to_have_count(1)
+    expect(page.locator('#links-section a')).to_have_count(4)
+    page.locator('#social-1').click()
+    assert page.evaluate('__aboutLink')==1
+    # A second hydrated renderer can contain the same destinations but fresh
+    # YouTube redirect tokens. It must not paint a second Links panel.
+    page.locator('#reserve-links').evaluate('''e=>{
+        const original=document.querySelector('#links-section');
+        e.innerHTML=original.innerHTML;
+        for(const a of e.querySelectorAll('a'))a.href='https://www.youtube.com/redirect?event=channel_description&redir_token=new&q='+encodeURIComponent(a.href);
+    }''')
+    expect(heading).to_have_count(1)
+    expect(page.locator('#reserve-links')).to_be_hidden()
+    # If the original native renderer is removed, the replacement takes over.
+    page.locator('#links-section').evaluate('e=>{window.__originalLinks=e.cloneNode(true);e.remove()}')
+    expect(page.locator('#reserve-links')).to_be_visible()
+    expect(heading).to_have_count(1)
+    expect(page.locator('#reserve-links a')).to_have_count(4)
+    # A genuinely new destination is preserved, even in a separate native group.
+    page.locator('#reserve-links').evaluate('''e=>e.insertAdjacentHTML('afterend','<div id="unique-group"><h3>Links</h3><div><yt-channel-external-link-view-model><a href="https://example.org/unique">Unique website</a></yt-channel-external-link-view-model></div></div>')''')
+    expect(page.get_by_role('link',name='Unique website')).to_be_visible()
+    # Native hidden populated copies stay hidden rather than replacing the live list.
+    page.locator('#reserve-links').evaluate('''e=>{const hidden=e.cloneNode(true);hidden.id='hidden-links';hidden.hidden=true;e.before(hidden)}''')
+    expect(page.locator('#hidden-links')).to_be_hidden()
+    expect(page.locator('#reserve-links')).to_be_visible()
+    page.locator('#reserve-links').evaluate('e=>e.innerHTML="<h3>Links</h3><div id=links-container></div>"')
+    expect(page.locator('#reserve-links')).to_be_hidden()
+    page.locator('#unique-group').evaluate('e=>e.remove()')
+    expect(heading).to_have_count(0)
+    # Restore the original populated renderer and reopen the same native dialog.
+    page.locator('#hidden-links').evaluate('e=>e.after(window.__originalLinks)')
+    expect(heading).to_have_count(1)
+    page.locator('#close-about').click()
+    page.locator('#about-dialog').evaluate('e=>e.hidden=false')
+    expect(heading).to_have_count(1)
+    page.wait_for_timeout(100)
+    assert_stable(page)
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('#reserve-links')).to_be_visible()
+    page.close()
+    print(f'PASS empty/duplicate Links sections, redirect URLs, native restamps, replacements and reopen: {width}px',flush=True)
+
+
 if __name__=='__main__':
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -165,4 +216,6 @@ if __name__=='__main__':
         check(browser,900,True,False,True)
         for width,dark in ((1440,True),(900,False),(390,True)):
             readable_description_and_info(browser,width,dark)
+        for width in (1440,390):
+            unique_links(browser,width)
         browser.close()

@@ -170,6 +170,25 @@ def links_and_more(browser):
         print(f'PASS all external-link wrappers/restamps hidden, More aligned/clickable, native restoration: {width}px',flush=True)
 
 
+def preview_descenders(browser):
+    for width in (1440,900,390):
+        for text_class in ('ytDescriptionPreviewViewModelTruncatedText','yt-description-preview-view-model-wiz__truncated-text'):
+            body=fixture().replace('ytDescriptionPreviewViewModelTruncatedText',text_class)
+            body+=f'<style>.{text_class}{{height:16px;max-height:16px;line-height:16px}}</style>'
+            page=setup(browser,'/@JoeSpeen/videos',body,width=width,native_dark=True)
+            page.locator('#author-description').evaluate('e=>e.textContent="SUBSCRIBE FOR A COOKIE! gypqj_ уфру"')
+            bounds=page.locator('.'+text_class).evaluate('''e=>{
+                const range=document.createRange();range.selectNodeContents(e.querySelector('#author-description'));
+                const glyph=range.getClientRects()[0],clip=e.getBoundingClientRect();
+                return {top:glyph.top,bottom:glyph.bottom,clipTop:clip.top,clipBottom:clip.bottom};
+            }''')
+            assert bounds['top']>=bounds['clipTop']-1 and bounds['bottom']<=bounds['clipBottom']+1,bounds
+            page.locator('#description-more').click()
+            assert page.evaluate('__more')==1
+            page.close()
+        print(f'PASS native preview height cannot clip letter descenders; More remains functional: {width}px',flush=True)
+
+
 if __name__=='__main__':
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -179,4 +198,5 @@ if __name__=='__main__':
         redirects(browser)
         navigation(browser)
         links_and_more(browser)
+        preview_descenders(browser)
         browser.close()
