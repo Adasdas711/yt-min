@@ -98,6 +98,64 @@ def check(browser,width,dark,legacy,fallback=False):
     print(f'PASS wider about dialog, responsive link/info cards, native links/email/close, restamps and restoration: {width}px, dark={dark}, legacy={legacy}, fallback={fallback}',flush=True)
 
 
+def readable_description_and_info(browser,width,dark):
+    markup=about_dialog()
+    start=markup.index('<div id="description-container">')
+    end=markup.index('</div>',start)+len('</div>')
+    paragraphs=['SUBSCRIBE FOR A COOKIE!', 'New MrBeast Gaming video every single Saturday at noon eastern time!',
+                'Helped people around the world and built an animal shelter.',
+                'A long description must wrap inside the dialog instead of painting over adjacent lines. '*3]
+    lines=''.join(f'<span id="about-line-{i}">{text}</span><br>' for i,text in enumerate(paragraphs))
+    inline='<yt-attributed-string><span id="description" class="yt-core-attributed-string">'+lines+'<a id="description-link" href="https://example.com/author" onclick="event.preventDefault();window.__authorVisits=(window.__authorVisits||0)+1">Author source</a></span></yt-attributed-string>'
+    markup=markup[:start]+inline+markup[end:]
+    empty='<tr id="empty-phone"><td><yt-icon><svg><title>Phone</title></svg></yt-icon></td><td><button aria-label="More info"><svg><title>Information</title></svg></button></td></tr>'
+    markup=markup.replace('<tbody>','<tbody>'+empty,1)
+    page=setup(browser,'/@JoeSpeen/videos',fixture(),width=width,native_dark=dark)
+    page.locator('#description-more').evaluate('(e,html)=>e.onclick=()=>document.body.insertAdjacentHTML("beforeend",html)',markup)
+    page.locator('#description-more').click()
+    page.wait_for_selector('[data-myt-channel-about-description]')
+    description=page.locator('#about-dialog #description')
+    # An inline span needs a single panel box, rather than a padded fragment for
+    # each text line (those fragments painted over the previous line of text).
+    assert description.evaluate('e=>e.getClientRects().length')==1
+    bounds=description.bounding_box()
+    assert bounds['x']>=0 and bounds['x']+bounds['width']<=width,bounds
+    last=None
+    for i,text in enumerate(paragraphs):
+        paragraph=page.locator('#about-line-'+str(i))
+        expect(paragraph).to_have_text(text.strip())
+        rect=paragraph.bounding_box()
+        if last:assert rect['y']>=last['y']+last['height']-1,(last,rect)
+        assert rect['x']>=bounds['x'] and rect['x']+rect['width']<=bounds['x']+bounds['width'],rect
+        last=rect
+    page.locator('#description-link').click()
+    assert page.evaluate('__authorVisits')==1
+    expect(page.locator('#empty-phone')).to_be_hidden()
+    rows=page.locator('[data-myt-channel-about-info-row]:visible')
+    expect(rows).to_have_count(7)
+    boxes=[row.bounding_box() for row in rows.all()]
+    for previous,current in zip(boxes,boxes[1:]):
+        assert abs(previous['x']-current['x'])<1 and current['y']>=previous['y']+previous['height'],(previous,current)
+    page.locator('#email').click()
+    assert page.evaluate('__emailChecks')==1
+    # Empty/loading native rows must reappear when a real value arrives.
+    page.locator('#empty-phone td').last.evaluate('e=>e.textContent="Business phone: +1 555 0100"')
+    expect(page.locator('#empty-phone')).to_be_visible()
+    page.locator('#empty-phone td').last.evaluate('e=>e.textContent=""')
+    expect(page.locator('#empty-phone')).to_be_hidden()
+    page.wait_for_timeout(100)
+    assert_stable(page)
+    Path('/tmp/yt-min-qa').mkdir(exist_ok=True)
+    page.locator('[data-myt-channel-about-scroll]').evaluate('e=>e.scrollTop=0')
+    page.screenshot(path=f'/tmp/yt-min-qa/readable-about-{width}.png')
+    page.locator('[data-myt-channel-about-scroll]').evaluate('e=>e.scrollTop=e.scrollHeight')
+    page.screenshot(path=f'/tmp/yt-min-qa/compact-info-{width}.png')
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('#empty-phone')).to_be_visible()
+    page.close()
+    print(f'PASS inline attributed description remains readable, compact info list, empty/loading rows and native actions: {width}px, dark={dark}',flush=True)
+
+
 if __name__=='__main__':
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -105,4 +163,6 @@ if __name__=='__main__':
             for width,dark in ((1440,True),(900,False),(390,True)):
                 check(browser,width,dark,legacy)
         check(browser,900,True,False,True)
+        for width,dark in ((1440,True),(900,False),(390,True)):
+            readable_description_and_info(browser,width,dark)
         browser.close()

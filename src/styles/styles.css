@@ -1759,6 +1759,7 @@ html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about] {
     font: 16px/1.55 Arial, sans-serif;
 }
 html.minimal-youtube[data-myt-page="channel"] :is([data-myt-channel-about-description], [data-myt-channel-about-links], [data-myt-channel-about-info]) {
+    display: block !important;
     box-sizing: border-box;
     width: 100% !important;
     min-width: 0 !important;
@@ -1772,7 +1773,7 @@ html.minimal-youtube[data-myt-page="channel"] :is([data-myt-channel-about-descri
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-description],
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-description] :is(span, a, yt-attributed-string, yt-formatted-string, #description) {
     font: 400 17px/1.8 "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", ui-monospace, monospace !important;
-    white-space: pre-wrap;
+    white-space: pre-wrap !important;
     overflow-wrap: anywhere;
     -webkit-line-clamp: unset !important;
     max-height: none !important;
@@ -1783,7 +1784,7 @@ html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about] :is(h2, h
     font: italic 900 30px/1.1 "MYT Barlow Condensed", "MYT Cyrillic Condensed", "Arial Narrow", sans-serif !important;
     text-transform: uppercase;
 }
-html.minimal-youtube[data-myt-page="channel"] :is([data-myt-channel-about-link-list], [data-myt-channel-about-info-list]) {
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-link-list] {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
@@ -1792,7 +1793,7 @@ html.minimal-youtube[data-myt-page="channel"] :is([data-myt-channel-about-link-l
     margin: 0 !important;
     padding: 0 !important;
 }
-html.minimal-youtube[data-myt-page="channel"] :is([data-myt-channel-about-link], [data-myt-channel-about-info-row]) {
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-link] {
     display: flex !important;
     align-items: center;
     gap: 12px;
@@ -1849,10 +1850,52 @@ html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-icon] {
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-info-row] td {
     min-width: 0;
     padding: 0 !important;
-    font: 400 15px/1.5 Arial, sans-serif !important;
+    font: 400 16px/1.5 Arial, sans-serif !important;
     color: var(--myt-ink) !important;
     overflow-wrap: anywhere;
     font-variant-numeric: tabular-nums;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-info-list] {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-info-row] {
+    display: flex !important;
+    align-items: center;
+    gap: 14px;
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0;
+    min-height: 52px;
+    padding: 12px 0 !important;
+    margin: 0 !important;
+    border: 0;
+    border-bottom: 1px solid var(--myt-border);
+    border-radius: 0;
+    background: transparent;
+    color: var(--myt-ink);
+    overflow-wrap: anywhere;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-info-row]:last-child {
+    border-bottom: 0;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-empty] {
+    display: none !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-info-row] [data-myt-channel-about-icon] {
+    flex-basis: 22px;
+    width: 22px !important;
+    height: 22px !important;
+    max-width: 22px !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-info-row] td:last-child {
+    flex: 1 1 auto;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-info] a {
+    color: var(--myt-ink) !important;
+    overflow-wrap: anywhere;
 }
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-info] table {
     display: block;
@@ -1887,7 +1930,7 @@ html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about] :is(a, bu
         padding: 18px !important;
         border-radius: 16px;
     }
-    html.minimal-youtube[data-myt-page="channel"] :is([data-myt-channel-about-link-list], [data-myt-channel-about-info-list]) {
+    html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about-link-list] {
         grid-template-columns: minmax(0, 1fr);
     }
 }

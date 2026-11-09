@@ -136,6 +136,12 @@
             if(!this.nextAboutNodes.has(node))this.nextAboutNodes.set(node,new Set());
             this.nextAboutNodes.get(node).add(name);
         }
+        aboutInfoValue(row){
+            const content=row.cloneNode(true);
+            content.querySelectorAll('yt-icon,svg,img,tp-yt-paper-tooltip,yt-tooltip,[aria-hidden="true"],script,style').forEach(node=>node.remove());
+            if(content.textContent.trim())return true;
+            return !!row.querySelector('a[href^="mailto:"],a[href^="tel:"]')||[...row.querySelectorAll('button,[role="button"]')].some(button=>/e-?mail|почт|anzeigen|reveal/iu.test(button.getAttribute('aria-label')||''));
+        }
         about(){
             this.nextAboutNodes=new Map();
             const sources=new Set(document.querySelectorAll(aboutSelector));
@@ -181,6 +187,7 @@
                     const rows=[...info.querySelectorAll('tr,yt-about-channel-metadata-view-model,yt-about-channel-info-row-view-model,.ytAboutChannelViewModelMetadataRow,.metadata-row,.info-row')];
                     for(const row of rows){
                         this.markAbout(row,'info-row');this.markAbout(row.parentElement,'info-list');
+                        if(!this.aboutInfoValue(row))this.markAbout(row,'empty');
                         this.markAbout(row.querySelector('yt-icon,yt-img-shadow,yt-image,img,svg'),'icon');
                     }
                 }
