@@ -1,10 +1,15 @@
 """Channel search labels, empty queries and leaving cached search feeds."""
 from pathlib import Path
+from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, expect
 from smoke import setup as local_setup, assert_stable
 from channel_header import fixture, startup
 from channel_navigation import setup, finish
 from search import video, playlist
+
+
+def wait_section(page,section):
+    page.wait_for_url(lambda url:urlparse(str(url)).path.rstrip('/').endswith('/'+section))
 
 
 def search(page,nav,pending,query='cookie'):
@@ -23,20 +28,18 @@ def labels_and_sections(browser,width):
     root=page.locator('#myt-search')
     for title,section,expected in [('Videos','videos','Regular video 20'),('Playlists','playlists','Playlist 22')]:
         search(page,nav,pending)
-        expect(root.get_by_role('heading',name='результаты поиска',exact=True)).to_be_visible()
+        expect(root.get_by_role('heading',name='Результаты поиска',exact=True)).to_be_visible()
         if section=='videos':
             Path('/tmp/yt-min-qa').mkdir(exist_ok=True)
             page.screenshot(path=f'/tmp/yt-min-qa/channel-query-label-{width}.png')
-        nav.get_by_role('link',name=title,exact=True).click()
-        expect(nav).to_have_attribute('aria-busy','true')
-        assert requests[-1]['params']=='native-'+section and 'query' not in requests[-1]
-        assert finish(pending)==section
-        page.wait_for_url('**/'+section)
+        count=len(requests);nav.get_by_role('link',name=title,exact=True).click()
+        wait_section(page,section)
+        assert len(requests)==count and not pending
         expect(root.locator('.media-title')).to_have_text([expected])
-        expect(root.get_by_role('heading',name='результаты поиска',exact=True)).to_be_hidden()
+        expect(root.get_by_role('heading',name='Результаты поиска',exact=True)).to_be_hidden()
         expect(root.locator('.empty')).to_be_hidden()
         expect(nav.get_by_role('link',name=title,exact=True)).to_have_attribute('aria-current','page')
-    assert len(documents)==1 and not errors,(documents,errors)
+    assert len(documents)==3 and not errors,(documents,errors)
     context.close()
     print(f'PASS search heading and Videos/Playlists after search: {width}px',flush=True)
 
@@ -49,26 +52,24 @@ def empty_queries(browser,width):
         nav.get_by_role('button',name='Search',exact=True).click()
         expect(field).to_be_visible();expect(field).to_have_value('')
         assert requests[-1]['params']=='native-videos','Opening an empty channel search must load Videos'
-        assert finish(pending)=='videos';page.wait_for_url('**/videos')
+        assert finish(pending)=='videos';wait_section(page,'videos')
         expect(field).to_be_visible();expect(field).to_be_focused()
     count=len(requests);field.press('Enter');page.wait_for_timeout(50)
     assert len(requests)==count,'Empty Enter on Videos must not start another request'
     field.fill('cookie');field.press('Enter');finish(pending);page.wait_for_url('**/search?**')
     expect(page.locator('#myt-search .results-heading')).to_be_visible()
-    field.fill('')
-    page.wait_for_function('__native.events.at(-1).browseEndpoint.params==="native-videos"')
-    assert requests[-1]['params']=='native-videos' and 'query' not in requests[-1]
-    finish(pending);page.wait_for_url('**/videos')
+    count=len(requests);field.fill('');wait_section(page,'videos')
+    assert len(requests)==count and not pending
+    expect(page.locator('#myt-search .media-title')).to_have_text(['Regular video 20'])
     expect(field).to_be_visible();expect(field).to_have_value('');expect(field).to_be_focused()
     expect(page.locator('#myt-search .results-heading')).to_be_hidden()
     field.fill('cookie');field.press('Enter');finish(pending);page.wait_for_url('**/search?**')
-    field.fill('   ')
-    page.wait_for_function('__native.events.at(-1).browseEndpoint.params==="native-videos"')
-    assert requests[-1]['params']=='native-videos' and 'query' not in requests[-1]
-    finish(pending);page.wait_for_url('**/videos')
+    count=len(requests);field.fill('   ');wait_section(page,'videos')
+    assert len(requests)==count and not pending
+    expect(page.locator('#myt-search .media-title')).to_have_text(['Regular video 20'])
     expect(field).to_be_visible();expect(field).to_have_value('')
     assert all(request.get('query','valid').strip() for request in requests),'An empty query reached YouTube'
-    assert len(documents)==1 and not errors,(documents,errors)
+    assert len(documents)==3 and not errors,(documents,errors)
     context.close()
     print(f'PASS opening/clearing/whitespace/empty Enter keeps Videos and an editable search field: {width}px',flush=True)
 
@@ -104,12 +105,10 @@ def empty_search_loading(browser):
     pending.pop().fulfill(content_type='application/json',body='{"html":"<ytd-message-renderer>No results found</ytd-message-renderer>"}')
     page.wait_for_url('**/search?**');expect(page.locator('#myt-search .empty')).to_be_visible()
     nav.get_by_role('link',name='Videos',exact=True).click()
-    expect(nav).to_have_attribute('aria-busy','true')
-    expect(page.locator('#myt-search .empty')).to_be_hidden()
-    finish(pending);page.wait_for_url('**/videos')
+    wait_section(page,'videos')
     expect(page.locator('#myt-search .media-title')).to_have_text(['Regular video 20'])
     expect(page.locator('#myt-search .empty')).to_be_hidden()
-    assert len(documents)==1 and not errors,(documents,errors)
+    assert len(documents)==2 and not pending and not errors,(documents,errors)
     context.close()
     print('PASS genuine zero search results do not flash as an error while loading Videos',flush=True)
 

@@ -5,6 +5,7 @@
     const tabsSelector='yt-tab-shape,tp-yt-paper-tab,ytd-expandable-tab-renderer,[role="tab"]';
     const aboutSelector='ytd-about-channel-renderer,yt-about-channel-renderer,ytd-channel-about-metadata-renderer,yt-about-channel-view-model';
     const navigationEvents=['yt-navigate-start','yt-navigate-finish','yt-page-data-updated','yt-navigate-error','yt-navigate-cancel'];
+    const searchOpenKey='minimal-youtube:channel-search-open';
     const compact=new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:2});
     const words=new Map([
         ['Subscribe','Подписаться','Abonnieren'],['Subscribed','Вы подписаны','Подписка оформлена','Abonniert'],
@@ -293,6 +294,22 @@
             this.open(this.url('videos'),{keepSearchOpen:true});
             this.nav.shadowRoot.querySelector('form').hidden=false;this.searchButton.setAttribute('aria-expanded','true');
         }
+        restoreSearchField(){
+            if(this.searchIntentChecked||!this.nav.isConnected)return;
+            this.searchIntentChecked=true;
+            let intent;
+            try{
+                intent=JSON.parse(sessionStorage.getItem(searchOpenKey)||'null');
+                if(!intent)return;
+                if(!Number.isFinite(intent.expires)||intent.expires<Date.now()){sessionStorage.removeItem(searchOpenKey);return;}
+                if(intent.path!==location.pathname.replace(/\/$/,'')||!intent.path.endsWith('/videos'))return;
+                sessionStorage.removeItem(searchOpenKey);
+            }catch{return;}
+            this.keepSearchOpen=true;
+            const input=this.nav.shadowRoot.querySelector('input');input.value='';
+            this.nav.shadowRoot.querySelector('form').hidden=false;this.searchButton.setAttribute('aria-expanded','true');
+            input.focus({preventScroll:true});
+        }
         closeSearch(focus=false){
             this.keepSearchOpen=false;
             this.nav.shadowRoot.querySelector('form').hidden=true;this.searchButton.setAttribute('aria-expanded','false');
@@ -329,16 +346,25 @@
         fallbackNavigation(pending){
             if(this.navigationPending!==pending)return;
             clearTimeout(pending.acceptTimer);clearTimeout(pending.completeTimer);this.navigationPending=null;
+            try{
+                if(pending.keepSearchOpen){const url=new URL(pending.href);sessionStorage.setItem(searchOpenKey,JSON.stringify({path:url.pathname.replace(/\/$/,''),expires:Date.now()+60000}));}
+                else sessionStorage.removeItem(searchOpenKey);
+            }catch{}
             location.assign(pending.href);
         }
         open(href,{keepSearchOpen=false}={}){
-            const url=new URL(href,location.href),key=this.navigationKey(url.href);
+            const url=new URL(href,location.href),search=/\/search\/?$/.test(url.pathname);
+            if(!search)url.searchParams.delete('query');
+            const key=this.navigationKey(url.href),fromSearch=/\/search\/?$/.test(location.pathname)||!!this.navigationPending&&/\/search\/?$/.test(new URL(this.navigationPending.href).pathname);
             this.keepSearchOpen=keepSearchOpen;
             if(!/\/search\/?$/.test(url.pathname)&&!keepSearchOpen){this.closeSearch();this.nav.shadowRoot.querySelector('input').value='';}
             if(this.navigationPending?.key===key||!this.navigationPending&&key===this.navigationKey(location.href))return;
             this.cancelNavigation();
-            const pending={id:(this.navigationSequence||0)+1,href:url.href,key,sourceKey:this.navigationKey(location.href),accepted:false};
+            const pending={id:(this.navigationSequence||0)+1,href:url.href,key,sourceKey:this.navigationKey(location.href),accepted:false,keepSearchOpen};
             this.navigationSequence=pending.id;this.navigationPending=pending;this.renderNavigationState();
+            // Search keeps extra state in YouTube's browse controller. A clean
+            // document request reliably opens the destination outside that state.
+            if(fromSearch&&!search){this.fallbackNavigation(pending);return;}
             this.nav.setAttribute('data-myt-channel-navigation-request',JSON.stringify({id:pending.id,href:pending.href}));
             this.nav.removeAttribute('data-myt-channel-navigation-result');
             this.nav.dispatchEvent(new Event('minimal-youtube:channel-navigate',{bubbles:true}));
@@ -360,6 +386,7 @@
             if(header){this.identity(header);this.links(header);}
             this.preview(header);
             this.navigation(browse,match[2]?.replace(/\/$/,'')||'videos');
+            this.restoreSearchField();
             this.about();
             if(this.descriptionDialog.open&&this.nativeAboutOpen()){this.restoreDescriptionFocus=false;this.descriptionDialog.close();}
             this.translate(browse);

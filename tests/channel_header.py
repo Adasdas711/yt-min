@@ -7,7 +7,8 @@ from smoke import ROOT, MOCK, MASTHEAD, setup, navigate_spa, assert_stable
 from search import video, playlist
 
 
-def fixture(legacy=False):
+def fixture(legacy=False,contents=None):
+    if contents is None:contents=video(1)+playlist(1,count=12)+'<ytd-continuation-item-renderer></ytd-continuation-item-renderer>'
     metadata = ('<div id="channel-tagline"><span id="channel-handle">@JoeSpeen</span> · '
                 '<span id="subscriber-count">2,24 млн подписчиков</span> · '
                 '<span id="videos-count">2,4 тыс. видео</span></div>') if legacy else (
@@ -30,7 +31,7 @@ def fixture(legacy=False):
       <ytd-subscribe-button-renderer><button id="subscribe" aria-label="Подписаться" onclick="this.textContent='Вы подписаны';window.__subscriptions=(window.__subscriptions||0)+1">Подписаться</button></ytd-subscribe-button-renderer>
       </div></{profile}><div id="tabs"><yt-tab-group-shape>{tabs}</yt-tab-group-shape></div></div>
       <div id="contents"><ytd-feed-filter-chip-bar-renderer><button>Новые</button><button>Популярные</button><button>Старые</button></ytd-feed-filter-chip-bar-renderer>
-      {video(1)}{playlist(1,count=12)}<ytd-continuation-item-renderer></ytd-continuation-item-renderer></div>
+      {contents}</div>
       </ytd-browse></ytd-page-manager></ytd-app>'''
 
 

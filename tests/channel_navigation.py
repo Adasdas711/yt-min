@@ -66,7 +66,7 @@ ROUTER=r'''(() => {
 })();'''
 
 
-def setup(browser,width=1440,dom_only=False,bridge=True):
+def setup(browser,width=1440,dom_only=False,bridge=True,search_context_bug=False):
     context=browser.new_context(viewport={'width':width,'height':960})
     page=context.new_page();documents=[];requests=[];pending=[];errors=[]
     def route(route):
@@ -75,13 +75,28 @@ def setup(browser,width=1440,dom_only=False,bridge=True):
             requests.append(request.post_data_json);pending.append(route);return
         if request.resource_type=='document':
             documents.append(request.url)
-            body=document(fixture()).replace('</head>','<style>'+(ROOT/'src/styles/styles.css').read_text()+'</style></head>')
+            contents=None
+            if len(documents)>1:
+                section=urlparse(request.url).path.rstrip('/').split('/')[-1]
+                contents=playlist(22,count=12) if section=='playlists' else '<ytd-backstage-post-renderer>Channel post</ytd-backstage-post-renderer>' if section in ('posts','community') else video(24 if section=='search' else 21 if section=='streams' else 20)
+            body=document(fixture(contents=contents)).replace('</head>','<style>'+(ROOT/'src/styles/styles.css').read_text()+'</style></head>')
             route.fulfill(content_type='text/html; charset=utf-8',body=body)
         else:route.fulfill(status=204,body='')
     context.route('https://www.youtube.com/**',route)
     page.on('pageerror',lambda error:errors.append(error))
     main=(ROOT/'src/content/search-data.js').read_text()+'\n'+(ROOT/'src/content/channel-main.js').read_text()
     if bridge:main+='\n'+(ROOT/'src/content/channel-navigation-main.js').read_text()
+    if search_context_bug:main+='''
+      document.addEventListener('yt-navigate',event=>{
+        const endpoint=event.detail?.endpoint,url=endpoint?.commandMetadata?.webCommandMetadata?.url;
+        if(!/\\/search$/.test(location.pathname)||!url||/\\/search(?:[?#]|$)/.test(url))return;
+        event.preventDefault();event.stopImmediatePropagation();
+        history.pushState({},'',url);
+        document.querySelector('ytd-browse > #contents').innerHTML='<ytd-message-renderer>No results found</ytd-message-renderer>';
+        document.dispatchEvent(new CustomEvent('yt-page-data-updated',{detail:{endpoint,url}}));
+        document.dispatchEvent(new CustomEvent('yt-navigate-finish',{detail:{endpoint,url}}));
+      },true);
+    '''
     main+='\nwindow.__nativeOptions='+json.dumps({'domOnly':dom_only})+';\n'+ROUTER
     page.add_init_script(main)
     isolated='('+MOCK+')({enabled:true});chrome.runtime.id="channel-navigation";\n'
