@@ -730,12 +730,13 @@
 
     function syncSearch() {
         const channel=enabled&&root.dataset.mytPage==='channel';
+        if(channel)searchView?.prepareChannelRoute?.(location.href);
         const contents=syncChannel();
         const active=enabled&&(root.dataset.mytPage==='search'||channel&&contents);
         if(!active||searchView&&searchView.channel!==channel){searchView?.destroy();searchView=null;}
         for(const node of document.querySelectorAll('[data-myt-channel-results]'))if(node!==contents)node.removeAttribute('data-myt-channel-results');
         if(!active)return;
-        if(globalThis.MinimalYouTubeSearch){searchView ||= new globalThis.MinimalYouTubeSearch(channel);searchView.sync(channel?[contents]:document.querySelectorAll('ytd-search'));}
+        if(globalThis.MinimalYouTubeSearch){searchView ||= new globalThis.MinimalYouTubeSearch(channel);if(channel)searchView.prepareChannelRoute?.(location.href);searchView.sync(channel?[contents]:document.querySelectorAll('ytd-search'));}
     }
 
     function syncChatFrames() {

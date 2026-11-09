@@ -158,6 +158,7 @@ def search_and_races(browser):
     expect(nav.get_by_role('link',name='Live',exact=True)).to_have_attribute('aria-current','page')
     assert urlparse(page.url).path.endswith('/streams')
     button=nav.get_by_role('button',name='Search',exact=True);button.focus();button.press('Space')
+    assert requests[-1]['params']=='native-videos','Opening empty search from Live must request Videos'
     field=nav.get_by_role('searchbox',name='Search this channel')
     assert not button.text_content().strip(),'Channel search must use an icon instead of a text tab'
     expect(button.locator('svg')).to_have_count(1)
@@ -167,7 +168,7 @@ def search_and_races(browser):
     query='Поиск & + #';field.fill(query);field.press('Enter')
     expect(nav).to_have_attribute('aria-busy','true')
     assert requests[-1]['query']==query
-    finish(pending);page.wait_for_url('**/search?**')
+    finish(pending,1);page.wait_for_url('**/search?**');finish(pending)
     expect(field).to_have_value(query)
     expect(nav.get_by_role('link',name='Videos',exact=True)).to_have_attribute('aria-current','page')
     expect(page.locator('#myt-search').get_by_role('link',name='Regular video 24',exact=True)).to_be_visible()

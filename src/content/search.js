@@ -205,6 +205,7 @@
       *{box-sizing:border-box}[hidden]{display:none!important}a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}a:focus-visible,button:focus-visible{outline:2px solid var(--myt-muted);outline-offset:3px}
       .channels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:24px}
       .stream,.group-stream{display:flex;flex-direction:column;gap:20px}.row{display:grid;gap:20px;align-items:stretch;min-width:0}
+      .results-heading{margin:0 0 20px;font:600 18px/1.5 Arial,sans-serif;overflow-wrap:anywhere}
       .media{display:flex;flex-direction:column;gap:14px;min-width:0;height:100%;padding:12px 12px 18px;border-radius:18px;background:var(--myt-surface);transition:background .12s}
       .media:is(:hover,:focus-within){background:var(--myt-soft)}.cover{position:relative;display:block;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:var(--myt-soft)}.cover img{display:block;width:100%;height:100%;object-fit:cover}.media-info{display:flex;flex-direction:column;justify-content:center;gap:12px;min-width:0;padding:0 3px}
       .media-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;font-size:20px;line-height:1.35;font-weight:700}.media.video .media-title{font-size:18px}
@@ -213,7 +214,7 @@
       .group{min-width:0;padding:20px;border-radius:22px;background:var(--myt-soft)}.group h2{margin:0 0 18px;padding-inline-end:.2em;overflow:visible;overflow-wrap:anywhere;font:italic 900 40px/1.05 "MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:-.025em}
       :host([data-channel]) .media.playlist{display:flex;flex-direction:column;gap:14px;padding-bottom:18px}:host([data-channel]) .media.playlist .media-title{font-size:18px}
       /* Keep 20px gaps fixed while reducing channel column widths by 15%. */
-      :host([data-channel]) .row{width:calc(85% + (var(--myt-columns,1) - 1)*3px);margin-inline:auto}
+      :host([data-channel]) :is(.row,.results-heading){width:calc(85% + (var(--myt-columns,1) - 1)*3px);margin-inline:auto}
       .empty{padding:32px 0;color:var(--myt-muted)}@media(max-width:700px){.channels{grid-template-columns:1fr}.media-title{font-size:18px}.media.video .media-title{font-size:16px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}:host([data-channel]) .row{width:calc(85% + (var(--myt-columns,1) - 1)*2.4px)}}
     `;
     class MediaCard{
@@ -282,7 +283,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             this.nativeStyle=node('style');this.nativeStyle.id='myt-search-native-style';this.nativeStyle.textContent=channel?nativeStyles.replaceAll('ytd-search','[data-myt-channel-results]'):nativeStyles;document.documentElement.append(this.nativeStyle);
             this.cards=new Map();this.channels=new Map();this.groups=new Map();this.sources=new Map();this.sequence=0;this.nativeNodes=new Set();this.filterText=new Map();this.filterAttributes=new Map();
             this.host=node('div');this.host.id='myt-search';this.host.lang='en';if(channel)this.host.dataset.channel='';this.shadow=this.host.attachShadow({mode:'open'});
-            this.shadow.innerHTML='<style>'+styles+'</style><div class="channels" aria-label="Channels"></div><div class="stream"></div><p class="empty" hidden>No results found.</p>';
+            this.shadow.innerHTML='<style>'+styles+'</style><h2 class="results-heading" lang="ru" hidden>результаты поиска</h2><div class="channels" aria-label="Channels"></div><div class="stream"></div><p class="empty" hidden>No results found.</p>';
             this.q=selector=>this.shadow.querySelector(selector);
             this.resize=new ResizeObserver(()=>this.layout());this.resize.observe(this.host);
             this.observer=new MutationObserver(records=>{
@@ -302,6 +303,18 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             this.changed=()=>this.queue();document.addEventListener('yt-page-data-updated',this.changed);document.addEventListener('yt-rendererstamper-finished',this.changed);
         }
         static isPlaylist(card){return card.matches('ytd-playlist-renderer,ytd-grid-playlist-renderer,ytd-radio-renderer,[is-playlist],[content-type="playlist"],[data-content-type="playlist"]')||!!card.querySelector('yt-collection-thumbnail-view-model,yt-collections-stack,ytd-thumbnail-overlay-side-panel-renderer')||safeURL(card.querySelector(titleSelector)?.href)?.pathname==='/playlist';}
+        prepareChannelRoute(href){
+            if(!this.channel)return;
+            const url=new URL(href),key=JSON.stringify([url.pathname.replace(/\/$/,''),/\/search\/?$/.test(url.pathname)?url.searchParams.get('query')?.trim()||'':'']);
+            if(this.routeKey===key)return;
+            this.routeKey=key;
+            // Restore native visibility before choosing the incoming feed. Our
+            // old root's display override can otherwise reveal a cached search
+            // shell that YouTube has hidden using a class on a tab transition.
+            this.observer.disconnect();this.search?.removeEventListener('load',this.changed,true);
+            this.search?.removeAttribute('data-myt-channel-results');this.restoreNative();this.search=null;
+            this.host.remove();
+        }
         static channelResults(browse){
             // Discover the feed from its cards instead of depending on a named
             // section/primary wrapper. Use its outer content branch so native
@@ -365,9 +378,10 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             const candidates=[...searches],selectionNodes=new Set();
             for(const item of candidates)for(let parent=item;parent&&parent!==document.body;parent=parent.parentElement)selectionNodes.add(parent);
             for(const item of candidates)for(const toolbar of item.querySelectorAll(nativeToolbarSelector))selectionNodes.add(toolbar);
+            if(this.channel){const nav=document.querySelector('#myt-channel-nav');if(nav)selectionNodes.add(nav);}
             if(selectionNodes.size!==this.selectionNodes.size||[...selectionNodes].some(item=>!this.selectionNodes.has(item))){
                 this.selectionObserver.disconnect();this.selectionNodes=selectionNodes;
-                for(const item of selectionNodes)this.selectionObserver.observe(item,{attributes:true,attributeFilter:['hidden','aria-hidden','class','style']});
+                for(const item of selectionNodes)this.selectionObserver.observe(item,{attributes:true,attributeFilter:['hidden','aria-hidden','class','style','aria-busy']});
             }
             const search=candidates.find(item=>!item.closest('[hidden],[aria-hidden="true"]')&&item.getClientRects().length&&getComputedStyle(item).visibility!=='hidden')||candidates[0];if(!search)return;
             if(this.search!==search){
@@ -416,7 +430,12 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             for(const [shelf,group]of this.groups)if(!groups.has(shelf))group.host.remove();this.groups=groups;this.stream=stream;
             const channelContainer=this.q('.channels');let index=0;
             for(const source of sources){const card=this.channels.get(source);if(card){if(channelContainer.children[index]!==card.host)channelContainer.insertBefore(card.host,channelContainer.children[index]||null);index++;}}
-            this.q('.channels').hidden=!this.channels.size;this.q('.empty').hidden=Boolean(this.channels.size||stream.length);
+            const url=new URL(location.href),query=this.channel&&/\/search\/?$/.test(url.pathname)&&Boolean(url.searchParams.get('query')?.trim());
+            this.q('.results-heading').hidden=!query;
+            const busy=this.channel&&document.querySelector('#myt-channel-nav')?.getAttribute('aria-busy')==='true';
+            const confirmedEmpty=this.channel&&[...search.querySelectorAll('ytd-message-renderer,yt-message-view-model,ytd-background-promo-renderer')].some(node=>nativeAvailable(node,search));
+            this.q('.empty').textContent=this.channel&&!query?(/\/playlists\/?$/.test(url.pathname)?'No playlists yet.':'No videos yet.'):'No results found.';
+            this.q('.channels').hidden=!this.channels.size;this.q('.empty').hidden=Boolean(this.channels.size||stream.length||busy||this.channel&&!query&&!confirmedEmpty);
             this.prepareNative(search);this.translateFilters();this.layout();
         }
         prepareNative(search){
@@ -451,6 +470,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
         layout(){
             if(!this.host.isConnected||!this.stream)return;
             const style=getComputedStyle(this.search),width=this.search.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),columns=width<560?1:width<900?2:3;
+            if(this.channel&&this.host.style.getPropertyValue('--myt-columns')!==String(columns))this.host.style.setProperty('--myt-columns',String(columns));
             this.place(this.q('.stream'),this.stream,columns);
             for(const group of this.groups.values())this.place(group.stream,group.items,columns===3&&[2,4].includes(group.items.length)?2:columns);
         }

@@ -39,8 +39,9 @@
     class Channel {
         static landing(url){
             const match=url.pathname.match(basePattern);
-            if(!match||match[2]&&!/^(featured)?\/?$/.test(match[2]))return null;
-            const target=new URL(url);target.pathname=match[1]+'/videos';target.searchParams.set('hl','en');target.searchParams.set('persist_hl','1');return target.href;
+            const emptySearch=/^search\/?$/.test(match?.[2]||'')&&!url.searchParams.get('query')?.trim();
+            if(!match||match[2]&&!/^(featured)?\/?$/.test(match[2])&&!emptySearch)return null;
+            const target=new URL(url);target.pathname=match[1]+'/videos';if(emptySearch)target.searchParams.delete('query');target.searchParams.set('hl','en');target.searchParams.set('persist_hl','1');return target.href;
         }
         static destination(url,language){
             const landing=Channel.landing(url);if(landing)return landing;
@@ -102,6 +103,10 @@
                 @media(max-width:600px){.toolbar{gap:4px}nav{gap:0}nav a{font-size:14px;padding:12px 9px}.channel-search{gap:8px}form{width:clamp(110px,38vw,190px)}}
                 </style><div class="toolbar"><nav aria-label="Channel sections"></nav><div class="channel-search"><button class="search-toggle" data-section="search" type="button" aria-label="Search" title="Search this channel" aria-expanded="false" aria-controls="channel-search-form"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7"/><path d="m16 16 5 5"/></svg></button><form id="channel-search-form" role="search" hidden><input name="query" type="search" aria-label="Search this channel" placeholder="Search" autocomplete="off"></form></div></div><span class="navigation-status" role="status" aria-live="polite"></span>`;
             this.searchButton=this.nav.shadowRoot.querySelector('.search-toggle');
+            this.nav.shadowRoot.querySelector('input').addEventListener('input',event=>{
+                event.stopPropagation();
+                if(!event.isComposing&&!event.target.value.trim())this.showSearchVideos();
+            });
             this.nav.shadowRoot.querySelector('form').addEventListener('submit',event=>{
                 event.preventDefault();event.stopPropagation();
                 this.submitSearch();
@@ -280,13 +285,20 @@
         toggleSearch(){
             const form=this.nav.shadowRoot.querySelector('form'),input=form.querySelector('input');
             if(!form.hidden&&input.value.trim()){this.submitSearch();return;}
+            if(!input.value.trim())this.showSearchVideos();
             form.hidden=false;this.searchButton.setAttribute('aria-expanded','true');input.focus({preventScroll:true});
         }
+        showSearchVideos(){
+            this.nav.shadowRoot.querySelector('input').value='';
+            this.open(this.url('videos'),{keepSearchOpen:true});
+            this.nav.shadowRoot.querySelector('form').hidden=false;this.searchButton.setAttribute('aria-expanded','true');
+        }
         closeSearch(focus=false){
+            this.keepSearchOpen=false;
             this.nav.shadowRoot.querySelector('form').hidden=true;this.searchButton.setAttribute('aria-expanded','false');
             if(focus)this.searchButton.focus({preventScroll:true});
         }
-        submitSearch(){const query=this.nav.shadowRoot.querySelector('input').value.trim();if(query)this.open(this.url('search',query));}
+        submitSearch(){const query=this.nav.shadowRoot.querySelector('input').value.trim();if(query)this.open(this.url('search',query));else this.showSearchVideos();}
         navigationKey(href){
             try{
                 const url=new URL(href,location.href);
@@ -319,15 +331,14 @@
             clearTimeout(pending.acceptTimer);clearTimeout(pending.completeTimer);this.navigationPending=null;
             location.assign(pending.href);
         }
-        open(href){
+        open(href,{keepSearchOpen=false}={}){
             const url=new URL(href,location.href),key=this.navigationKey(url.href);
+            this.keepSearchOpen=keepSearchOpen;
+            if(!/\/search\/?$/.test(url.pathname)&&!keepSearchOpen){this.closeSearch();this.nav.shadowRoot.querySelector('input').value='';}
             if(this.navigationPending?.key===key||!this.navigationPending&&key===this.navigationKey(location.href))return;
             this.cancelNavigation();
             const pending={id:(this.navigationSequence||0)+1,href:url.href,key,sourceKey:this.navigationKey(location.href),accepted:false};
             this.navigationSequence=pending.id;this.navigationPending=pending;this.renderNavigationState();
-            if(!/\/search\/?$/.test(url.pathname)){
-                this.closeSearch();
-            }
             this.nav.setAttribute('data-myt-channel-navigation-request',JSON.stringify({id:pending.id,href:pending.href}));
             this.nav.removeAttribute('data-myt-channel-navigation-result');
             this.nav.dispatchEvent(new Event('minimal-youtube:channel-navigate',{bubbles:true}));
@@ -604,7 +615,8 @@
                 this.searchButton.setAttribute('aria-expanded','true');
                 this.searchRouteKey=routeKey;
             }else if(current!=='search'&&this.current==='search'){
-                this.closeSearch();
+                if(!this.keepSearchOpen)this.closeSearch();
+                this.nav.shadowRoot.querySelector('input').value='';
                 this.searchRouteKey=null;
             }
             this.current=current;
