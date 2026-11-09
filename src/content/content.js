@@ -512,6 +512,8 @@
         if (standaloneHome || !enabled || document.readyState !== "loading" ||
             !root.lang || /^en(?:-|$)/i.test(root.lang)) return;
         const url = new URL(location.href);
+        // Channel routing combines its landing and language changes in one redirect.
+        if (globalThis.MinimalYouTubeChannel&&channelRoute.test(url.pathname)) return;
         if (url.searchParams.get("hl") === "en") return;
         url.searchParams.set("hl", "en");
         location.replace(url.href);
@@ -691,6 +693,7 @@
     }
 
     let channelResizeFrame=0;
+    let channelView=null;
     window.addEventListener('resize',()=>{
         if(channelResizeFrame||!enabled||root.dataset.mytPage!=='channel')return;
         channelResizeFrame=requestAnimationFrame(()=>{channelResizeFrame=0;syncChannel();});
@@ -698,21 +701,14 @@
 
     function syncChannel() {
         const active=enabled&&root.dataset.mytPage==='channel';
-        if(!active){for(const tab of document.querySelectorAll('[data-myt-channel-tab-hidden]'))tab.removeAttribute('data-myt-channel-tab-hidden');return null;}
-        const browse=[...document.querySelectorAll("ytd-browse[page-subtype='channels']")].find(el=>!el.closest('[hidden]'));
+        if(!active){channelView?.destroy();channelView=null;return null;}
+        const browse=[...document.querySelectorAll("ytd-browse[page-subtype='channels']")].find(el=>!el.closest('[hidden],[aria-hidden="true"]')&&getComputedStyle(el).display!=='none');
         if(!browse)return null;
-        for(const tab of browse.querySelectorAll('yt-tab-shape,tp-yt-paper-tab,ytd-expandable-tab-renderer,[role="tab"]')){
-            const link=tab.matches('a[href]')?tab:tab.querySelector('a[href]');
-            let section='';try{section=new URL(link?.href||location.href).pathname.split('/').filter(Boolean).at(-1);}catch{}
-            const label=tab.textContent.trim()||tab.getAttribute('aria-label')||tab.querySelector('[aria-label]')?.getAttribute('aria-label')||'';
-            const allowed=tab.matches('ytd-expandable-tab-renderer')||!!tab.querySelector('input[type=search]')|| (link?['videos','streams','playlists','community','posts','search'].includes(section):/^(videos|live|streams|playlists|posts|search|видео|трансляции|плейлисты|записи|посты|поиск)$/iu.test(label));
-            if(!allowed&&!tab.hasAttribute('data-myt-channel-tab-hidden'))tab.setAttribute('data-myt-channel-tab-hidden','');
-            else if(allowed)tab.removeAttribute('data-myt-channel-tab-hidden');
-        }
+        if(globalThis.MinimalYouTubeChannel){channelView ||= new globalThis.MinimalYouTubeChannel();channelView.sync(browse);}
         // Some YouTube layouts nest tabs inside the profile header. Stick that
         // wrapper with a negative offset so only its navigation remains visible.
         for(const wrapper of browse.querySelectorAll(':scope > #header,:scope > #page-header')){
-            const tabs=wrapper.querySelector('#tabs,#tabs-container,yt-tab-group-shape,tp-yt-paper-tabs');
+            const tabs=wrapper.querySelector('#tabs,#tabs-container')||wrapper.querySelector('#myt-channel-nav');
             if(!tabs)continue;
             if(!wrapper.hasAttribute('data-myt-channel-sticky-header'))wrapper.setAttribute('data-myt-channel-sticky-header','');
             const offset=Math.max(0,tabs.getBoundingClientRect().top-wrapper.getBoundingClientRect().top);
@@ -1234,6 +1230,12 @@
         const urlChanged = currentURL !== url.href;
         const nextPage = url.pathname === "/" ? "home" : url.pathname === "/watch" ? "watch" :
             url.pathname === "/results" ? "search" : url.pathname === "/playlist" ? "playlist" : channelRoute.test(url.pathname) ? "channel" : "other";
+        const channelDestination=nextPage==='channel'&&settingsReady&&!pendingNavigation?globalThis.MinimalYouTubeChannel?.destination(url,root.lang):null;
+        if(channelDestination){
+            root.dataset.mytPage='channel';
+            if(redirectingURL!==url.href){redirectingURL=url.href;location.replace(channelDestination);}
+            return;
+        }
         const previous = root.dataset.mytPage;
         if (previous && previous !== nextPage && previous !== "home" && !root.dataset.mytPreviousPage) {
             root.dataset.mytPreviousPage = previous;
@@ -1356,7 +1358,7 @@
             if (record.type === "attributes" && record.attributeName === "title" && !target.closest(filterScope)) return false;
             if (target.closest("title")) { cleanTitle(); return false; }
             if (stableHome) return record.target === root && record.attributeName === "dark";
-            if (target.closest("#myt-watch, #myt-home, #myt-search, #myt-playlist-summary, [data-myt-search-channel-card]")) return false;
+            if (target.closest("#myt-watch, #myt-home, #myt-search, #myt-channel-nav, #myt-channel-stats, #myt-playlist-summary, [data-myt-search-channel-card]")) return false;
             if(record.type==='childList'){
                 const changes=[...record.addedNodes,...record.removedNodes];
                 if(changes.length&&changes.every(node=>node instanceof Element&&node.matches('#myt-watch,#myt-home,#myt-playlist-summary,[data-myt-search-playlist-card],[data-myt-search-channel-card],.myt-masthead-brand'))&&(!changes.some(node=>node.matches('.myt-masthead-brand'))||target.querySelectorAll(':scope > .myt-masthead-brand').length<=1))return false;

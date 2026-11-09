@@ -111,6 +111,7 @@ def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, nati
     page.add_script_tag(path=str(ROOT / "src/content/playlist.js"))
     page.add_script_tag(path=str(ROOT / "src/content/search-data.js"))
     page.add_script_tag(path=str(ROOT / "src/content/search.js"))
+    page.add_script_tag(path=str(ROOT / "src/content/channel.js"))
     page.add_script_tag(path=str(ROOT / "src/content/content.js"))
     return page
 
@@ -167,7 +168,7 @@ def setup_at_document_start(browser, path, enabled=True, defer_settings=False):
     page = browser.new_page(viewport={"width": 1440, "height": 960})
     page.errors = []
     page.on("pageerror", lambda error: page.errors.append(str(error)))
-    code = (ROOT / "src/content/watch.js").read_text() + "\n" + (ROOT / "src/content/playlist.js").read_text() + "\n" + (ROOT / "src/content/search.js").read_text() + "\n" + (ROOT / "src/content/content.js").read_text()
+    code = (ROOT / "src/content/watch.js").read_text() + "\n" + (ROOT / "src/content/playlist.js").read_text() + "\n" + (ROOT / "src/content/search.js").read_text() + "\n" + (ROOT / "src/content/channel.js").read_text() + "\n" + (ROOT / "src/content/content.js").read_text()
     initial = json.dumps({"enabled": enabled})
     script = f"({MOCK})({initial});\n"
     if defer_settings:
@@ -355,7 +356,7 @@ def check_channel_sections(browser, width):
       <ytd-shelf-renderer id="for-you"><div id="title-container"><h2>For you</h2></div><ytd-horizontal-list-renderer><div style="overflow-x:auto"><div id="items" style="display:flex;width:max-content">{cards.replace('popular-', 'for-you-')}</div></div></ytd-horizontal-list-renderer></ytd-shelf-renderer>
       <ytd-shelf-renderer id="popular"><div id="title-container"><h2>Popular videos</h2></div><ytd-horizontal-list-renderer><div id="carousel-scroll" style="overflow-x:auto"><div id="items" style="display:flex;width:max-content">{cards}</div></div></ytd-horizontal-list-renderer></ytd-shelf-renderer>
       </div></ytd-browse></ytd-page-manager></ytd-app>'''
-    page = setup(browser, '/@creator', fixture, width=width)
+    page = setup(browser, '/@creator/videos', fixture, width=width)
     expect(page.locator('#uploads')).to_be_hidden()
     expect(page.locator('#myt-search .media')).to_have_count(10)
     expect(page.locator('#myt-search .group')).to_have_count(2)
@@ -2560,7 +2561,7 @@ def main():
         page.close()
 
         modern_channel = channel_profile.replace('<div id="banner" style="height:180px;background:#345"><img id="banner-image" alt="Channel banner" style="display:block;width:100%;height:180px"></div>', '<yt-image-banner-view-model id="modern-channel-banner" style="height:180px;background:#345"></yt-image-banner-view-model>')
-        page = setup(browser, "/@creator", modern_channel)
+        page = setup(browser, "/@creator/videos", modern_channel)
         modern_banner = page.locator("#modern-channel-banner").bounding_box()
         assert modern_banner["x"] == 0 and modern_banner["width"] == 1440, modern_banner
         assert page.locator("#profile-avatar").bounding_box()["width"] == 160

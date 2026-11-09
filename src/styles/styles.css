@@ -1656,3 +1656,20 @@ html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-sticky-header] {
     z-index: 100;
     background: var(--yt-spec-base-background, var(--myt-bg));
 }
+
+/* Keep source metadata/controllers for updates without painting duplicate UI. */
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-source] {
+    display: none !important;
+}
+html.minimal-youtube[data-myt-page="channel"] :is(#header, #page-header, ytd-c4-tabbed-header-renderer, yt-page-header-view-model, yt-page-header-renderer) :is(
+    yt-channel-external-link-view-model, .ytChannelExternalLinkViewModelHost,
+    #channel-header-links, #primary-links, #links-holder, #links-container
+) {
+    display: none !important;
+}
+html.minimal-youtube[data-myt-page="channel"] :is(#description-container, #channel-description, yt-description-preview-view-model),
+html.minimal-youtube[data-myt-page="channel"] :is(#description-container, #channel-description, yt-description-preview-view-model) :is(span, a, yt-attributed-string, yt-formatted-string) {
+    font-family: "SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace !important;
+    font-size: 17px !important;
+    line-height: 1.75 !important;
+}

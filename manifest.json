@@ -28,6 +28,7 @@
                 "src/content/playlist.js",
                 "src/content/search-data.js",
                 "src/content/search.js",
+                "src/content/channel.js",
                 "src/content/content.js"
             ],
             "run_at": "document_start",
