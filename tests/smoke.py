@@ -113,6 +113,7 @@ def setup(browser, path="/", body="", enabled=None, width=1440, theme=None, nati
     page.add_script_tag(path=str(ROOT / "src/content/search.js"))
     page.add_script_tag(path=str(ROOT / "src/content/channel.js"))
     page.add_script_tag(path=str(ROOT / "src/content/channel-main.js"))
+    page.add_script_tag(path=str(ROOT / "src/content/channel-navigation-main.js"))
     page.add_script_tag(path=str(ROOT / "src/content/content.js"))
     return page
 

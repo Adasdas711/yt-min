@@ -4,6 +4,7 @@
     const basePattern=/^(\/(?:@[^/]+|(?:channel|c|user)\/[^/]+))(?:\/(.*))?\/?$/;
     const tabsSelector='yt-tab-shape,tp-yt-paper-tab,ytd-expandable-tab-renderer,[role="tab"]';
     const aboutSelector='ytd-about-channel-renderer,yt-about-channel-renderer,ytd-channel-about-metadata-renderer,yt-about-channel-view-model';
+    const navigationEvents=['yt-navigate-start','yt-navigate-finish','yt-page-data-updated','yt-navigate-error','yt-navigate-cancel'];
     const compact=new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:2});
     const words=new Map([
         ['Subscribe','Подписаться','Abonnieren'],['Subscribed','Вы подписаны','Подписка оформлена','Abonniert'],
@@ -95,12 +96,13 @@
                 :host{display:block!important;min-width:0;font:600 16px/1.4 Arial,sans-serif;color:var(--myt-ink)}*{box-sizing:border-box}[hidden]{display:none!important}
                 nav{display:flex;justify-content:center;gap:8px;overflow-x:auto;scrollbar-width:thin;padding:4px 0}a,button{flex:none;color:inherit;font:inherit;text-decoration:none;background:none;border:0;border-bottom:2px solid transparent;padding:12px 16px;cursor:pointer;white-space:nowrap}
                 [aria-current=page],button[aria-expanded=true]{border-color:currentColor}a:hover,button:hover{background:var(--myt-soft);border-radius:8px 8px 0 0}a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
+                [data-pending]{opacity:.65;cursor:progress}.navigation-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
                 form{display:flex;gap:8px;max-width:520px;margin:8px auto;padding:0 8px}input{min-width:0;flex:1;border:1px solid var(--myt-border);border-radius:8px;background:var(--myt-surface);color:inherit;padding:10px 12px;font:400 16px Arial,sans-serif}
                 @media(max-width:600px){nav{gap:0;justify-content:safe center}a,button{font-size:14px;padding:12px 9px}}
-                </style><nav aria-label="Channel sections"></nav><form role="search" hidden><input name="query" type="search" aria-label="Search this channel" placeholder="Search this channel" autocomplete="off"><button type="submit">Search</button></form>`;
+                </style><nav aria-label="Channel sections"></nav><form role="search" hidden><input name="query" type="search" aria-label="Search this channel" placeholder="Search this channel" autocomplete="off"><button type="submit">Search</button></form><span class="navigation-status" role="status" aria-live="polite"></span>`;
             this.nav.shadowRoot.querySelector('form').addEventListener('submit',event=>{
                 event.preventDefault();event.stopPropagation();
-                const query=this.nav.shadowRoot.querySelector('input').value.trim();if(query)this.open(this.url('search',query));
+                this.submitSearch();
             });
             this.click=event=>{
                 const path=event.composedPath();
@@ -119,12 +121,32 @@
                     if(button){event.stopImmediatePropagation();if(button.dataset.section==='search'){event.preventDefault();this.toggleSearch(button);}}
                     return;
                 }
-                // Keep browser navigation independent of stale YouTube SPA tab commands.
+                // Native commands are resolved in MAIN; preserve normal browser
+                // behavior for modified clicks and middle-clicks.
                 event.stopImmediatePropagation();
                 if(!event.button&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){event.preventDefault();this.open(link.href);}
             };
             this.keydown=event=>{
                 const path=event.composedPath();
+                if(path.includes(this.nav.shadowRoot.querySelector('input'))){
+                    event.stopImmediatePropagation();
+                    if(event.key==='Enter'&&!event.isComposing){event.preventDefault();this.submitSearch();}
+                    else if(event.key==='Escape'){event.preventDefault();const button=this.nav.shadowRoot.querySelector('nav button');this.toggleSearch(button);button?.focus();}
+                    return;
+                }
+                if(path.includes(this.nav)){
+                    const link=path.find(node=>node instanceof HTMLAnchorElement),button=path.find(node=>node instanceof HTMLButtonElement);
+                    if(link&&event.key==='Enter'){
+                        event.stopImmediatePropagation();
+                        if(!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){event.preventDefault();this.open(link.href);}
+                        return;
+                    }
+                    if(button&&(event.key==='Enter'||event.key===' ')){
+                        event.preventDefault();event.stopImmediatePropagation();
+                        if(!event.repeat){if(button.dataset.section==='search')this.toggleSearch(button);else this.submitSearch();}
+                        return;
+                    }
+                }
                 if(event.key==='Escape'&&this.descriptionDialog.open){
                     event.preventDefault();event.stopImmediatePropagation();this.descriptionDialog.close();
                 }else if((event.key==='Enter'||event.key===' ')&&(path.includes(this.descriptionMore)||path.includes(this.descriptionClose)||path.includes(this.descriptionRetry))){
@@ -164,6 +186,24 @@
                 const y=event.touches[0].clientY,delta=this.descriptionTouchY-y;this.descriptionTouchY=y;
                 if(event.cancelable&&!this.canScrollDescription(event,delta))event.preventDefault();
             };
+            this.nativeNavigation=event=>{
+                const pending=this.navigationPending;if(!pending)return;
+                const href=event.detail?.url||event.detail?.endpoint?.commandMetadata?.webCommandMetadata?.url;
+                const matches=typeof href==='string'?this.navigationKey(href)===pending.key:this.navigationKey(location.href)===pending.key;
+                if(event.type==='yt-navigate-start'&&(matches||!href)){pending.accepted=true;clearTimeout(pending.acceptTimer);}
+                else if(matches&&(event.type==='yt-navigate-finish'||event.type==='yt-page-data-updated'))this.cancelNavigation();
+                else if((event.type==='yt-navigate-error'&&(matches||!href&&pending.accepted))||(event.type==='yt-navigate-cancel'&&href&&matches))this.fallbackNavigation(pending);
+            };
+            this.historyNavigation=()=>this.cancelNavigation();
+            this.routeNavigation=()=>{
+                const pending=this.navigationPending;if(!pending)return;
+                const key=this.navigationKey(location.href);
+                if(key===pending.key){pending.accepted=true;clearTimeout(pending.acceptTimer);}
+                else if(key!==pending.sourceKey)this.cancelNavigation();
+            };
+            for(const name of navigationEvents)window.addEventListener(name,this.nativeNavigation,true);
+            window.addEventListener('popstate',this.historyNavigation);
+            window.navigation?.addEventListener('currententrychange',this.routeNavigation);
             window.addEventListener('click',this.click,true);
             window.addEventListener('auxclick',this.click,true);
             window.addEventListener('keydown',this.keydown,true);
@@ -235,12 +275,65 @@
             if(this.nativeAboutOpen()){this.restoreDescriptionFocus=false;this.descriptionDialog.close();}
             else this.requestAbout();
         }
-        toggleSearch(button){const form=this.nav.shadowRoot.querySelector('form');form.hidden=!form.hidden;button.setAttribute('aria-expanded',String(!form.hidden));if(!form.hidden)form.querySelector('input').focus();}
-        open(href){location.assign(href);}
+        toggleSearch(button){const form=this.nav.shadowRoot.querySelector('form');form.hidden=!form.hidden;button?.setAttribute('aria-expanded',String(!form.hidden));if(!form.hidden)form.querySelector('input').focus();}
+        submitSearch(){const query=this.nav.shadowRoot.querySelector('input').value.trim();if(query)this.open(this.url('search',query));}
+        navigationKey(href){
+            try{
+                const url=new URL(href,location.href);
+                const path=url.pathname.replace(/\/$/,'').replace(/\/community$/,'/posts').replace(/^\/@[^/]+/,value=>value.toLowerCase());
+                return JSON.stringify([url.origin,path,/\/search$/.test(path)?url.searchParams.get('query')||'':'']);
+            }catch{return '';}
+        }
+        renderNavigationState(){
+            const pending=this.navigationPending,href=pending?.href||location.href;
+            const section=new URL(href,location.href).pathname.replace(/\/$/,'').split('/').pop();
+            const current=section==='community'?'posts':section;
+            for(const control of this.nav.shadowRoot.querySelectorAll('nav [data-section]')){
+                const active=control.dataset.section===current;
+                if(active)control.setAttribute('aria-current','page');else control.removeAttribute('aria-current');
+                control.toggleAttribute('data-pending',!!pending&&active);
+            }
+            const busy=String(!!pending);if(this.nav.getAttribute('aria-busy')!==busy)this.nav.setAttribute('aria-busy',busy);
+            const status=this.nav.shadowRoot.querySelector('.navigation-status');
+            const message=pending?'Loading '+(sections.find(([key])=>key===current)?.[1]||'section')+'…':'';
+            if(status.textContent!==message)status.textContent=message;
+        }
+        cancelNavigation(){
+            const pending=this.navigationPending;
+            if(pending){clearTimeout(pending.acceptTimer);clearTimeout(pending.completeTimer);}
+            this.navigationPending=null;this.renderNavigationState();
+        }
+        fallbackNavigation(pending){
+            if(this.navigationPending!==pending)return;
+            clearTimeout(pending.acceptTimer);clearTimeout(pending.completeTimer);this.navigationPending=null;
+            location.assign(pending.href);
+        }
+        open(href){
+            const url=new URL(href,location.href),key=this.navigationKey(url.href);
+            if(this.navigationPending?.key===key||!this.navigationPending&&key===this.navigationKey(location.href))return;
+            this.cancelNavigation();
+            const pending={id:(this.navigationSequence||0)+1,href:url.href,key,sourceKey:this.navigationKey(location.href),accepted:false};
+            this.navigationSequence=pending.id;this.navigationPending=pending;this.renderNavigationState();
+            if(!/\/search\/?$/.test(url.pathname)){
+                this.nav.shadowRoot.querySelector('form').hidden=true;
+                this.nav.shadowRoot.querySelector('nav button')?.setAttribute('aria-expanded','false');
+            }
+            this.nav.setAttribute('data-myt-channel-navigation-request',JSON.stringify({id:pending.id,href:pending.href}));
+            this.nav.removeAttribute('data-myt-channel-navigation-result');
+            this.nav.dispatchEvent(new Event('minimal-youtube:channel-navigate',{bubbles:true}));
+            if(this.navigationPending!==pending)return;
+            let result={};try{result=JSON.parse(this.nav.getAttribute('data-myt-channel-navigation-result')||'{}');}catch{}
+            if(result.id!==pending.id||!result.started){this.fallbackNavigation(pending);return;}
+            pending.acceptTimer=setTimeout(()=>{
+                if(this.navigationPending===pending&&!pending.accepted&&this.navigationKey(location.href)!==pending.key)this.fallbackNavigation(pending);
+            },700);
+            pending.completeTimer=setTimeout(()=>this.fallbackNavigation(pending),12000);
+        }
         url(section,query){const url=new URL(this.base+'/'+section,location.origin);url.searchParams.set('hl','en');url.searchParams.set('persist_hl','1');if(query)url.searchParams.set('query',query);return url.href;}
         hide(node){if(node&&!this.hidden.has(node)){node.setAttribute('data-myt-channel-source','');this.hidden.add(node);}}
         sync(browse){
             const match=location.pathname.match(basePattern);if(!match)return;
+            if(this.base&&this.base!==match[1])this.cancelNavigation();
             this.base=match[1];
             const header=browse.querySelector(':scope > #header,:scope > #page-header,ytd-c4-tabbed-header-renderer,yt-page-header-view-model,yt-page-header-renderer');
             if(header){this.identity(header);this.links(header);}
@@ -460,7 +553,11 @@
         }
         navigation(browse,current){
             const tabs=[...browse.querySelectorAll(tabsSelector)].filter(node=>!node.parentElement.closest(tabsSelector));
-            if(!tabs.length){this.nav.remove();return;}
+            if(!tabs.length){
+                if(this.navigationPending){const slot=browse.querySelector('#tabs,#tabs-container');if(slot&&!slot.contains(this.nav))slot.prepend(this.nav);this.renderNavigationState();}
+                else this.nav.remove();
+                return;
+            }
             const group=tabs[0].closest('yt-tab-group-shape,tp-yt-paper-tabs')||tabs[0];
             if(this.nav.nextElementSibling!==group)group.before(this.nav);
             const available=new Map();
@@ -472,6 +569,7 @@
                 if(section)available.set(section[0],{key:section[0],label:section[1],slug:section[0]==='posts'&&slug==='community'?'community':section[0]});
             }
             if(!available.size){
+                if(this.navigationPending){this.renderNavigationState();return;}
                 this.nav.remove();
                 for(const node of [...tabs,group]){node.removeAttribute('data-myt-channel-source');this.hidden.delete(node);}
                 return;
@@ -490,14 +588,17 @@
                     nav.append(control);
                 }
             }
-            for(const link of this.nav.shadowRoot.querySelectorAll('nav a')){
-                const selected=link.dataset.section===(current==='community'?'posts':current);
-                if(selected)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
-            }
-            if(current==='search'&&this.current!=='search'){
+            this.renderNavigationState();
+            const routeKey=this.navigationKey(location.href);
+            if(current==='search'&&(this.current!=='search'||this.searchRouteKey!==routeKey)){
                 this.nav.shadowRoot.querySelector('form').hidden=false;
                 this.nav.shadowRoot.querySelector('input').value=new URL(location.href).searchParams.get('query')||'';
                 this.nav.shadowRoot.querySelector('nav button')?.setAttribute('aria-expanded','true');
+                this.searchRouteKey=routeKey;
+            }else if(current!=='search'&&this.current==='search'){
+                this.nav.shadowRoot.querySelector('form').hidden=true;
+                this.nav.shadowRoot.querySelector('nav button')?.setAttribute('aria-expanded','false');
+                this.searchRouteKey=null;
             }
             this.current=current;
         }
@@ -521,6 +622,10 @@
             }
         }
         destroy(){
+            this.cancelNavigation();
+            for(const name of navigationEvents)window.removeEventListener(name,this.nativeNavigation,true);
+            window.removeEventListener('popstate',this.historyNavigation);
+            window.navigation?.removeEventListener('currententrychange',this.routeNavigation);
             document.removeEventListener('minimal-youtube:channel-about-updated',this.aboutUpdated);
             if(this.descriptionDialog.open)this.descriptionDialog.close();
             this.releaseDescriptionScroll();
