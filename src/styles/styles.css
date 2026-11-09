@@ -1644,6 +1644,11 @@ html.minimal-youtube[data-myt-page="channel"] body,
 html.minimal-youtube[data-myt-page="channel"][data-myt-search-ui] body {
     overflow: visible !important;
 }
+html.minimal-youtube[data-myt-page="channel"][data-myt-channel-description-open],
+html.minimal-youtube[data-myt-page="channel"][data-myt-channel-description-open] body {
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+}
 
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-sticky-header] {
     position: sticky !important;

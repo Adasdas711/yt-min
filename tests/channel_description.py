@@ -126,10 +126,102 @@ def blocked_input(browser,width):
     print(f'PASS document capture blockers, inactive about caches, disabled/throwing/non-clickable native targets and mouse/Enter/Space/Escape: {width}px',flush=True)
 
 
+def description_scroll(browser,width,nested=False):
+    from smoke import setup
+    page=setup(browser,'/@JoeSpeen/videos',fixture(),width=width)
+    page.set_viewport_size({'width':width,'height':640})
+    full='Full biography\n\n'+''.join(f'Paragraph {i}: original channel description with enough text to wrap on smaller screens.\n\n' for i in range(60))+'Last line of the biography.'
+    page.evaluate('''({full,nested})=>{
+        document.querySelector('ytd-browse').style.minHeight='4000px';
+        const source=document.querySelector('yt-description-preview-view-model');
+        source.data={description:{content:'Full biography'}};
+        window.ytInitialData={metadata:{channelMetadataRenderer:{vanityChannelUrl:'https://www.youtube.com/@JoeSpeen',description:full}}};
+        document.querySelector('#author-description').textContent='Full biography';
+        if(nested){
+            const manager=document.querySelector('ytd-page-manager'),scroll=document.createElement('div');
+            scroll.id='channel-scrollport';scroll.style.cssText='position:fixed;inset:56px 0 0;overflow-y:auto';
+            manager.before(scroll);scroll.append(manager);
+        }
+    }''',{'full':full,'nested':nested})
+    host=page.locator('#myt-channel-description')
+    expect(host.locator('.summary')).to_have_text('Full biography')
+    host.locator('.more').click()
+    body=host.locator('.full-body')
+    expect(body).to_be_visible()
+    expect(host.locator('.full-text')).to_have_text(full)
+    background=lambda:page.evaluate('({document:scrollY,nested:document.querySelector("#channel-scrollport")?.scrollTop||0})')
+    before=background()
+    body.hover()
+    page.mouse.wheel(0,320)
+    page.wait_for_timeout(180)
+    assert body.evaluate('e=>e.scrollTop')>0,{'descriptionScroll':body.evaluate('e=>e.scrollTop'),'backgroundBefore':before,'backgroundAfter':background()}
+    assert background()==before,(before,background())
+    # Neither scroll boundary, the title nor the backdrop may move the channel.
+    for end,delta in ((True,500),(False,-500)):
+        body.evaluate('(e,end)=>e.scrollTop=end?e.scrollHeight:0',end)
+        page.mouse.wheel(0,delta)
+        page.wait_for_timeout(120)
+        assert background()==before,(before,background())
+    for target in ('header',None):
+        if target:host.locator(target).hover()
+        else:page.mouse.move(3,320)
+        page.mouse.wheel(0,400)
+        page.wait_for_timeout(120)
+        assert background()==before,(target,before,background())
+    if width==390:
+        session=page.context.new_cdp_session(page)
+        session.send('Emulation.setTouchEmulationEnabled',{'enabled':True,'maxTouchPoints':1})
+        box=body.bounding_box()
+        def swipe(x,delta):
+            start=box['y']+box['height']/2
+            session.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':x,'y':start}]})
+            for step in range(1,7):
+                session.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':x,'y':start+delta*step/6}]})
+                page.wait_for_timeout(30)
+            page.wait_for_timeout(150)
+            session.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
+            page.wait_for_timeout(80)
+        swipe(box['x']+box['width']/2,-180)
+        page.wait_for_function('document.querySelector("#myt-channel-description").shadowRoot.querySelector(".full-body").scrollTop>0')
+        assert background()==before,(before,background())
+        body.evaluate('e=>e.scrollTop=e.scrollHeight')
+        swipe(box['x']+box['width']/2,-180)
+        swipe(3,-180)
+        assert background()==before,(before,background())
+        body.evaluate('e=>e.scrollTop=0')
+        swipe(box['x']+box['width']/2,180)
+        assert background()==before,(before,background())
+    # Keyboard scrolling belongs to the description and reaches its last line.
+    body.focus()
+    page.keyboard.press('PageDown')
+    page.wait_for_function('document.querySelector("#myt-channel-description").shadowRoot.querySelector(".full-body").scrollTop>0')
+    page.keyboard.press('End')
+    page.wait_for_function('''()=>{const e=document.querySelector('#myt-channel-description').shadowRoot.querySelector('.full-body');return e.scrollTop+e.clientHeight>=e.scrollHeight-1}''')
+    assert background()==before,(before,background())
+    page.keyboard.press('Home')
+    page.wait_for_function('document.querySelector("#myt-channel-description").shadowRoot.querySelector(".full-body").scrollTop===0')
+    host.locator('.close').click()
+    page.mouse.move(3,320)
+    page.mouse.wheel(0,320)
+    page.wait_for_function('(before)=>scrollY>before.document||(document.querySelector("#channel-scrollport")?.scrollTop||0)>before.nested',arg=before)
+    # Disabling while the dialog is open must also release the scroll lock.
+    host.locator('.more').click()
+    page.evaluate('__setEnabled(false)')
+    expect(host).to_have_count(0)
+    unlocked=background()
+    page.locator('#channel-scrollport' if nested else 'body').hover(position={'x':5,'y':320})
+    page.mouse.wheel(0,320)
+    page.wait_for_function('(before)=>scrollY>before.document||(document.querySelector("#channel-scrollport")?.scrollTop||0)>before.nested',arg=unlocked)
+    page.close()
+    print(f'PASS description wheel/keyboard/touch, boundaries/backdrop isolation and restored document/nested scroll: {width}px, nested={nested}',flush=True)
+
+
 if __name__=='__main__':
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         for width in (1440,390):check(browser,width)
         dom_duplicates(browser)
         for width in (1440,390):blocked_input(browser,width)
+        for width in (1440,390):
+            for nested in (False,True):description_scroll(browser,width,nested)
         browser.close()

@@ -57,15 +57,18 @@
                 button{display:inline-block;align-self:flex-start;margin:0;padding:0;border:0;border-radius:0;background:transparent;color:var(--myt-ink,#18181b);font:600 16px/1.8 "SFMono-Regular",Menlo,Consolas,monospace;cursor:pointer}
                 button:hover{text-decoration:underline}button:focus-visible{outline:2px solid var(--myt-muted,#74747d);outline-offset:3px}button:disabled{opacity:.6;cursor:default}svg{width:14px;height:14px;flex:none}
                 dialog{width:min(1040px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 48px);margin:auto;padding:0;border:1px solid var(--myt-border,#e5e5ea);border-radius:20px;background:var(--myt-bg,#fff);color:var(--myt-ink,#18181b);overflow:hidden}
-                dialog::backdrop{background:#0009}dialog header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 24px;border-bottom:1px solid var(--myt-border,#e5e5ea)}h2{margin:0;font:600 20px/1.4 Arial,sans-serif}button.close{font:400 26px/1 Arial,sans-serif;padding:4px;align-self:center}.full-body{max-height:calc(100dvh - 160px);overflow:auto;overscroll-behavior:contain;padding:24px}.full-text{white-space:pre-wrap}
+                dialog[open]{display:flex;flex-direction:column}dialog::backdrop{background:#0009}dialog header{display:flex;flex:none;align-items:center;justify-content:space-between;gap:20px;padding:20px 24px;border-bottom:1px solid var(--myt-border,#e5e5ea)}h2{margin:0;font:600 20px/1.4 Arial,sans-serif}button.close{font:400 26px/1 Arial,sans-serif;padding:4px;align-self:center}.full-body{min-height:0;overflow:auto;overscroll-behavior:contain;padding:24px}.full-text{white-space:pre-wrap}
                 @media(max-width:600px){dialog header,.full-body{padding:16px}}
-                </style><section aria-label="Channel description"><p class="summary"></p><button class="more" type="button" aria-haspopup="dialog">...more</button></section><dialog class="full" aria-label="About this channel"><header><h2>About this channel</h2><button class="close" type="button" aria-label="Close">×</button></header><div class="full-body"><p class="full-text"></p></div></dialog>`;
+                </style><section aria-label="Channel description"><p class="summary"></p><button class="more" type="button" aria-haspopup="dialog">...more</button></section><dialog class="full" aria-label="About this channel"><header><h2>About this channel</h2><button class="close" type="button" aria-label="Close">×</button></header><div class="full-body" tabindex="0" role="region" aria-label="Full channel description"><p class="full-text"></p></div></dialog>`;
             this.descriptionText=this.descriptionHost.shadowRoot.querySelector('.summary');
             this.descriptionMore=this.descriptionHost.shadowRoot.querySelector('.more');
             this.descriptionDialog=this.descriptionHost.shadowRoot.querySelector('dialog');
+            this.descriptionBody=this.descriptionHost.shadowRoot.querySelector('.full-body');
             this.descriptionClose=this.descriptionHost.shadowRoot.querySelector('.close');
             this.descriptionClose.addEventListener('click',()=>this.descriptionDialog.close());
             this.descriptionDialog.addEventListener('close',()=>{
+                if(this.descriptionDialog.open)return;
+                this.releaseDescriptionScroll();
                 if(this.restoreDescriptionFocus!==false&&this.descriptionMore.isConnected)this.descriptionMore.focus({preventScroll:true});
                 this.restoreDescriptionFocus=true;
             });
@@ -113,18 +116,55 @@
                 }else if((event.key==='Enter'||event.key===' ')&&(path.includes(this.descriptionMore)||path.includes(this.descriptionClose))){
                     event.preventDefault();event.stopImmediatePropagation();
                     if(!event.repeat){if(path.includes(this.descriptionMore))this.openDescription();else this.descriptionDialog.close();}
+                }else if(this.descriptionDialog.open&&!event.ctrlKey&&!event.metaKey&&!event.altKey){
+                    const body=this.descriptionBody,steps={ArrowUp:-40,ArrowDown:40,PageUp:-body.clientHeight,PageDown:body.clientHeight,Home:-body.scrollHeight,End:body.scrollHeight,' ':body.clientHeight*(event.shiftKey?-1:1)};
+                    if(Object.hasOwn(steps,event.key)){
+                        event.preventDefault();event.stopImmediatePropagation();body.scrollBy({top:steps[event.key],behavior:'instant'});
+                    }
                 }
+            };
+            // Stop the page's capture handlers before they mistake a shadow
+            // dialog event for a wheel/touch gesture on the channel behind it.
+            this.descriptionWheel=event=>{
+                if(!this.descriptionDialog.open)return;
+                event.stopImmediatePropagation();
+                if(!event.ctrlKey&&!this.canScrollDescription(event,event.deltaY))event.preventDefault();
+            };
+            this.descriptionTouchStart=event=>{
+                if(!this.descriptionDialog.open)return;
+                event.stopImmediatePropagation();this.descriptionTouchY=event.touches.length===1?event.touches[0].clientY:null;
+            };
+            this.descriptionTouchMove=event=>{
+                if(!this.descriptionDialog.open)return;
+                event.stopImmediatePropagation();
+                if(event.touches.length!==1||this.descriptionTouchY===null)return;
+                const y=event.touches[0].clientY,delta=this.descriptionTouchY-y;this.descriptionTouchY=y;
+                if(event.cancelable&&!this.canScrollDescription(event,delta))event.preventDefault();
             };
             window.addEventListener('click',this.click,true);
             window.addEventListener('auxclick',this.click,true);
             window.addEventListener('keydown',this.keydown,true);
+            window.addEventListener('wheel',this.descriptionWheel,{capture:true,passive:false});
+            window.addEventListener('touchstart',this.descriptionTouchStart,{capture:true,passive:true});
+            window.addEventListener('touchmove',this.descriptionTouchMove,{capture:true,passive:false});
+        }
+        canScrollDescription(event,delta){
+            const body=this.descriptionBody;
+            return event.composedPath().includes(body)&&(delta<0?body.scrollTop>0:delta>0&&body.scrollTop+body.clientHeight<body.scrollHeight-1);
+        }
+        releaseDescriptionScroll(){
+            if(!this.descriptionScrollLocked)return;
+            this.descriptionScrollLocked=false;document.documentElement.removeAttribute('data-myt-channel-description-open');
         }
         openDescription(){
             if(!this.descriptionHost.isConnected||!document.documentElement.classList.contains('minimal-youtube'))return;
             this.descriptionHost.shadowRoot.querySelector('.full-text').textContent=this.descriptionFullValue||this.descriptionValue||'';
             // Show a usable dialog before attempting YouTube's optional opener.
             // Native controls can be disabled, ignore synthetic events or throw.
-            if(!this.descriptionDialog.open)this.descriptionDialog.showModal();
+            if(!this.descriptionDialog.open){
+                this.descriptionScrollLocked=true;document.documentElement.setAttribute('data-myt-channel-description-open','');
+                this.descriptionBody.scrollTop=0;this.descriptionDialog.showModal();this.descriptionBody.focus({preventScroll:true});
+            }
             const source=this.descriptionSource;
             if(source?.isConnected){
                 const control=source.querySelector('button,[role="button"],.ytDescriptionPreviewViewModelMoreButton,.yt-description-preview-view-model-wiz__more-button,.ytDescriptionPreviewViewModelMoreText,.yt-description-preview-view-model-wiz__more-text')||source;
@@ -417,6 +457,8 @@
         }
         destroy(){
             if(this.descriptionDialog.open)this.descriptionDialog.close();
+            this.releaseDescriptionScroll();
+            window.removeEventListener('wheel',this.descriptionWheel,true);window.removeEventListener('touchstart',this.descriptionTouchStart,true);window.removeEventListener('touchmove',this.descriptionTouchMove,true);
             window.removeEventListener('click',this.click,true);window.removeEventListener('auxclick',this.click,true);window.removeEventListener('keydown',this.keydown,true);this.nav.remove();this.stats.remove();this.descriptionHost.remove();
             for(const node of this.hidden)node.removeAttribute('data-myt-channel-source');this.hidden.clear();
             for(const [node,names]of this.previewNodes)for(const name of names)node.removeAttribute(name);this.previewNodes.clear();
