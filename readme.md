@@ -179,6 +179,7 @@ node tests/data-pruning.cjs
 node tests/search-data.cjs
 python tests/smoke.py
 python tests/fonts.py
+python tests/channel.py
 python tests/interface.py
 python tests/scroll.py
 python tests/playlist.py
@@ -254,3 +255,8 @@ python scripts/package.py
 ## Автор и лицензия
 
 Исходное расширение — [Minimal YouTube](https://github.com/dephraiim/minimal-youtube), Ephraim Atta-Duncan. Условия лицензии сохранены в файле `license`.
+
+
+### Страница канала
+
+Баннер, аватар и нативная подписка сохранены. Название использует заполненный жирный курсив страницы видео, описание — monospace. В навигации остаются Videos, Live, Playlists, Posts и Search; вкладки центрированы и закрепляются под шапкой сайта. Карточки используют компонент и ширину поиска. Плейлисты на канале занимают одну ячейку, с количеством видео на обложке. Посты сохраняют нативное содержимое и действия. Отключение расширения возвращает исходную страницу.

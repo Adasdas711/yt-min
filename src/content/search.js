@@ -163,7 +163,7 @@
     }
 
 
-    const sourceSelector='ytd-video-renderer,ytd-grid-video-renderer,ytd-compact-video-renderer,ytd-playlist-renderer,ytd-grid-playlist-renderer,ytd-radio-renderer,ytd-channel-renderer,yt-lockup-view-model';
+    const sourceSelector='ytd-rich-item-renderer,ytd-rich-grid-media,ytd-video-renderer,ytd-grid-video-renderer,ytd-compact-video-renderer,ytd-playlist-renderer,ytd-grid-playlist-renderer,ytd-radio-renderer,ytd-channel-renderer,yt-lockup-view-model';
     const shelfSelector='ytd-shelf-renderer,grid-shelf-view-model,ytd-rich-section-renderer';
     // Rendering must also work with an already loaded extension manifest which
     // does not list the newer optional MAIN data adapter yet.
@@ -202,6 +202,7 @@
       .media-channel{display:block;overflow-wrap:anywhere;color:var(--myt-muted);font-size:18px;font-weight:500;line-height:1.4}.media-channel:is(:hover,:focus-visible){color:var(--myt-ink)}
       .media.playlist{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:center;gap:20px;padding-bottom:12px}.media.playlist .cover{width:100%}.playlist-badge{position:absolute;right:8px;bottom:8px;padding:4px 8px;border-radius:6px;background:#000b;color:#fff;font-size:13px}
       .group{min-width:0;padding:20px;border-radius:22px;background:var(--myt-soft)}.group h2{margin:0 0 18px;padding-inline-end:.2em;overflow:visible;overflow-wrap:anywhere;font:italic 900 40px/1.05 "MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:-.025em}
+      :host([data-channel]) .media.playlist{display:flex;flex-direction:column;gap:14px;padding-bottom:18px}:host([data-channel]) .media.playlist .media-title{font-size:18px}
       .empty{padding:32px 0;color:var(--myt-muted)}@media(max-width:700px){.channels{grid-template-columns:1fr}.media-title{font-size:18px}.media.video .media-title{font-size:16px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}}
     `;
     class MediaCard{
@@ -265,10 +266,11 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
 }
 @media(max-width:600px){html.minimal-youtube[data-myt-search-ui] ytd-search{padding:20px 16px 40px !important;}}`;
     class Search{
-        constructor(){
-            this.nativeStyle=node('style');this.nativeStyle.id='myt-search-native-style';this.nativeStyle.textContent=nativeStyles;document.documentElement.append(this.nativeStyle);
+        constructor(channel=false){
+            this.channel=channel;
+            this.nativeStyle=node('style');this.nativeStyle.id='myt-search-native-style';this.nativeStyle.textContent=channel?nativeStyles.replaceAll('ytd-search','[data-myt-channel-results]'):nativeStyles;document.documentElement.append(this.nativeStyle);
             this.cards=new Map();this.channels=new Map();this.groups=new Map();this.sources=new Map();this.sequence=0;this.nativeNodes=new Set();this.filterText=new Map();this.filterAttributes=new Map();
-            this.host=node('div');this.host.id='myt-search';this.host.lang='en';this.shadow=this.host.attachShadow({mode:'open'});
+            this.host=node('div');this.host.id='myt-search';this.host.lang='en';if(channel)this.host.dataset.channel='';this.shadow=this.host.attachShadow({mode:'open'});
             this.shadow.innerHTML='<style>'+styles+'</style><div class="channels" aria-label="Channels"></div><div class="stream"></div><p class="empty" hidden>No results found.</p>';
             this.q=selector=>this.shadow.querySelector(selector);
             this.resize=new ResizeObserver(()=>this.layout());this.resize.observe(this.host);
@@ -289,7 +291,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             this.changed=()=>this.queue();document.addEventListener('yt-page-data-updated',this.changed);document.addEventListener('yt-rendererstamper-finished',this.changed);
         }
         static isPlaylist(card){return card.matches('ytd-playlist-renderer,ytd-grid-playlist-renderer,ytd-radio-renderer,[is-playlist],[content-type="playlist"],[data-content-type="playlist"]')||!!card.querySelector('yt-collection-thumbnail-view-model,yt-collections-stack,ytd-thumbnail-overlay-side-panel-renderer')||safeURL(card.querySelector(titleSelector)?.href)?.pathname==='/playlist';}
-        queue(){if(this.frame)return;this.frame=requestAnimationFrame(()=>{this.frame=0;const searches=document.querySelectorAll('ytd-search');if(searches.length)this.sync(searches);});}
+        queue(){if(this.frame)return;this.frame=requestAnimationFrame(()=>{this.frame=0;const searches=document.querySelectorAll(this.channel?'[data-myt-channel-results]':'ytd-search');if(searches.length)this.sync(searches);});}
         queueCard(source){
             if(!this.cards.has(source)){this.queue();return;}
             this.pendingCards ||=new Set();this.pendingCards.add(source);if(this.cardFrame)return;
@@ -395,6 +397,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             const available=node=>{for(let parent=node;parent&&parent!==search;parent=parent.parentElement)if(parent.hasAttribute('hidden')||parent.style.display==='none')return false;return true;};
             const paths=new Set(),toolbar=[...search.querySelectorAll(nativeToolbarSelector)].find(available)||[...search.querySelectorAll('button,[role="button"],tp-yt-paper-button')].slice(0,200).find(node=>available(node)&&/^(?:filters|filter|фильтры)$/iu.test(node.getAttribute('aria-label')||text(node)));
             const nativeUI=new Set(toolbar?[toolbar]:[]);
+            if(this.channel)for(const control of search.querySelectorAll('ytd-feed-filter-chip-bar-renderer,yt-chip-cloud-renderer'))nativeUI.add(control);
             for(const panel of search.querySelectorAll('ytd-search-filter-dialog-renderer,yt-search-filter-dialog-view-model'))if(!toolbar?.contains(panel))nativeUI.add(panel.closest('dialog,tp-yt-paper-dialog,tp-yt-iron-dropdown,[role="dialog"]')||panel);
             for(const endpoint of [...search.querySelectorAll('ytd-continuation-item-renderer'),...nativeUI])for(let parent=endpoint;parent&&parent!==search;parent=parent.parentElement)paths.add(parent);
             for(const source of this.nativeNodes){
@@ -405,6 +408,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             for(const path of paths){path.setAttribute('data-myt-search-layout-path','');this.nativeNodes.add(path);}
             for(const element of nativeUI)element.setAttribute('data-myt-search-native-ui','');
             if(toolbar)toolbar.setAttribute('data-myt-search-toolbar','');
+            if(this.channel)for(const control of nativeUI)control.setAttribute('data-myt-search-toolbar','');
         }
 
         layout(){
@@ -422,7 +426,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             const flush=()=>{if(!row)return;row.style.gridTemplateColumns='repeat('+columns+',minmax(0,1fr))';content.push(row);row=null;used=0;};
             for(const item of items){
                 if(item.items){flush();content.push(item.host);continue;}
-                const units=Math.min(columns,item.host.dataset.kind==='playlist'?2:1);
+                const units=Math.min(columns,!this.channel&&item.host.dataset.kind==='playlist'?2:1);
                 if(row&&used+units>columns)flush();
                 if(!row)row=node('div','row');item.host.style.gridColumn='span '+units;row.append(item.host);used+=units;
                 if(used===columns)flush();

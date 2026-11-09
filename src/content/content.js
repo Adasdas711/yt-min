@@ -690,10 +690,52 @@
         }
     }
 
+    let channelResizeFrame=0;
+    window.addEventListener('resize',()=>{
+        if(channelResizeFrame||!enabled||root.dataset.mytPage!=='channel')return;
+        channelResizeFrame=requestAnimationFrame(()=>{channelResizeFrame=0;syncChannel();});
+    });
+
+    function syncChannel() {
+        const active=enabled&&root.dataset.mytPage==='channel';
+        if(!active){for(const tab of document.querySelectorAll('[data-myt-channel-tab-hidden]'))tab.removeAttribute('data-myt-channel-tab-hidden');return null;}
+        const browse=[...document.querySelectorAll("ytd-browse[page-subtype='channels']")].find(el=>!el.closest('[hidden]'));
+        if(!browse)return null;
+        for(const tab of browse.querySelectorAll('yt-tab-shape,tp-yt-paper-tab,ytd-expandable-tab-renderer,[role="tab"]')){
+            const link=tab.matches('a[href]')?tab:tab.querySelector('a[href]');
+            let section='';try{section=new URL(link?.href||location.href).pathname.split('/').filter(Boolean).at(-1);}catch{}
+            const label=tab.textContent.trim()||tab.getAttribute('aria-label')||tab.querySelector('[aria-label]')?.getAttribute('aria-label')||'';
+            const allowed=tab.matches('ytd-expandable-tab-renderer')||!!tab.querySelector('input[type=search]')|| (link?['videos','streams','playlists','community','posts','search'].includes(section):/^(videos|live|streams|playlists|posts|search|видео|трансляции|плейлисты|записи|посты|поиск)$/iu.test(label));
+            if(!allowed&&!tab.hasAttribute('data-myt-channel-tab-hidden'))tab.setAttribute('data-myt-channel-tab-hidden','');
+            else if(allowed)tab.removeAttribute('data-myt-channel-tab-hidden');
+        }
+        // Some YouTube layouts nest tabs inside the profile header. Stick that
+        // wrapper with a negative offset so only its navigation remains visible.
+        for(const wrapper of browse.querySelectorAll(':scope > #header,:scope > #page-header')){
+            const tabs=wrapper.querySelector('#tabs,#tabs-container,yt-tab-group-shape,tp-yt-paper-tabs');
+            if(!tabs)continue;
+            if(!wrapper.hasAttribute('data-myt-channel-sticky-header'))wrapper.setAttribute('data-myt-channel-sticky-header','');
+            const offset=Math.max(0,tabs.getBoundingClientRect().top-wrapper.getBoundingClientRect().top);
+            const value=offset+'px';
+            if(wrapper.style.getPropertyValue('--myt-channel-header-offset')!==value)wrapper.style.setProperty('--myt-channel-header-offset',value);
+        }
+        const title=browse.querySelector('yt-page-header-view-model h1,yt-page-header-renderer h1,ytd-page-header-renderer h1,ytd-c4-tabbed-header-renderer h1,ytd-channel-name #text,#channel-name #text');
+        if(title)globalThis.MinimalYouTubeWatch?.loadTitleFonts?.(title.textContent);
+        // Posts retain their native interactions and layout.
+        if(/\/(community|posts)\/?$/.test(location.pathname))return null;
+        const contents=browse.querySelector(':scope > #contents');
+        if(contents&&!contents.hasAttribute('data-myt-channel-results'))contents.setAttribute('data-myt-channel-results','');
+        return contents;
+    }
+
     function syncSearch() {
-        const active=enabled&&(root.dataset.mytPage==='search'||root.dataset.mytPreviousPage==='search');
-        if(!active){searchView?.destroy();searchView=null;return;}
-        if(globalThis.MinimalYouTubeSearch){searchView ||= new globalThis.MinimalYouTubeSearch();searchView.sync(document.querySelectorAll('ytd-search'));}
+        const channel=enabled&&root.dataset.mytPage==='channel';
+        const contents=syncChannel();
+        const active=enabled&&(root.dataset.mytPage==='search'||channel&&contents);
+        if(!active||searchView&&searchView.channel!==channel){searchView?.destroy();searchView=null;}
+        for(const node of document.querySelectorAll('[data-myt-channel-results]'))if(node!==contents)node.removeAttribute('data-myt-channel-results');
+        if(!active)return;
+        if(globalThis.MinimalYouTubeSearch){searchView ||= new globalThis.MinimalYouTubeSearch(channel);searchView.sync(channel?[contents]:document.querySelectorAll('ytd-search'));}
     }
 
     function syncChatFrames() {
@@ -1290,7 +1332,7 @@
             }
             // Added thumbnails/labels can produce many mutation roots in one
             // frame. Reconcile each search once, rather than once per new node.
-            if (changedRoots.some(node=>node.closest('ytd-search')||node.querySelector('ytd-search'))) syncSearch();
+            if (root.dataset.mytPage==='channel'||changedRoots.some(node=>node.closest('ytd-search')||node.querySelector('ytd-search'))) syncSearch();
             cleanTitle();
         });
     }

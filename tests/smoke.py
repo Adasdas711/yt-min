@@ -357,21 +357,12 @@ def check_channel_sections(browser, width):
       </div></ytd-browse></ytd-page-manager></ytd-app>'''
     page = setup(browser, '/@creator', fixture, width=width)
     expect(page.locator('#uploads')).to_be_hidden()
-    expect(page.locator('#for-you')).to_be_visible()
-    first = page.locator('#for-you-0 ytd-thumbnail').bounding_box()
-    popular = page.locator('#popular-0 ytd-thumbnail').bounding_box()
-    assert abs(first['width'] - popular['width']) < 1, (first,popular)
-    assert abs(popular['height'] - popular['width'] * 9 / 16) < 1, popular
-    rail = page.locator('#popular ytd-horizontal-list-renderer').bounding_box()['width']
-    expected_columns = 3 if width > 900 else 2 if width > 500 else 1
-    expected = (rail - (expected_columns - 1) * 28) / expected_columns
-    assert abs(page.locator('#popular-0').bounding_box()['width'] - expected) < 1
+    expect(page.locator('#myt-search .media')).to_have_count(10)
+    expect(page.locator('#myt-search .group')).to_have_count(2)
+    sizes=page.locator('#myt-search').evaluate("""host=>[...host.shadowRoot.querySelectorAll('.media .cover')].map(e=>{const r=e.getBoundingClientRect();return {width:r.width,height:r.height}})""")
+    assert all(abs(size['width']-sizes[0]['width'])<1 for size in sizes),sizes
+    assert all(abs(size['height']-size['width']*9/16)<1 for size in sizes),sizes
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-    assert page.locator('#carousel-scroll').evaluate('element => { element.scrollLeft=300; return element.scrollLeft; }') > 0
-    page.locator('#uploads h2').evaluate("element => element.firstChild.nodeValue='Popular videos'")
-    expect(page.locator('#uploads')).to_be_visible()
-    page.locator('#uploads h2').evaluate("element => element.firstChild.nodeValue='Новые видео'")
-    expect(page.locator('#uploads')).to_be_hidden()
     page.evaluate('__setEnabled(false)')
     expect(page.locator('#uploads')).to_be_visible()
     page.close()
@@ -607,6 +598,8 @@ def check_full_width_background_scroll(browser):
       </div><div id="empty-left" style="position:fixed;left:0;top:80px;width:200px;height:80vh"></div><div id="empty-right" style="position:fixed;right:0;top:80px;width:200px;height:80vh"></div>
       </ytd-search></ytd-page-manager></ytd-app>'''
     fixture=fixture.replace('ytd-search','ytd-browse').replace('<ytd-browse style=','<ytd-browse page-subtype="channels" style=')
+    # Independent native controls belong outside the replaced video results.
+    fixture=fixture.replace('<div id="contents" style=', '<div id="header" style=')
     page=setup(browser,'/@creator/videos',fixture,width=2016)
     page.evaluate("document.documentElement.style.overflow='hidden'; for (const id of ['empty-left','empty-right']) document.getElementById(id).addEventListener('wheel',event=>event.preventDefault(),{passive:false})")
     for x in [26,1990]:
@@ -709,10 +702,10 @@ def check_channel_hover_surface(browser, dark):
     fixture+='</div></ytd-browse></ytd-page-manager></ytd-app>'
     page=setup(browser,'/@creator/videos',fixture,native_dark=dark)
     page.add_style_tag(content=':is(ytd-rich-item-renderer,ytd-grid-video-renderer,yt-lockup-view-model):is(:hover,:focus-within) { background:transparent !important; }')
-    for selector in ['#rich-hover','#grid-hover','#lockup-hover']:
-        assert_card_surface(page,selector)
-        page.locator(selector+' ytd-thumbnail').hover()
-        assert page.locator(selector).evaluate('element=>getComputedStyle(element).backgroundColor')!='rgba(0, 0, 0, 0)'
+    expect(page.locator('#myt-search .media')).to_have_count(3)
+    for surface in page.locator('#myt-search .media').all():
+        surface.hover()
+        assert surface.evaluate('element=>getComputedStyle(element).backgroundColor')!='rgba(0, 0, 0, 0)'
     page.close()
 
 
@@ -2576,7 +2569,7 @@ def main():
 
         for width in [2016, 900, 390]:
             check_channel_sections(browser, width)
-            ok(f'channel at {width}px removes New Uploads, equalizes shelf thumbnail sizes, retains carousel scrolling and restores native sections on disable')
+            ok(f'channel at {width}px removes New Uploads, renders equal search-style cards and groups and restores native sections on disable')
 
         channel_scroll = '''<ytd-app style="height:100%"><div id="main-scroll" style="position:absolute;top:60px;left:120px;width:calc(100% - 240px);height:840px;overflow-y:auto"><ytd-page-manager class="ytd-app">
           <ytd-browse page-subtype="channels" style="min-height:2400px">
