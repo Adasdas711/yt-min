@@ -106,7 +106,7 @@
                 mark(model,'');
                 // Keep trusted input on the original More control and its native
                 // event path. Only its layout and clipping wrappers are decorated.
-                const control=model.querySelector('button,[role="button"],.ytDescriptionPreviewViewModelMoreButton,.yt-description-preview-view-model-wiz__more-button');
+                const control=model.querySelector('button,[role="button"],.ytDescriptionPreviewViewModelMoreButton,.yt-description-preview-view-model-wiz__more-button,.ytDescriptionPreviewViewModelMoreText,.yt-description-preview-view-model-wiz__more-text');
                 const text=[...model.querySelectorAll('.ytDescriptionPreviewViewModelTruncatedText,.yt-description-preview-view-model-wiz__truncated-text,.ytDescriptionPreviewViewModelDescriptionText,.yt-description-preview-view-model-wiz__description-text,yt-attributed-string,yt-formatted-string')].find(node=>!control||!control.contains(node)&&!node.contains(control));
                 if(text&&control){
                     let row=text.parentElement;while(row&&!row.contains(control))row=row.parentElement;

@@ -1679,7 +1679,8 @@ html.minimal-youtube[data-myt-page="channel"] :is(#description-container, #chann
    original control/event handler, but let the monospace line set its baseline. */
 html.minimal-youtube[data-myt-page="channel"] yt-description-preview-view-model {
     display: flex !important;
-    align-items: baseline !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
     gap: 0 .35em;
     min-width: 0;
     height: auto !important;
@@ -1755,8 +1756,9 @@ html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] *::afte
 }
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-row] {
     display: flex !important;
+    flex-direction: column !important;
     flex-wrap: nowrap !important;
-    align-items: baseline !important;
+    align-items: stretch !important;
     gap: 0 .35em;
     min-width: 0 !important;
 }
@@ -1766,7 +1768,7 @@ html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-text-cel
 }
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-control-cell] {
     flex: 0 0 auto !important;
-    align-self: baseline !important;
+    align-self: flex-start !important;
 }
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] [data-myt-channel-preview-text] {
     display: block !important;
@@ -1778,7 +1780,16 @@ html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] [data-m
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-text] * {
     white-space: inherit !important;
 }
-html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview-control] {
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-preview] [data-myt-channel-preview-control] {
+    display: block !important;
+    position: relative !important;
+    inset: auto !important;
+    transform: none !important;
+    translate: none !important;
+    align-self: flex-start !important;
+    width: max-content !important;
+    max-width: 100% !important;
+    margin-block-start: 12px !important;
     background: transparent !important;
 }
 

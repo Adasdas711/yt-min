@@ -1,5 +1,6 @@
 """Channel redirects, metadata, English controls and real section navigation."""
 import json
+import re
 from urllib.parse import urlparse, parse_qs
 from playwright.sync_api import sync_playwright, expect
 from smoke import ROOT, MOCK, MASTHEAD, setup, navigate_spa, assert_stable
@@ -154,7 +155,7 @@ def links_and_more(browser):
             expect(more).to_be_visible()
             author=page.locator('#author-description').bounding_box()
             label=page.locator('#more-label').bounding_box()
-            assert abs(author['y']-label['y'])<1,(width,author,label)
+            assert label['y']>=author['y']+author['height']+12,(width,author,label)
             assert more.bounding_box()['x']+more.bounding_box()['width']<=width+1
             more.click()
             assert page.evaluate('__more')==1
@@ -167,7 +168,7 @@ def links_and_more(browser):
             more.click()
             assert page.evaluate('__more')==2
             page.close()
-        print(f'PASS all external-link wrappers/restamps hidden, More aligned/clickable, native restoration: {width}px',flush=True)
+        print(f'PASS external-link wrappers hidden, More separated below description/clickable, native restoration: {width}px',flush=True)
 
 
 def preview_descenders(browser):
@@ -240,6 +241,20 @@ def nested_preview(browser):
         print(f'PASS nested native wrappers cannot clip text/More; masks and gradient overlays removed: {width}px',flush=True)
 
 
+def more_text_spacing(browser):
+    for width in (1440,900,390):
+        body=re.sub(r'<button id="description-more".*?</button>', '<span id="description-more" class="ytDescriptionPreviewViewModelMoreText"><span id="more-label">...more</span></span>',fixture())
+        body=body.replace('<yt-description-preview-view-model>', '<yt-description-preview-view-model role="button" onclick="window.__more=(window.__more||0)+1">')
+        page=setup(browser,'/@JoeSpeen/videos',body,width=width,native_dark=True)
+        author=page.locator('#author-description').bounding_box()
+        more=page.locator('#more-label').bounding_box()
+        assert more['y']>=author['y']+author['height']+12,(width,author,more)
+        page.locator('#more-label').click()
+        assert page.evaluate('__more')==1
+        page.close()
+    print('PASS explicit description/More spacing for delegated More text controls at desktop/tablet/mobile widths',flush=True)
+
+
 if __name__=='__main__':
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -251,4 +266,5 @@ if __name__=='__main__':
         links_and_more(browser)
         preview_descenders(browser)
         nested_preview(browser)
+        more_text_spacing(browser)
         browser.close()
