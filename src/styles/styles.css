@@ -207,7 +207,8 @@ html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-results]:is([hid
 html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) :is(yt-page-header-content-view-model, .page-header-view-model-wiz__page-header-content, .yt-page-header-view-model-wiz__page-header-content, .ytPageHeaderViewModelPageHeaderContent),
 html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-c4-tabbed-header-renderer #channel-header-container,
 html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-c4-tabbed-header-renderer #inner-header-container:not(#channel-header-container #inner-header-container),
-html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-browse > #contents {
+html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-browse > #contents,
+html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-browse > [data-myt-channel-results] {
     box-sizing: border-box;
     width: 100% !important;
     min-width: 0 !important;
@@ -1083,7 +1084,8 @@ html.minimal-youtube :is(grid-shelf-view-model, ytd-shelf-renderer, ytd-rich-sec
     html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) :is(yt-page-header-content-view-model, .page-header-view-model-wiz__page-header-content, .yt-page-header-view-model-wiz__page-header-content, .ytPageHeaderViewModelPageHeaderContent),
     html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-c4-tabbed-header-renderer #channel-header-container,
     html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-c4-tabbed-header-renderer #inner-header-container:not(#channel-header-container #inner-header-container),
-    html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-browse > #contents {
+    html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-browse > #contents,
+    html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="channel"]) ytd-browse > [data-myt-channel-results] {
         padding-inline: 16px !important;
     }
 

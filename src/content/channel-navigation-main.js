@@ -76,7 +76,7 @@
     document.addEventListener('minimal-youtube:channel-navigate',event=>{
         const nav=event.target;
         if(!(nav instanceof Element)||nav.id!=='myt-channel-nav'||!document.documentElement.classList.contains('minimal-youtube'))return;
-        const browse=nav.closest('ytd-browse[page-subtype="channels"]');if(!browse)return;
+        const browse=nav.closest('ytd-browse');if(!browse)return;
         let request;try{request=JSON.parse(nav.getAttribute('data-myt-channel-navigation-request')||'{}');}catch{return;}
         if(!Number.isSafeInteger(request.id)||typeof request.href!=='string'||request.href.length>4096)return;
         let started=false;

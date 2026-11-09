@@ -699,10 +699,14 @@
         channelResizeFrame=requestAnimationFrame(()=>{channelResizeFrame=0;syncChannel();});
     });
 
+    function channelBrowse() {
+        return [...document.querySelectorAll('ytd-browse')].find(el=>!el.closest('[hidden],[aria-hidden="true"]')&&getComputedStyle(el).display!=='none'&&(el.getAttribute('page-subtype')==='channels'||el.querySelector('yt-page-header-view-model,yt-page-header-renderer,ytd-page-header-renderer,ytd-c4-tabbed-header-renderer,#myt-channel-nav')));
+    }
+
     function syncChannel() {
         const active=enabled&&root.dataset.mytPage==='channel';
         if(!active){channelView?.destroy();channelView=null;return null;}
-        const browse=[...document.querySelectorAll("ytd-browse[page-subtype='channels']")].find(el=>!el.closest('[hidden],[aria-hidden="true"]')&&getComputedStyle(el).display!=='none');
+        const browse=channelBrowse();
         if(!browse)return null;
         if(globalThis.MinimalYouTubeChannel){channelView ||= new globalThis.MinimalYouTubeChannel();channelView.sync(browse);}
         // Some YouTube layouts nest tabs inside the profile header. Stick that
@@ -1214,9 +1218,10 @@
     }
 
     function destinationMounted(path) {
+        if(channelRoute.test(path))return Boolean(channelBrowse()?.getClientRects().length);
         const selector = path === "/watch" ? "ytd-watch-flexy" : path === "/results" ? "ytd-search" :
             path === "/playlist" ? "ytd-browse[page-subtype='playlist'],ytd-browse:has(ytd-playlist-header-renderer,ytd-playlist-sidebar-renderer,yt-playlist-header-view-model)" :
-            channelRoute.test(path) ? "ytd-browse[page-subtype='channels']" : "ytd-page-manager > :not(ytd-browse[page-subtype='home'])";
+            "ytd-page-manager > :not(ytd-browse[page-subtype='home'])";
         return [...document.querySelectorAll(selector)].some(element =>
             !element.closest("[hidden], [aria-hidden='true']") && getComputedStyle(element).display !== "none" && element.getClientRects().length);
     }
@@ -1456,7 +1461,7 @@
             classObserver.observe(root, { attributes: true, attributeFilter: ["class"] });
             observer.observe(document.documentElement, {
                 subtree: true, childList: true, characterData: true,
-                attributes: true, attributeFilter: ["href", "aria-label", "title", "aria-hidden", "visibility", "is-shorts", "is-playlist", "data-myt-search-playlists", "data-myt-search-channels", "data-video-count", "content-type", "data-content-type", "overlay-style", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "data-srcset", "expanded", "is-expanded", "aria-pressed", "subscribed", "is-subscribed", "disabled", "aria-disabled", "aria-busy", "aria-valuetext", "data-value", "value", "content"],
+                attributes: true, attributeFilter: ["href", "aria-label", "title", "aria-hidden", "visibility", "page-subtype", "is-shorts", "is-playlist", "data-myt-search-playlists", "data-myt-search-channels", "data-video-count", "content-type", "data-content-type", "overlay-style", "dark", "hidden", "theater", "fullscreen", "collapsed", "src", "srcset", "data-src", "data-srcset", "expanded", "is-expanded", "aria-pressed", "subscribed", "is-subscribed", "disabled", "aria-disabled", "aria-busy", "aria-valuetext", "data-value", "value", "content"],
             });
             updateRoute(true);
             syncBrand();

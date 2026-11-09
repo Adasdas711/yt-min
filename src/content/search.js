@@ -171,6 +171,8 @@
 
 
     const sourceSelector='ytd-rich-item-renderer,ytd-rich-grid-media,ytd-video-renderer,ytd-grid-video-renderer,ytd-compact-video-renderer,ytd-playlist-renderer,ytd-grid-playlist-renderer,ytd-radio-renderer,ytd-channel-renderer,yt-lockup-view-model';
+    const channelHeaderSelector='#myt-channel-nav,#myt-channel-description,yt-page-header-view-model,yt-page-header-renderer,ytd-page-header-renderer,ytd-c4-tabbed-header-renderer';
+    const channelExcludedSelector=channelHeaderSelector+',#header,#page-header,#tabs,#tabs-container,#secondary,ytd-popup-container,[role="dialog"]';
     const shelfSelector='ytd-shelf-renderer,grid-shelf-view-model,ytd-rich-section-renderer';
     // Rendering must also work with an already loaded extension manifest which
     // does not list the newer optional MAIN data adapter yet.
@@ -301,15 +303,24 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
         }
         static isPlaylist(card){return card.matches('ytd-playlist-renderer,ytd-grid-playlist-renderer,ytd-radio-renderer,[is-playlist],[content-type="playlist"],[data-content-type="playlist"]')||!!card.querySelector('yt-collection-thumbnail-view-model,yt-collections-stack,ytd-thumbnail-overlay-side-panel-renderer')||safeURL(card.querySelector(titleSelector)?.href)?.pathname==='/playlist';}
         static channelResults(browse){
-            // Videos usually has a direct #contents; channel search also uses
-            // section lists inside a two-column primary pane. Choose the active
-            // pane without mixing it with a retained, hidden Videos feed.
-            const candidates=[...browse.querySelectorAll(':scope > #contents,:scope > #primary,ytd-two-column-browse-results-renderer > #primary,ytd-section-list-renderer,ytd-rich-grid-renderer')].filter(node=>{
-                if(node.closest('#header,#page-header,#secondary,ytd-popup-container,[role="dialog"]')||!nativeAvailable(node,browse.parentElement))return false;
+            // Discover the feed from its cards instead of depending on a named
+            // section/primary wrapper. Use its outer content branch so native
+            // inner widths cannot give search a different grid from Videos.
+            const available=node=>{
+                if(node.closest(channelExcludedSelector)||!nativeAvailable(node,browse.parentElement))return false;
                 for(let parent=node;parent&&parent!==browse;parent=parent.parentElement)if(getComputedStyle(parent).display==='none')return false;
                 return true;
-            });
-            return candidates.find(node=>[...node.querySelectorAll(sourceSelector)].some(source=>nativeAvailable(source,node)))||candidates[0]||null;
+            };
+            const source=[...browse.querySelectorAll(sourceSelector)].find(available);
+            if(source){
+                let contents=source.parentElement;
+                while(contents.parentElement&&contents.parentElement!==browse&&!contents.parentElement.querySelector(channelHeaderSelector+',#tabs,#tabs-container'))contents=contents.parentElement;
+                if(contents!==browse&&!contents.querySelector(channelHeaderSelector))return contents;
+            }
+            // Loading and empty feeds have no cards to locate yet.
+            const previous=browse.querySelector('[data-myt-channel-results]');
+            if(previous&&available(previous))return previous;
+            return [...browse.querySelectorAll(':scope > #contents,:scope > #primary,ytd-two-column-browse-results-renderer,ytd-section-list-renderer,ytd-rich-grid-renderer')].find(available)||null;
         }
         queue(){if(this.frame)return;this.frame=requestAnimationFrame(()=>{this.frame=0;const searches=document.querySelectorAll(this.channel?'[data-myt-channel-results]':'ytd-search');if(searches.length)this.sync(searches);});}
         queueCard(source){
@@ -367,7 +378,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
                 search.addEventListener('load',this.changed,true);
             }
             if(this.host.parentElement!==search)search.prepend(this.host);
-            const sources=[...search.querySelectorAll(sourceSelector)].filter(source=>(!this.channel||nativeAvailable(source,search))&&!source.parentElement.closest(sourceSelector)&&!source.closest('[data-myt-hidden],[data-myt-hidden-section],ytd-reel-shelf-renderer')&&!/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(text(source.closest(shelfSelector)?.querySelector('#title-container,#header,h2'))));
+            const sources=[...search.querySelectorAll(sourceSelector)].filter(source=>(!this.channel||nativeAvailable(source,search)&&!source.closest(channelExcludedSelector))&&!source.parentElement.closest(sourceSelector)&&!source.closest('[data-myt-hidden],[data-myt-hidden-section],ytd-reel-shelf-renderer')&&!/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(text(source.closest(shelfSelector)?.querySelector('#title-container,#header,h2'))));
             const wanted=new Set(sources);
             for(const source of sources){
                 let kind=source.matches('ytd-channel-renderer,[content-type="channel"],[data-content-type="channel"]')?'channel':Search.isPlaylist(source)?'playlist':'video';

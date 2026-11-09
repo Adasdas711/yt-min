@@ -4,6 +4,7 @@ from playwright.sync_api import sync_playwright, expect
 from smoke import setup, assert_stable
 from channel_header import fixture
 from search import video
+from channel_navigation import setup as navigation_setup, finish
 
 
 def geometry(page):
@@ -99,10 +100,85 @@ def direct_search(browser,width):
     print(f'PASS direct channel search opens the Videos grid: {width}px',flush=True)
 
 
+def changed_wrappers(browser,width,untyped=False):
+    page=setup(browser,'/@JoeSpeen/videos',fixture(),width=width,native_dark=True)
+    expect(page.locator('#myt-search .media')).to_have_count(2)
+    before=geometry(page)
+    page.add_style_tag(content='ytd-video-renderer > #dismissible{display:flex;gap:24px}ytd-video-renderer ytd-thumbnail{display:block;flex:0 0 320px}ytd-video-renderer img{width:100%}')
+    markup='<section class="native-feed-shell" style="max-width:920px;padding:32px;margin:auto"><yt-section-list-view-model><yt-item-section-view-model>'+video(401)+video(402)+'<ytd-continuation-item-renderer id="changed-continuation"></ytd-continuation-item-renderer></yt-item-section-view-model></yt-section-list-view-model></section>'
+    page.evaluate('''({markup,untyped})=>{
+        const browse=document.querySelector('ytd-browse');browse.querySelector(':scope > #contents').remove();
+        if(untyped)browse.removeAttribute('page-subtype');
+        browse.insertAdjacentHTML('beforeend',markup);history.pushState({},'', '/@JoeSpeen/search?query=changed');
+        document.dispatchEvent(new Event('yt-page-data-updated'));document.dispatchEvent(new Event('yt-navigate-finish'));
+    }''',{'markup':markup,'untyped':untyped})
+    host=page.locator('#myt-search')
+    expect(host).to_be_visible()
+    expect(host.locator('.media-title')).to_have_text(['Regular video 401','Regular video 402'])
+    after=geometry(page)
+    for key in ('display','direction','padding','border','background','title','columns'):assert after[key]==before[key],(key,before,after)
+    assert abs(after['width']-before['width'])<1,(before,after)
+    expect(page.locator('#video-401')).to_be_hidden()
+    expect(page.locator('#video-402')).to_be_hidden()
+    expect(page.locator('#myt-channel-nav').get_by_role('link',name='Videos',exact=True)).to_have_attribute('aria-current','page')
+    expect(page.locator('#subscribe')).to_be_visible()
+    sentinel=page.locator('#changed-continuation')
+    sentinel.evaluate('(e,html)=>e.insertAdjacentHTML("beforebegin",html)',video(403))
+    expect(host.locator('.media-title')).to_have_text(['Regular video 401','Regular video 402','Regular video 403'])
+    assert sentinel.evaluate('e=>e.getBoundingClientRect().top>=document.querySelector("#myt-search").getBoundingClientRect().bottom-1')
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    page.wait_for_timeout(100);assert_stable(page)
+    Path('/tmp/yt-min-qa').mkdir(exist_ok=True)
+    page.screenshot(path=f'/tmp/yt-min-qa/channel-changed-search-{width}-{untyped}.png')
+    page.locator('yt-item-section-view-model').evaluate('e=>e.querySelectorAll("ytd-video-renderer").forEach(card=>card.remove())')
+    expect(host.locator('.media')).to_have_count(0)
+    expect(host.locator('.empty')).to_be_visible()
+    sentinel.evaluate('(e,html)=>e.insertAdjacentHTML("beforebegin",html)',video(404))
+    expect(host.locator('.media-title')).to_have_text(['Regular video 404'])
+    page.evaluate('__setEnabled(false)')
+    expect(host).to_have_count(0)
+    expect(page.locator('#video-404')).to_be_visible()
+    expect(page.locator('[data-myt-channel-results],[data-myt-search-native-root],[data-myt-search-layout-path]')).to_have_count(0)
+    page.close()
+    print(f'PASS channel search with new wrapper names, native width constraints and late subtype: {width}px, untyped={untyped}',flush=True)
+
+
+def separate_worlds(browser):
+    context,page,nav,documents,requests,pending,errors=navigation_setup(browser)
+    expect(page.locator('#myt-search .media')).to_have_count(2)
+    before=geometry(page)
+    page.evaluate('document.querySelector("ytd-browse").removeAttribute("page-subtype")')
+    nav.get_by_role('button',name='Search',exact=True).click()
+    field=nav.get_by_role('searchbox',name='Search this channel');field.fill('new layout');field.press('Enter')
+    expect(nav).to_have_attribute('aria-busy','true')
+    finish(pending);page.wait_for_url('**/search?**')
+    page.evaluate('''()=>{
+        const old=document.querySelector('ytd-browse > #contents'),shell=document.createElement('section');
+        shell.className='new-native-search';shell.style.cssText='max-width:920px;margin:auto;padding:32px';
+        shell.append(...[...old.childNodes].filter(node=>node.id!=='myt-search'));old.replaceWith(shell);
+        document.dispatchEvent(new Event('yt-page-data-updated'));document.dispatchEvent(new Event('yt-navigate-finish'));
+    }''')
+    host=page.locator('#myt-search')
+    expect(host.locator('.media-title')).to_have_text(['Regular video 24'])
+    expect(page.locator('#video-24')).to_be_hidden()
+    after=geometry(page)
+    assert abs(after['width']-before['width'])<1,(before,after)
+    assert after['direction']=='column' and after['columns']==before['columns'],(before,after)
+    expect(nav.get_by_role('link',name='Videos',exact=True)).to_have_attribute('aria-current','page')
+    assert requests[-1]['query']=='new layout'
+    assert len(documents)==1,'Search must not fall back to reloading the page'
+    assert not errors,errors
+    context.close()
+    print('PASS actual MAIN/ISOLATED worlds: SPA search, missing subtype and renamed content branch use the Videos grid',flush=True)
+
+
 if __name__=='__main__':
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
-        for width in (1440,390):
+        separate_worlds(browser)
+        for width in (1440,900,700,390):
+            changed_wrappers(browser,width)
+            changed_wrappers(browser,width,True)
             direct_search(browser,width)
             for cached,primary in ((False,True),(True,True),(False,False)):check(browser,width,cached,primary)
         browser.close()

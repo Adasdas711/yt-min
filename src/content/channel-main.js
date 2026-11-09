@@ -54,7 +54,7 @@
         Object.assign(snapshot.info,data.info);
     }
     function inspect(source){
-        const base=channelBase(location.pathname),browse=source.closest('ytd-browse[page-subtype="channels"]');
+        const base=channelBase(location.pathname),browse=source.closest('ytd-browse');
         if(!base||!browse)return null;
         const snapshot={base,description:'',fullDescription:'',links:[],info:{channelUrl:location.origin+base},aboutStatus:''};
         const roots=[],app=document.querySelector('ytd-app');let channelId='';
