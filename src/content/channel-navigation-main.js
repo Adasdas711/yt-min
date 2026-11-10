@@ -132,6 +132,13 @@
         if(problem)throw new Error('Wrong channel section: '+problem);
         const endpoint=JSON.parse(JSON.stringify(command));
         endpoint.commandMetadata.webCommandMetadata.url=route.pathname+route.search+route.hash;
+        // API-path metadata can also name the resolver as the request URL and
+        // page type. Use a channel browse request, or the section loads empty.
+        if(!pageURL){
+            const metadata=endpoint.commandMetadata.webCommandMetadata;
+            metadata.webPageType='WEB_PAGE_TYPE_CHANNEL';metadata.apiUrl='/youtubei/v1/browse';metadata.rootVe=3611;
+            delete metadata.sendPost;
+        }
         if(wanted==='search')endpoint.browseEndpoint.query=route.searchParams.get('query')||'';
         else delete endpoint.browseEndpoint.query;
         // Keep immutable snapshots, not objects a native controller can reuse

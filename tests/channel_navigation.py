@@ -79,7 +79,7 @@ def resolve_url(route,section=None,api_metadata=False,browse_id='UCfixtureNaviga
     if section=='community':section='posts'
     endpoint={'browseEndpoint':{'browseId':'UCfixtureNavigation','params':'native-'+section},'commandMetadata':{'webCommandMetadata':{'url':target.geturl(),'webPageType':'WEB_PAGE_TYPE_CHANNEL','apiUrl':'/youtubei/v1/browse'}}}
     # Live YouTube can put the API path instead of a page URL in the metadata.
-    if api_metadata:endpoint['commandMetadata']['webCommandMetadata']['url']='/youtubei/v1/navigation/resolve_url'
+    if api_metadata:endpoint['commandMetadata']['webCommandMetadata']={'url':'/youtubei/v1/navigation/resolve_url','apiUrl':'/youtubei/v1/navigation/resolve_url','sendPost':True}
     endpoint['browseEndpoint']['browseId']=browse_id
     route.fulfill(content_type='application/json',body=json.dumps({'endpoint':endpoint}))
 
@@ -348,6 +348,10 @@ def api_metadata_resolution(browser):
         context.route('**/navigation/resolve_url?**',lambda route:resolve_url(route,api_metadata=True))
         nav.get_by_role('link',name=title,exact=True).click()
         page.wait_for_function('__native.events.length===1')
+        metadata=page.evaluate('__native.events[0].commandMetadata.webCommandMetadata')
+        # The section is requested from the browse API, not the resolver.
+        assert metadata['apiUrl']=='/youtubei/v1/browse' and metadata['webPageType']=='WEB_PAGE_TYPE_CHANNEL' and 'sendPost' not in metadata,metadata
+        assert metadata['url'].startswith('/@'),metadata
         assert finish(pending)==section
         wait_section(page,section)
         assert len(documents)==1 and not errors,(section,documents,errors)
