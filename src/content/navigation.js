@@ -63,11 +63,16 @@
         if(url.origin!==location.origin||!channelBase.test(url.pathname))return;
         if(go(url.href)){event.preventDefault();event.stopImmediatePropagation();}
     },true);
-    // Own links that no native control handled would otherwise load a document.
+    // Last chance before the browser loads a new document: a click that
+    // reaches window unhandled would reload the whole tab. This covers own
+    // links and the native links own controls forward clicks to, which
+    // YouTube's handlers may ignore (synthetic or not yet bound).
     window.addEventListener('click',event=>{
-        if(event.defaultPrevented||!plainClick(event))return;
-        const anchor=anchorOf(event),root=anchor?.getRootNode();
-        if(!(root instanceof ShadowRoot)||!root.host.closest(ownHost))return;
+        if(event.defaultPrevented||!plainClick(event)||!available())return;
+        const anchor=anchorOf(event);if(!anchor)return;
+        const root=anchor.getRootNode();
+        // Shadow links of other page components keep their own behavior.
+        if(root instanceof ShadowRoot&&!root.host.closest(ownHost))return;
         let url;try{url=new URL(anchor.href);}catch{return;}
         if(url.origin===location.origin&&url.pathname===location.pathname&&url.search===location.search&&url.hash)return;
         if(go(url.href))event.preventDefault();
