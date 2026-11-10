@@ -6,3 +6,6 @@ explicitly requests a new version.
 
 When updating the distributable, run `python scripts/package.py` and keep
 `articafts/minimal-youtube-1.0.0.zip` consistent with the current source.
+
+After committing and pushing work to the development branch, always open a
+pull request into `main` and merge it, so `main` carries the latest changes.
