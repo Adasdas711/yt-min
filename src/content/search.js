@@ -188,7 +188,7 @@
             if(!card.host.isConnected||!path.includes(link))continue;
             event.stopImmediatePropagation();
             if(event.type==='click'&&!event.button&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&channelURL(link.href)){
-                event.preventDefault();location.assign(link.href);
+                event.preventDefault();if(!globalThis.MinimalYouTubeNavigation?.go(link.href))location.assign(link.href);
             }
             return;
         }

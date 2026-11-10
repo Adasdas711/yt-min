@@ -116,7 +116,7 @@ main.has-sidecar .details { min-height:0; }
             this.q('.transcript-retry').onclick=()=>this.loadTranscript();
             const input=this.q('#watch-search'),clear=this.q('#watch-clear');
             input.oninput=()=>{clear.hidden=!input.value;};input.onkeydown=event=>{if(event.key==='Escape'){event.preventDefault();input.value='';clear.hidden=true;}};clear.onclick=()=>{input.value="";clear.hidden=true;input.focus();};
-            this.q('form').onsubmit=event=>{input.value=input.value.trim();if(!input.value){event.preventDefault();input.focus();}};
+            this.q('form').onsubmit=event=>{input.value=input.value.trim();if(!input.value){event.preventDefault();input.focus();}else if(globalThis.MinimalYouTubeNavigation?.search(input.value))event.preventDefault();};
             this.shadow.addEventListener('keydown',event=>{if(event.target.matches('input,textarea,[contenteditable],button,a')){if(event.key==='/'&&!event.target.matches('input,textarea,[contenteditable]')){event.preventDefault();input.focus();}event.stopPropagation();}});
             this.shortcut=event=>{if(event.key==='/'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!event.isComposing&&!event.composedPath().some(node=>node instanceof Element&&node.matches('input,textarea,[contenteditable]'))){event.preventDefault();input.focus();}};document.addEventListener('keydown',this.shortcut);
             this.shadow.addEventListener('click',event=>{
