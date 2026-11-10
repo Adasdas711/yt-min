@@ -139,6 +139,24 @@
     let storageRevision = 0;
     let theme = null;
     let themeRevision = 0;
+    // A per-tab copy of the last known settings survives page reloads and is
+    // readable synchronously at document_start, before chrome.storage replies.
+    // It only seeds the reversible UI state; redirects still wait for storage.
+    const settingsCacheKey = "minimal-youtube:settings";
+    function readSettingsCache() {
+        try {
+            const value = JSON.parse(sessionStorage.getItem(settingsCacheKey));
+            if (!value || typeof value.enabled !== "boolean") return null;
+            return { enabled: value.enabled, theme: value.theme === "dark" || value.theme === "light" ? value.theme : null };
+        } catch { return null; }
+    }
+    function writeSettingsCache() {
+        // Never persist the provisional default before any real settings exist.
+        if (!settingsReady && !settingsKnown) return;
+        try { sessionStorage.setItem(settingsCacheKey, JSON.stringify({ enabled, theme })); } catch { /* Storage can be unavailable. */ }
+    }
+    const settingsCache = standaloneHome ? null : readSettingsCache();
+    let settingsKnown = Boolean(settingsCache);
     let themeWrite = 0;
     let watchVideo = null;
     let commentsOpen = false;
@@ -1293,7 +1311,7 @@
         }
         renderTheme();
         // Both own page shells mount before native metadata or async storage.
-        if (!settingsReady) { syncWatchDetails(); return; }
+        if (!settingsReady && !settingsKnown) { syncWatchDetails(); return; }
         syncWatch();
         syncWatchDetails();
         syncSections();
@@ -1338,7 +1356,7 @@
                 syncBrand();
                 syncSearchDecorations();
             }
-            if (!settingsReady) { syncWatchDetails(); return; }
+            if (!settingsReady && !settingsKnown) { syncWatchDetails(); return; }
             syncWatch();
             syncWatchDetails();
             syncSections();
@@ -1659,6 +1677,7 @@
             const value = changes.theme.newValue;
             theme = value === "dark" || value === "light" ? value : null;
             renderTheme();
+            writeSettingsCache();
         }
         if (Object.hasOwn(changes, "language")) {
             languageRevision++;
@@ -1669,6 +1688,7 @@
             const value = changes.enabled.newValue;
             settingsReady = true;
             setEnabled(typeof value === "undefined" ? true : Boolean(value));
+            writeSettingsCache();
             if (enabled) { updateRoute(true); cleanTitle(); }
         }
     });
@@ -1678,7 +1698,11 @@
     // This script starts before the application DOM. Install default-on styling
     // immediately; the saved disabled setting removes it as soon as storage returns.
     // Nothing hides the document globally, including on storage/runtime failures.
-    setEnabled(true);
+    // After a reload the tab's last known settings apply at once instead, so a
+    // disabled tab never flashes provisional styling and the saved theme and
+    // page shells are ready on the first paint.
+    if (settingsCache) theme = settingsCache.theme;
+    setEnabled(settingsCache ? settingsCache.enabled : true);
     function settingsLoaded(data) {
         settingsReady = true;
         // A storage error must never hide YouTube or leave a blank document.
@@ -1691,6 +1715,8 @@
         if (storageRevision === initialRevision) {
             setEnabled(typeof data?.enabled === "undefined" ? true : Boolean(data.enabled));
         }
+        settingsKnown = true;
+        writeSettingsCache();
         useEnglishNativeInterface();
         if (enabled) { updateRoute(true); cleanTitle(); schedule(); }
         renderTheme();

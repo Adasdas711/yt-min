@@ -2,6 +2,8 @@
 (() => {
     'use strict';
     if(!/^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)(?:\/|$)/.test(location.pathname))return;
+    // A reload in a tab where the extension is known to be off never hides the channel.
+    try{if(JSON.parse(sessionStorage.getItem('minimal-youtube:settings'))?.enabled===false)return;}catch{}
     const start=()=>{
         const root=document.documentElement;
         root.classList.add('minimal-youtube');root.dataset.mytPage='channel';root.setAttribute('data-myt-channel-boot','');
