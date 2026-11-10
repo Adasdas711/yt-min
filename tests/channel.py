@@ -14,6 +14,13 @@ if __name__ == '__main__':
         for width,nested in ((1440,False),(900,False),(390,False),(1440,True)):
             page=setup(browser,path='/@creator/videos',body=fixture().replace('</div><div id="tabs">','<div id="tabs">').replace('</yt-tab-group-shape></div><div id="contents">','</yt-tab-group-shape></div></div><div id="contents">') if nested else fixture(),width=width)
             expect(page.locator('#myt-search .media')).to_have_count(18)
+            # YouTube lays out a rich grid from its own width and stamps no
+            # items into a boxless grid after an SPA section change.
+            grid=page.evaluate('''()=>{const g=document.querySelector('ytd-rich-grid-renderer'),c=document.querySelector('#continuation'),host=document.querySelector('#myt-search');
+                const gb=g.getBoundingClientRect(),cb=c.getBoundingClientRect(),hb=host.getBoundingClientRect();
+                return {width:gb.width,height:gb.height,hostWidth:hb.width,visibility:getComputedStyle(g).visibility,continuationTop:cb.top,hostBottom:hb.bottom};}''')
+            assert grid['width']>=grid['hostWidth']>0 and grid['height']<=2 and grid['visibility']=='hidden',grid
+            assert grid['continuationTop']>=grid['hostBottom']-1,grid
             for label in ('Home','About','Shorts'):
                 expect(page.get_by_role('tab').filter(has_text=label)).to_be_hidden()
             expect(page.locator('#myt-channel-nav').get_by_role('link',name='Videos',exact=True)).to_be_visible()
