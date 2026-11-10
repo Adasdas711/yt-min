@@ -1,6 +1,7 @@
 """Repeated section navigation, isolated search, delayed replies and history."""
+import base64
 import json
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import unquote, urlparse, parse_qs
 from playwright.sync_api import sync_playwright, expect
 from smoke import ROOT, MOCK, document
 from channel_header import fixture
@@ -131,8 +132,15 @@ def setup(browser,width=1440,dom_only=False,bridge=True,search_context_bug=False
     return context,page,nav,documents,requests,pending,errors
 
 
+def params_section(params):
+    if params.startswith('native-'):return params.removeprefix('native-')
+    # Real YouTube params: protobuf field 2 holds the tab name.
+    raw=base64.b64decode(unquote(params)+'==');assert raw[0]==0x12,params
+    name=raw[2:2+raw[1]].decode();return 'posts' if name=='community' else name
+
+
 def finish(pending,index=0):
-    route=pending.pop(index);data=route.request.post_data_json;section=data['params'].removeprefix('native-')
+    route=pending.pop(index);data=route.request.post_data_json;section=params_section(data['params'])
     number={'videos':20,'streams':21,'playlists':22,'posts':23,'search':24}[section]
     html=f'<div id="section-result">{section}:{data.get("query","")}</div>'
     html+=playlist(number,count=12) if section=='playlists' else '<ytd-backstage-post-renderer>Channel post</ytd-backstage-post-renderer>' if section=='posts' else video(number)
@@ -366,6 +374,33 @@ def api_metadata_resolution(browser):
     print('PASS API-path metadata in resolved commands stays in the document for this channel only',flush=True)
 
 
+def verified_tab_commands(browser):
+    # Live YouTube: resolve_url adds fields to the params that make Videos and
+    # Live load without items. A tab command whose params name its own section
+    # is what a native click sends, so it is used without a resolution request.
+    context,page,nav,documents,requests,pending,errors=setup(browser,resolve_urls=True)
+    resolutions=[];context.route('**/navigation/resolve_url?**',lambda route:(resolutions.append(1),resolve_url(route,'search')))
+    page.evaluate('''()=>{for(const record of document.querySelector('ytd-browse').data.contents.twoColumnBrowseResultsRenderer.tabs){
+        const tab=record.tabRenderer||record.expandableTabRenderer,name=tab.endpoint.browseEndpoint.params.replace('native-','');
+        tab.endpoint.browseEndpoint.params=encodeURIComponent(btoa('\\x12'+String.fromCharCode(name.length)+name+'\\xf2\\x06\\x04\\x0a\\x02\\x3a\\x00'));}}''')
+    for index,(title,section) in enumerate([('Live','streams'),('Playlists','playlists'),('Videos','videos')]):
+        nav.get_by_role('link',name=title,exact=True).click()
+        page.wait_for_function('count=>__native.events.length===count',arg=index+1)
+        assert finish(pending)==section
+        wait_section(page,section)
+    assert not resolutions and len(documents)==1 and not errors,(resolutions,documents,errors)
+    context.close()
+    # A stale tab whose params name another section is never trusted.
+    context,page,nav,documents,requests,pending,errors=setup(browser,resolve_urls=True)
+    page.evaluate('''()=>{const tabs=document.querySelector('ytd-browse').data.contents.twoColumnBrowseResultsRenderer.tabs;
+        for(const record of tabs){const tab=record.tabRenderer||record.expandableTabRenderer;tab.endpoint.browseEndpoint.params=encodeURIComponent(btoa('\\x12\\x06videos'));}}''')
+    nav.get_by_role('link',name='Live',exact=True).click()
+    page.wait_for_function('__native.events.length===1')
+    assert finish(pending)=='streams'
+    context.close()
+    print('PASS verified tab commands open Videos/Live/Playlists without resolve_url; stale tabs fall back to it',flush=True)
+
+
 if __name__=='__main__':
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -380,4 +415,5 @@ if __name__=='__main__':
         resolved_search_and_empty_live(browser)
         invalid_resolution(browser)
         api_metadata_resolution(browser)
+        verified_tab_commands(browser)
         browser.close()
