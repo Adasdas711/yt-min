@@ -1,6 +1,10 @@
 /* Channel-only identity, English controls and reliable section navigation. */
 (() => {
     'use strict';
+    // YouTube can retain the original html.lang after an English override.
+    // Its SPA router drops hl from subsequent URLs; that must not trigger a
+    // second document load merely to apply the same language again.
+    const englishDocument=new URL(location.href).searchParams.get('hl')==='en';
     const basePattern=/^(\/(?:@[^/]+|(?:channel|c|user)\/[^/]+))(?:\/(.*))?\/?$/;
     const tabsSelector='yt-tab-shape,tp-yt-paper-tab,ytd-expandable-tab-renderer,[role="tab"]';
     const aboutSelector='ytd-about-channel-renderer,yt-about-channel-renderer,ytd-channel-about-metadata-renderer,yt-about-channel-view-model';
@@ -44,7 +48,7 @@
         }
         static destination(url,language){
             const landing=Channel.landing(url);if(landing)return landing;
-            if(!basePattern.test(url.pathname)||!language||/^en(?:-|$)/i.test(language)||url.searchParams.get('hl')==='en')return null;
+            if(!basePattern.test(url.pathname)||englishDocument||!language||/^en(?:-|$)/i.test(language)||url.searchParams.get('hl')==='en')return null;
             const target=new URL(url);target.searchParams.set('hl','en');target.searchParams.set('persist_hl','1');return target.href;
         }
         constructor(){

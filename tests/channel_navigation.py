@@ -81,7 +81,7 @@ def resolve_url(route,section=None):
     route.fulfill(content_type='application/json',body=json.dumps({'endpoint':endpoint}))
 
 
-def setup(browser,width=1440,dom_only=False,bridge=True,search_context_bug=False,dirty_tabs=False,resolve_urls=False):
+def setup(browser,width=1440,dom_only=False,bridge=True,search_context_bug=False,dirty_tabs=False,resolve_urls=False,document_language='en'):
     context=browser.new_context(viewport={'width':width,'height':960})
     page=context.new_page();documents=[];requests=[];pending=[];errors=[]
     def route(route):
@@ -96,7 +96,7 @@ def setup(browser,width=1440,dom_only=False,bridge=True,search_context_bug=False
             if len(documents)>1:
                 section=urlparse(request.url).path.rstrip('/').split('/')[-1]
                 contents=playlist(22,count=12) if section=='playlists' else '<ytd-backstage-post-renderer>Channel post</ytd-backstage-post-renderer>' if section in ('posts','community') else video(24 if section=='search' else 21 if section=='streams' else 20)
-            body=document(fixture(contents=contents)).replace('</head>','<style>'+(ROOT/'src/styles/styles.css').read_text()+'</style></head>')
+            body=document(fixture(contents=contents)).replace('<html lang="en">',f'<html lang="{document_language}">').replace('</head>','<style>'+(ROOT/'src/styles/styles.css').read_text()+'</style></head>')
             route.fulfill(content_type='text/html; charset=utf-8',body=body)
         else:route.fulfill(status=204,body='')
     context.route('https://www.youtube.com/**',route)
@@ -141,8 +141,8 @@ def wait_section(page,section):
     page.wait_for_url(lambda url:urlparse(str(url)).path.rstrip('/').endswith('/'+section),timeout=4000)
 
 
-def transitions(browser,width,dom_only,resolve_urls=False):
-    context,page,nav,documents,requests,pending,errors=setup(browser,width,dom_only,dirty_tabs=True,resolve_urls=resolve_urls)
+def transitions(browser,width,dom_only,resolve_urls=False,document_language='en'):
+    context,page,nav,documents,requests,pending,errors=setup(browser,width,dom_only,dirty_tabs=True,resolve_urls=resolve_urls,document_language=document_language)
     resolutions=[]
     context.on('request',lambda request:resolutions.append(request.post_data_json) if '/navigation/resolve_url' in request.url else None)
     if resolve_urls:
@@ -179,7 +179,7 @@ def transitions(browser,width,dom_only,resolve_urls=False):
     expect(nav.get_by_role('link',name='Videos',exact=True)).to_have_attribute('aria-current','page')
     assert not errors,errors
     context.close()
-    print(f'PASS 20 SPA section changes including Live, stable header/nav, immutable commands and history: {width}px, DOM models={dom_only}, resolved URLs={resolve_urls}',flush=True)
+    print(f'PASS 20 SPA section changes including Live, stable header/nav, immutable commands and history: {width}px, DOM models={dom_only}, resolved URLs={resolve_urls}, document language={document_language}',flush=True)
 
 
 def search_and_races(browser):
@@ -338,6 +338,8 @@ if __name__=='__main__':
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         for width,dom_only in ((1440,False),(390,True)):transitions(browser,width,dom_only)
         for width in (1440,390):transitions(browser,width,False,resolve_urls=True)
+        for language in ('ru','de'):
+            for width in (1440,390):transitions(browser,width,False,resolve_urls=True,document_language=language)
         search_and_races(browser)
         fallback_and_cleanup(browser)
         modified_clicks(browser)
