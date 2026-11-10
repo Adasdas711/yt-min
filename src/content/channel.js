@@ -345,16 +345,19 @@
         open(href){
             const url=new URL(href,location.href),search=/\/search\/?$/.test(url.pathname);
             if(!search)url.searchParams.delete('query');
-            const key=this.navigationKey(url.href),fromSearch=/\/search\/?$/.test(location.pathname)||!!this.navigationPending&&/\/search\/?$/.test(new URL(this.navigationPending.href).pathname);
+            const key=this.navigationKey(url.href);
             this.emptySearch=false;document.documentElement.removeAttribute('data-myt-channel-search-empty');
-            if(!search){this.closeSearch();this.nav.shadowRoot.querySelector('input').value='';}
+            if(!search){
+                this.closeSearch();this.nav.shadowRoot.querySelector('input').value='';
+                // YouTube can acknowledge a cached tab command without loading
+                // its feed (notably Live and repeated section changes). A real
+                // document navigation starts the requested section cleanly.
+                this.cancelNavigation();location.assign(url.href);return;
+            }
             if(this.navigationPending?.key===key||!this.navigationPending&&key===this.navigationKey(location.href))return;
             this.cancelNavigation();
             const pending={id:(this.navigationSequence||0)+1,href:url.href,key,sourceKey:this.navigationKey(location.href),accepted:false};
             this.navigationSequence=pending.id;this.navigationPending=pending;this.renderNavigationState();
-            // Exit the search controller cleanly; ordinary tabs use cached
-            // native endpoints and keep the current document and header.
-            if(fromSearch&&!search){this.fallbackNavigation(pending);return;}
             this.nav.setAttribute('data-myt-channel-navigation-request',JSON.stringify({id:pending.id,href:pending.href}));
             this.nav.removeAttribute('data-myt-channel-navigation-result');
             this.nav.dispatchEvent(new Event('minimal-youtube:channel-navigate',{bubbles:true}));

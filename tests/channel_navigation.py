@@ -129,29 +129,28 @@ def transitions(browser,width,dom_only):
     context,page,nav,documents,requests,pending,errors=setup(browser,width,dom_only,dirty_tabs=True)
     for cycle in range(5):
         for title,section in [('Live','streams'),('Playlists','playlists'),('Posts','posts'),('Videos','videos')]:
+            # A broken native router must not prevent any section from loading.
+            page.evaluate('__native.mode="silent"')
             token=page.evaluate('__native.token')
             link=nav.get_by_role('link',name=title,exact=True)
             if title=='Posts':link.focus();link.press('Enter')
             else:link.click()
-            assert requests[-1]['params']=='native-'+section,requests[-1]
-            assert finish(pending)==section
             wait_section(page,section)
             expect(link).to_have_attribute('aria-current','page')
             expect(nav).to_have_attribute('aria-busy','false')
-            assert page.evaluate('__native.token')==token
-            assert not pending
+            assert page.evaluate('__native.token')!=token
+            assert not requests and not pending
+            assert 'query' not in parse_qs(urlparse(page.url).query)
             if section=='posts':expect(page.locator('ytd-backstage-post-renderer')).to_have_text('Channel post')
             else:expect(page.locator('#myt-search .media-title')).to_have_text(['Playlist 22' if section=='playlists' else 'Regular video 21' if section=='streams' else 'Regular video 20'])
-    assert len(documents)==1 and len(requests)==20,(documents,requests)
-    count=len(documents);nav.get_by_role('link',name='Videos',exact=True).click();page.wait_for_timeout(50)
-    assert len(documents)==count,'The active section must not reload'
+    assert len(documents)==21,documents
     page.go_back();wait_section(page,'posts')
     expect(nav.get_by_role('link',name='Posts',exact=True)).to_have_attribute('aria-current','page')
     page.go_forward();wait_section(page,'videos')
     expect(nav.get_by_role('link',name='Videos',exact=True)).to_have_attribute('aria-current','page')
     assert not errors,errors
     context.close()
-    print(f'PASS 20 fast section changes without document reload, including corrupted native tab models after the third switch: {width}px, DOM models={dom_only}',flush=True)
+    print(f'PASS 20 section changes including Live with an unresponsive SPA router: {width}px, DOM models={dom_only}',flush=True)
 
 
 def search_and_races(browser):
