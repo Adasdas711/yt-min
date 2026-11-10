@@ -110,7 +110,7 @@
             this.nav.addEventListener('minimal-youtube:channel-navigation-result',()=>{
                 const pending=this.navigationPending;if(!pending)return;
                 let result;try{result=JSON.parse(this.nav.getAttribute('data-myt-channel-navigation-result')||'{}');}catch{return;}
-                if(result.id===pending.id&&!result.started)this.fallbackNavigation(pending);
+                if(result.id===pending.id&&!result.started)this.fallbackNavigation(pending,'channel route resolution failed'+(result.reason?': '+result.reason:''));
             });
             this.nav.shadowRoot.querySelector('input').addEventListener('input',event=>{
                 event.stopPropagation();
@@ -217,10 +217,10 @@
                             if(!/no results found|ничего не найдено|результатов нет/iu.test(node.textContent))return false;
                             for(let parent=node.parentElement;parent&&parent!==this.browse;parent=parent.parentElement)if(parent.hidden||parent.getAttribute('aria-hidden')==='true'||getComputedStyle(parent).display==='none')return false;
                             return true;
-                        }))location.assign(pending.href);
+                        })){console.info('[Minimal YouTube] document load:','search left an empty section',pending.href);location.assign(pending.href);}
                     },350);
                 }
-                else if((event.type==='yt-navigate-error'&&(matches||!href&&pending.accepted))||(event.type==='yt-navigate-cancel'&&href&&matches))this.fallbackNavigation(pending);
+                else if((event.type==='yt-navigate-error'&&(matches||!href&&pending.accepted))||(event.type==='yt-navigate-cancel'&&href&&matches))this.fallbackNavigation(pending,event.type);
             };
             this.historyNavigation=()=>{this.emptySearch=false;document.documentElement.removeAttribute('data-myt-channel-search-empty');this.cancelNavigation();};
             this.routeNavigation=()=>{
@@ -347,9 +347,10 @@
             this.nav.dispatchEvent(new Event('minimal-youtube:channel-navigation-cancel',{bubbles:true}));
             this.navigationPending=null;this.renderNavigationState();
         }
-        fallbackNavigation(pending){
+        fallbackNavigation(pending,reason){
             if(this.navigationPending!==pending)return;
             this.cancelNavigation();
+            console.info('[Minimal YouTube] document load:','channel section',reason||'unknown',pending.href);
             location.assign(pending.href);
         }
         open(href){
@@ -367,11 +368,11 @@
             this.nav.dispatchEvent(new Event('minimal-youtube:channel-navigate',{bubbles:true}));
             if(this.navigationPending!==pending)return;
             let result={};try{result=JSON.parse(this.nav.getAttribute('data-myt-channel-navigation-result')||'{}');}catch{}
-            if(result.id!==pending.id||!result.started){this.fallbackNavigation(pending);return;}
+            if(result.id!==pending.id||!result.started){this.fallbackNavigation(pending,result.id!==pending.id?'no response from the page router':'router did not start');return;}
             pending.acceptTimer=setTimeout(()=>{
-                if(this.navigationPending===pending&&!pending.accepted&&this.navigationKey(location.href)!==pending.key)this.fallbackNavigation(pending);
+                if(this.navigationPending===pending&&!pending.accepted&&this.navigationKey(location.href)!==pending.key)this.fallbackNavigation(pending,'YouTube did not start navigating');
             },result.resolving?6000:700);
-            pending.completeTimer=setTimeout(()=>this.fallbackNavigation(pending),search||result.resolving?12000:4000);
+            pending.completeTimer=setTimeout(()=>this.fallbackNavigation(pending,'navigation did not finish in time'),search||result.resolving?12000:4000);
         }
         url(section,query){const url=new URL(this.base+'/'+section,location.origin);url.searchParams.set('hl','en');url.searchParams.set('persist_hl','1');if(query)url.searchParams.set('query',query);return url.href;}
         hide(node){if(node&&!this.hidden.has(node)){node.setAttribute('data-myt-channel-source','');this.hidden.add(node);}}

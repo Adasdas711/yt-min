@@ -534,6 +534,7 @@
         if (globalThis.MinimalYouTubeChannel&&channelRoute.test(url.pathname)) return;
         if (url.searchParams.get("hl") === "en") return;
         url.searchParams.set("hl", "en");
+        console.info('[Minimal YouTube] document load:','English interface redirect', url.href);
         location.replace(url.href);
     }
 
@@ -1270,7 +1271,7 @@
         const channelDestination=nextPage==='channel'&&settingsReady&&!pendingNavigation?globalThis.MinimalYouTubeChannel?.destination(url,root.lang):null;
         if(channelDestination){
             root.dataset.mytPage='channel';
-            if(redirectingURL!==url.href){redirectingURL=url.href;location.replace(channelDestination);}
+            if(redirectingURL!==url.href){redirectingURL=url.href;console.info('[Minimal YouTube] document load:','channel landing/language redirect',url.href,'->',channelDestination);location.replace(channelDestination);}
             return;
         }
         const previous = root.dataset.mytPage;
@@ -1295,6 +1296,7 @@
             root.dataset.mytPage = "shorts";
             if (redirectingURL !== currentURL) {
                 redirectingURL = currentURL;
+                console.info('[Minimal YouTube] document load:','Shorts redirect', destination);
                 location.replace(destination);
             }
             return;
