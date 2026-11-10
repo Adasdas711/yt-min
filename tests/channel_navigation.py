@@ -72,12 +72,15 @@ ROUTER=r'''(() => {
 })();'''
 
 
-def resolve_url(route,section=None):
+def resolve_url(route,section=None,api_metadata=False,browse_id='UCfixtureNavigation'):
     target=urlparse(route.request.post_data_json['url'])
     if section:target=target._replace(path=target.path.rsplit('/',1)[0]+'/'+section)
     section=target.path.rstrip('/').split('/')[-1]
     if section=='community':section='posts'
     endpoint={'browseEndpoint':{'browseId':'UCfixtureNavigation','params':'native-'+section},'commandMetadata':{'webCommandMetadata':{'url':target.geturl(),'webPageType':'WEB_PAGE_TYPE_CHANNEL','apiUrl':'/youtubei/v1/browse'}}}
+    # Live YouTube can put the API path instead of a page URL in the metadata.
+    if api_metadata:endpoint['commandMetadata']['webCommandMetadata']['url']='/youtubei/v1/navigation/resolve_url'
+    endpoint['browseEndpoint']['browseId']=browse_id
     route.fulfill(content_type='application/json',body=json.dumps({'endpoint':endpoint}))
 
 
@@ -339,6 +342,26 @@ def invalid_resolution(browser):
     print('PASS a wrong-section answer loads the actual Live document; a failed resolution uses the Live tab command',flush=True)
 
 
+def api_metadata_resolution(browser):
+    for title,section in [('Playlists','playlists'),('Live','streams')]:
+        context,page,nav,documents,requests,pending,errors=setup(browser,resolve_urls=True)
+        context.route('**/navigation/resolve_url?**',lambda route:resolve_url(route,api_metadata=True))
+        nav.get_by_role('link',name=title,exact=True).click()
+        page.wait_for_function('__native.events.length===1')
+        assert finish(pending)==section
+        wait_section(page,section)
+        assert len(documents)==1 and not errors,(section,documents,errors)
+        context.close()
+    # The same answer for another channel id is never accepted.
+    context,page,nav,documents,requests,pending,errors=setup(browser,resolve_urls=True)
+    context.route('**/navigation/resolve_url?**',lambda route:resolve_url(route,api_metadata=True,browse_id='UCanotherChannel'))
+    nav.get_by_role('link',name='Playlists',exact=True).click()
+    wait_section(page,'playlists')
+    assert len(documents)==2,documents
+    context.close()
+    print('PASS API-path metadata in resolved commands stays in the document for this channel only',flush=True)
+
+
 if __name__=='__main__':
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
@@ -352,4 +375,5 @@ if __name__=='__main__':
         resolution_races(browser)
         resolved_search_and_empty_live(browser)
         invalid_resolution(browser)
+        api_metadata_resolution(browser)
         browser.close()
