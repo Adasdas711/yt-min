@@ -120,8 +120,15 @@
         const browseId=command?.browseEndpoint?.browseId,params=command?.browseEndpoint?.params;
         const sameChannel=base(resolved.pathname)===base(target.pathname)||base(resolved.pathname)==='/channel/'+String(browseId).toLowerCase();
         // Name the failed check: it identifies a changed YouTube response.
+        // Some answers carry the API path instead of a page URL in their
+        // metadata. Then the section cannot be read from it: accept the
+        // command only when it is provably for this channel.
+        const pageURL=Boolean(base(resolved.pathname));
+        const canonical=command?.browseEndpoint?.canonicalBaseUrl;
+        const ownChannel=Boolean(id&&browseId===id)||typeof canonical==='string'&&base(canonical)===base(target.pathname);
         const problem=!/^UC[\w-]+$/.test(browseId||'')?'no channel id':typeof params!=='string'||!params?'no section params':id&&browseId!==id?'another channel':
-            resolved.origin!==location.origin?'another origin':section(resolved.pathname)!==wanted?'section '+section(resolved.pathname)+' instead of '+wanted:!sameChannel?'another channel path':'';
+            resolved.origin!==location.origin?'another origin':!pageURL?(ownChannel?'':'another channel (metadata url '+resolved.pathname+')'):
+            section(resolved.pathname)!==wanted?'section '+section(resolved.pathname)+' instead of '+wanted:!sameChannel?'another channel path':'';
         if(problem)throw new Error('Wrong channel section: '+problem);
         const endpoint=JSON.parse(JSON.stringify(command));
         endpoint.commandMetadata.webCommandMetadata.url=route.pathname+route.search+route.hash;
