@@ -6,6 +6,18 @@
     const base=path=>path.match(/^(\/(?:@[^/]+|(?:channel|c|user)\/[^/]+))/)?.[1]?.toLowerCase()||'';
     const section=path=>{const value=path.replace(/\/$/,'').split('/').pop();return value==='community'?'posts':value;};
     const allowed=new Set(['videos','streams','playlists','posts','search']);
+    // A browse params value starts with protobuf field 2: the tab's own name.
+    // It proves a tab command really opens that section, even when the
+    // page's tab models went stale.
+    function paramsSection(params){
+        try{
+            const raw=atob(decodeURIComponent(String(params)).replace(/-/g,'+').replace(/_/g,'/'));
+            if(raw.charCodeAt(0)!==0x12)return '';
+            const length=raw.charCodeAt(1);if(!length||length>20||raw.length<2+length)return '';
+            const name=raw.slice(2,2+length);
+            return /^[a-z]+$/.test(name)?(name==='community'?'posts':name):'';
+        }catch{return '';}
+    }
     const endpointCache=new Map();
     const resolvedEndpoints=new Map();
     let active=null;
@@ -163,7 +175,17 @@
             if(target.origin!==location.origin||base(target.pathname)!==base(location.pathname)||!allowed.has(section(target.pathname)))throw new Error('Not a channel section');
             cancel(nav);
             const context=config('INNERTUBE_CONTEXT'),version=context?.client?.clientVersion||config('INNERTUBE_CONTEXT_CLIENT_VERSION');
-            if(typeof version==='string'&&version){
+            // The page's own tab command is what a native click sends.
+            // resolve_url can add fields to the params that make YouTube
+            // return Videos and Live without any items, so it is only the
+            // fallback for tabs whose command cannot be verified.
+            let tab=null;try{tab=endpoint(browse,target);}catch{}
+            const app=document.querySelector('ytd-app');
+            if(tab&&app&&paramsSection(tab.browseEndpoint?.params)===section(target.pathname)){
+                app.dispatchEvent(new CustomEvent('yt-navigate',{bubbles:true,composed:true,cancelable:true,detail:{endpoint:tab}}));
+                started=true;
+            }
+            else if(typeof version==='string'&&version){
                 const state={nav,controller:new AbortController()};active=state;
                 const current=()=>active===state&&nav.isConnected&&document.documentElement.classList.contains('minimal-youtube')&&base(location.pathname)===base(target.pathname);
                 nav.setAttribute('data-myt-channel-navigation-result',JSON.stringify({id:request.id,started:true,resolving:true}));
@@ -194,9 +216,8 @@
             }
             // Older clients without URL resolution can still use their native
             // tab models, with the existing navigation watchdog as a fallback.
-            const command=endpoint(browse,target),app=document.querySelector('ytd-app');
-            if(command&&app){
-                app.dispatchEvent(new CustomEvent('yt-navigate',{bubbles:true,composed:true,cancelable:true,detail:{endpoint:command}}));
+            else if(tab&&app){
+                app.dispatchEvent(new CustomEvent('yt-navigate',{bubbles:true,composed:true,cancelable:true,detail:{endpoint:tab}}));
                 started=true;
             }
         }catch(error){console.info('[Minimal YouTube] channel route failed:',String(error?.message||error));}
