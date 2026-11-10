@@ -213,9 +213,10 @@ main.has-sidecar .details { min-height:0; }
             // Keep that wrapper visible until the browser finishes the request.
             this.fullscreenIntent=event=>{
                 const path=event.composedPath().filter(node=>node instanceof Element),target=path[0];
+                if(this.handleFullscreenPlayback(event,path,target))return;
                 if((document.fullscreenElement||this.fullscreenPending)&&event.type==='keydown'&&event.key?.toLowerCase()==='v'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!path.some(node=>node.matches('input,textarea,[contenteditable]'))){event.preventDefault();event.stopImmediatePropagation();return;}
                 const button=event.type==='click'&&target?.closest('.ytp-fullscreen-button');
-                const doubleClick=event.type==='dblclick'&&target?.closest('[data-myt-watch-island="media"]')&&!target.closest('button,.ytp-settings-menu,.ytp-panel');
+                const doubleClick=event.type==='dblclick'&&(target?.closest('[data-myt-watch-island="media"]')||document.fullscreenElement?.contains(target))&&!target.closest('button,a,input,textarea,[role="slider"],.ytp-settings-menu,.ytp-panel,.ytp-chrome-bottom,.ytp-progress-bar-container');
                 const shortcut=event.type==='keydown'&&event.key?.toLowerCase()==='f'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!path.some(node=>node.matches('input,textarea,[contenteditable],button,a,[role="menu"]'));
                 if(button||doubleClick||shortcut){
                     const player=this.native.querySelector('#movie_player')||this.nativePlayer();
@@ -229,7 +230,7 @@ main.has-sidecar .details { min-height:0; }
                     player.requestFullscreen({navigationUI:'hide'}).catch(()=>this.resumeFullscreen());
                 }
             };
-            for(const type of ['click','dblclick','keydown'])window.addEventListener(type,this.fullscreenIntent,true);
+            for(const type of ['click','dblclick','keydown','keyup'])window.addEventListener(type,this.fullscreenIntent,true);
             this.fullscreenError=()=>this.resumeFullscreen();document.addEventListener('fullscreenerror',this.fullscreenError);
             this.sourceLoad=event=>{
                 if(!(event.target instanceof Element)||!event.target.matches('img')||!event.target.closest('#owner,ytd-video-owner-renderer,yt-video-owner-renderer,yt-video-owner-view-model,yt-avatar-stack-view-model,ytd-info-card-contents-renderer')||this.sourceFrame)return;
@@ -240,6 +241,29 @@ main.has-sidecar .details { min-height:0; }
             if(document.fullscreenElement)this.syncFullscreen();else this.open(this.host);
         }
         open(node) { if(node.isConnected&&!node.matches(':popover-open')) { try{node.showPopover();}catch{} } }
+        handleFullscreenPlayback(event,path,target){
+            const key=event.code||event.key;
+            if(event.type==='keyup'&&this.playbackKey===key){this.playbackKey=null;event.preventDefault();event.stopImmediatePropagation();return true;}
+            const fullscreen=document.fullscreenElement;
+            if(!fullscreen||!this.native.contains(fullscreen))return false;
+            const player=this.native.querySelector('#movie_player')||this.nativePlayer();
+            const video=fullscreen.matches('video')?fullscreen:fullscreen.querySelector('video.html5-main-video,video');
+            if(!player||!video||player.classList.contains('ad-showing'))return false;
+            if(path.some(node=>node.matches('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="slider"],[role="menu"],[role="menuitem"],.ytp-settings-menu,.ytp-popup,.ytp-panel')))return false;
+            const playButton=target?.closest('.ytp-play-button,.ytp-large-play-button');
+            const modified=event.ctrlKey||event.metaKey||event.altKey;
+            const touch=event.pointerType==='touch'||event.sourceCapabilities?.firesTouchEvents;
+            const click=event.type==='click'&&!event.button&&!modified&&(playButton||!touch&&(target===video||target===player||target?.matches('.html5-video-container,.ytp-bezel')));
+            const shortcut=event.type==='keydown'&&!modified&&!event.isComposing&&[' ','k','K'].includes(event.key)&&(!target?.closest('button,a,[role="button"]')||playButton);
+            if(!click&&!shortcut||video.paused&&video.readyState<HTMLMediaElement.HAVE_CURRENT_DATA)return false;
+            // Native single-click handling can wait for a possible double click.
+            // Toggle the decoded media in this input event and consume the same
+            // native command so a queued handler cannot toggle it a second time.
+            event.preventDefault();event.stopImmediatePropagation();
+            if(shortcut){this.playbackKey=key;if(event.repeat)return true;}
+            if(video.paused||video.ended)video.play()?.catch(()=>{});else video.pause();
+            return true;
+        }
         key(node) { const id=String(++this.sequence);this.sources.set(id,node);return id; }
         node(tag,className,value) {const node=document.createElement(tag);if(className)node.className=className;if(value)node.textContent=value;return node;}
         button(label,source,iconName) {const node=this.node('button','',label);node.type='button';if(iconName)node.insertAdjacentHTML('afterbegin',icon(iconName));if(source)node.dataset.source=this.key(source);return node;}
@@ -1097,7 +1121,7 @@ main.has-sidecar .details { min-height:0; }
             this.q('.transcript-status').textContent=data.length?(filtered.length?'':this.copy.noResults):(this.transcriptLoading?this.copy.loading:this.copy.unavailable);this.q('.transcript-retry').hidden=!!data.length||this.transcriptLoading;this.q('.transcript-search').hidden=!data.length;
         }
         closeTranscript() {this.transcriptOpen=false;clearTimeout(this.transcriptTimeout);if(this.q){this.q('#watch-transcript').hidden=true;this.q('.transcript-menu-toggle')?.setAttribute('aria-expanded','false');this.q('.transcript-content').hidden=true;this.q('.transcript-toggle').setAttribute('aria-expanded','false');}if(this.nativePanelState){for(const[name,value]of this.nativePanelState.attrs){if(value===null)this.nativePanelState.node.removeAttribute(name);else this.nativePanelState.node.setAttribute(name,value);}this.nativePanelState=null;}}
-        destroy() {this.playlistStateObserver?.disconnect();this.restorePlaylistChrome();clearTimeout(this.titleTimer);cancelAnimationFrame(this.geometryFrame);cancelAnimationFrame(this.sourceFrame);this.subscriptionPress?.cancel();this.subscriptionPress=null;this.clearSubscription(true);this.clearFullscreenPreview();this.restoreFullscreenLayout();for(const type of ['click','dblclick','keydown'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('touchmove',this.fullscreenTouch,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);for(const type of ['timeupdate','seeked'])this.media?.removeEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.removeEventListener(type,this.videoMetadata);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;window.dispatchEvent(new Event('resize'));}
+        destroy() {this.playlistStateObserver?.disconnect();this.restorePlaylistChrome();clearTimeout(this.titleTimer);cancelAnimationFrame(this.geometryFrame);cancelAnimationFrame(this.sourceFrame);this.subscriptionPress?.cancel();this.subscriptionPress=null;this.clearSubscription(true);this.clearFullscreenPreview();this.restoreFullscreenLayout();for(const type of ['click','dblclick','keydown','keyup'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('touchmove',this.fullscreenTouch,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);for(const type of ['timeupdate','seeked'])this.media?.removeEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.removeEventListener(type,this.videoMetadata);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;window.dispatchEvent(new Event('resize'));}
     }
     WatchView.loadTitleFonts=loadTitleFonts;
     WatchView.readSubscriptionState=WatchView.prototype.subscriptionState;
