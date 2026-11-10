@@ -25,7 +25,7 @@
     function settle(started){
         if(!pending)return;
         const {href,timer}=pending;clearTimeout(timer);pending=null;
-        if(!started)location.assign(href);
+        if(!started){console.info('[Minimal YouTube] document load:','page router fallback',href);location.assign(href);}
     }
     function available(){
         const root=document.documentElement;

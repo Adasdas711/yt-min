@@ -154,9 +154,9 @@
                     if(!current())return;
                     const app=document.querySelector('ytd-app');if(!app)throw new Error('Missing app');
                     app.dispatchEvent(new CustomEvent('yt-navigate',{bubbles:true,composed:true,cancelable:true,detail:{endpoint:command}}));
-                }).catch(()=>{
+                }).catch(error=>{
                     if(!current())return;
-                    nav.setAttribute('data-myt-channel-navigation-result',JSON.stringify({id:request.id,started:false}));
+                    nav.setAttribute('data-myt-channel-navigation-result',JSON.stringify({id:request.id,started:false,reason:String(error?.message||error).slice(0,200)}));
                     nav.dispatchEvent(new Event('minimal-youtube:channel-navigation-result',{bubbles:true}));
                 });
                 return;
@@ -168,7 +168,7 @@
                 app.dispatchEvent(new CustomEvent('yt-navigate',{bubbles:true,composed:true,cancelable:true,detail:{endpoint:command}}));
                 started=true;
             }
-        }catch{}
+        }catch(error){console.info('[Minimal YouTube] channel route failed:',String(error?.message||error));}
         nav.setAttribute('data-myt-channel-navigation-result',JSON.stringify({id:request.id,started}));
     });
 })();
