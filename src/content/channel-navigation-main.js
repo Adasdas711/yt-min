@@ -119,7 +119,10 @@
         // channel home response in place of Live. Params come from YouTube.
         const browseId=command?.browseEndpoint?.browseId,params=command?.browseEndpoint?.params;
         const sameChannel=base(resolved.pathname)===base(target.pathname)||base(resolved.pathname)==='/channel/'+String(browseId).toLowerCase();
-        if(!/^UC[\w-]+$/.test(browseId||'')||typeof params!=='string'||!params||id&&browseId!==id||resolved.origin!==location.origin||section(resolved.pathname)!==wanted||!sameChannel)throw new Error('Wrong channel section');
+        // Name the failed check: it identifies a changed YouTube response.
+        const problem=!/^UC[\w-]+$/.test(browseId||'')?'no channel id':typeof params!=='string'||!params?'no section params':id&&browseId!==id?'another channel':
+            resolved.origin!==location.origin?'another origin':section(resolved.pathname)!==wanted?'section '+section(resolved.pathname)+' instead of '+wanted:!sameChannel?'another channel path':'';
+        if(problem)throw new Error('Wrong channel section: '+problem);
         const endpoint=JSON.parse(JSON.stringify(command));
         endpoint.commandMetadata.webCommandMetadata.url=route.pathname+route.search+route.hash;
         if(wanted==='search')endpoint.browseEndpoint.query=route.searchParams.get('query')||'';
@@ -156,6 +159,20 @@
                     app.dispatchEvent(new CustomEvent('yt-navigate',{bubbles:true,composed:true,cancelable:true,detail:{endpoint:command}}));
                 }).catch(error=>{
                     if(!current())return;
+                    // The channel's own tab commands are the next best route:
+                    // they still avoid a document load for this section.
+                    // A response that points to another section or channel is a
+                    // real answer: never replace it with a possibly stale tab.
+                    const message=String(error?.message||error);
+                    const incomplete=!/section \S+ instead of|another (?:channel|origin)/.test(message);
+                    if(incomplete)try{
+                        const command=endpoint(browse,target),app=document.querySelector('ytd-app');
+                        if(command&&app){
+                            console.info('[Minimal YouTube] channel route:',String(error?.message||error),'- using the tab command instead');
+                            app.dispatchEvent(new CustomEvent('yt-navigate',{bubbles:true,composed:true,cancelable:true,detail:{endpoint:command}}));
+                            return;
+                        }
+                    }catch{}
                     nav.setAttribute('data-myt-channel-navigation-result',JSON.stringify({id:request.id,started:false,reason:String(error?.message||error).slice(0,200)}));
                     nav.dispatchEvent(new Event('minimal-youtube:channel-navigation-result',{bubbles:true}));
                 });
