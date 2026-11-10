@@ -103,6 +103,11 @@
                 @media(max-width:600px){.toolbar{gap:4px}nav{gap:0}nav a{font-size:14px;padding:12px 9px}.channel-search{gap:8px}form{width:clamp(110px,38vw,190px)}}
                 </style><div class="toolbar"><nav aria-label="Channel sections"></nav><div class="channel-search"><button class="search-toggle" data-section="search" type="button" aria-label="Search" title="Search this channel" aria-expanded="false" aria-controls="channel-search-form"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7"/><path d="m16 16 5 5"/></svg></button><form id="channel-search-form" role="search" hidden><input name="query" type="search" aria-label="Search this channel" placeholder="Search" autocomplete="off"></form></div></div><span class="navigation-status" role="status" aria-live="polite"></span>`;
             this.searchButton=this.nav.shadowRoot.querySelector('.search-toggle');
+            this.nav.addEventListener('minimal-youtube:channel-navigation-result',()=>{
+                const pending=this.navigationPending;if(!pending)return;
+                let result;try{result=JSON.parse(this.nav.getAttribute('data-myt-channel-navigation-result')||'{}');}catch{return;}
+                if(result.id===pending.id&&!result.started)this.fallbackNavigation(pending);
+            });
             this.nav.shadowRoot.querySelector('input').addEventListener('input',event=>{
                 event.stopPropagation();
                 if(!event.isComposing&&!event.target.value.trim())this.clearSearchResults();
@@ -200,7 +205,7 @@
                 if(event.type==='yt-navigate-start'&&(matches||!href)){pending.accepted=true;clearTimeout(pending.acceptTimer);}
                 else if(matches&&(event.type==='yt-navigate-finish'||event.type==='yt-page-data-updated')){
                     this.cancelNavigation();
-                    if(!/\/search\/?$/.test(new URL(pending.href).pathname))this.verifyTimer=setTimeout(()=>{
+                    if(pending.fromSearch&&!/\/search\/?$/.test(new URL(pending.href).pathname))this.verifyTimer=setTimeout(()=>{
                         if(this.navigationPending||this.navigationKey(location.href)!==pending.key)return;
                         const messages=[...this.browse?.querySelectorAll('ytd-message-renderer,yt-message-view-model')||[]];
                         if(messages.some(node=>{
@@ -335,11 +340,12 @@
             clearTimeout(this.verifyTimer);
             const pending=this.navigationPending;
             if(pending){clearTimeout(pending.acceptTimer);clearTimeout(pending.completeTimer);}
+            this.nav.dispatchEvent(new Event('minimal-youtube:channel-navigation-cancel',{bubbles:true}));
             this.navigationPending=null;this.renderNavigationState();
         }
         fallbackNavigation(pending){
             if(this.navigationPending!==pending)return;
-            clearTimeout(pending.acceptTimer);clearTimeout(pending.completeTimer);this.navigationPending=null;
+            this.cancelNavigation();
             location.assign(pending.href);
         }
         open(href){
@@ -347,16 +353,10 @@
             if(!search)url.searchParams.delete('query');
             const key=this.navigationKey(url.href);
             this.emptySearch=false;document.documentElement.removeAttribute('data-myt-channel-search-empty');
-            if(!search){
-                this.closeSearch();this.nav.shadowRoot.querySelector('input').value='';
-                // YouTube can acknowledge a cached tab command without loading
-                // its feed (notably Live and repeated section changes). A real
-                // document navigation starts the requested section cleanly.
-                this.cancelNavigation();location.assign(url.href);return;
-            }
+            if(!search){this.closeSearch();this.nav.shadowRoot.querySelector('input').value='';}
             if(this.navigationPending?.key===key||!this.navigationPending&&key===this.navigationKey(location.href))return;
             this.cancelNavigation();
-            const pending={id:(this.navigationSequence||0)+1,href:url.href,key,sourceKey:this.navigationKey(location.href),accepted:false};
+            const pending={id:(this.navigationSequence||0)+1,href:url.href,key,sourceKey:this.navigationKey(location.href),fromSearch:/\/search\/?$/.test(location.pathname),accepted:false};
             this.navigationSequence=pending.id;this.navigationPending=pending;this.renderNavigationState();
             this.nav.setAttribute('data-myt-channel-navigation-request',JSON.stringify({id:pending.id,href:pending.href}));
             this.nav.removeAttribute('data-myt-channel-navigation-result');
@@ -366,8 +366,8 @@
             if(result.id!==pending.id||!result.started){this.fallbackNavigation(pending);return;}
             pending.acceptTimer=setTimeout(()=>{
                 if(this.navigationPending===pending&&!pending.accepted&&this.navigationKey(location.href)!==pending.key)this.fallbackNavigation(pending);
-            },700);
-            pending.completeTimer=setTimeout(()=>this.fallbackNavigation(pending),search?12000:4000);
+            },result.resolving?6000:700);
+            pending.completeTimer=setTimeout(()=>this.fallbackNavigation(pending),search||result.resolving?12000:4000);
         }
         url(section,query){const url=new URL(this.base+'/'+section,location.origin);url.searchParams.set('hl','en');url.searchParams.set('persist_hl','1');if(query)url.searchParams.set('query',query);return url.href;}
         hide(node){if(node&&!this.hidden.has(node)){node.setAttribute('data-myt-channel-source','');this.hidden.add(node);}}

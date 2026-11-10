@@ -7,6 +7,9 @@
     const section=path=>{const value=path.replace(/\/$/,'').split('/').pop();return value==='community'?'posts':value;};
     const allowed=new Set(['videos','streams','playlists','posts','search']);
     const endpointCache=new Map();
+    const resolvedEndpoints=new Map();
+    let active=null;
+    const config=name=>globalThis.ytcfg?.get?.(name)??globalThis.ytcfg?.data_?.[name];
     const titles=[
         ['videos',/^(videos|видео)$/iu],['streams',/^(live|streams|трансляции|livestreams)$/iu],
         ['playlists',/^(playlists|плейлисты)$/iu],['posts',/^(posts|community|посты|записи|сообщество|beiträge)$/iu],
@@ -91,6 +94,46 @@
         const route=new URL(target.href);route.searchParams.delete('hl');route.searchParams.delete('persist_hl');
         return {browseEndpoint,commandMetadata:{webCommandMetadata:{...command.commandMetadata.webCommandMetadata,url:route.pathname+route.search+route.hash}},...(command.clickTrackingParams?{clickTrackingParams:command.clickTrackingParams}:{})};
     }
+    function routeURL(target){
+        const route=new URL(target.href);route.searchParams.delete('hl');route.searchParams.delete('persist_hl');
+        if(section(route.pathname)!=='search')route.searchParams.delete('query');
+        return route;
+    }
+    async function resolveURL(browse,target,state){
+        const route=routeURL(target),key=route.href,wanted=section(route.pathname);
+        const cached=resolvedEndpoints.get(key);if(cached)return JSON.parse(cached);
+        const context=config('INNERTUBE_CONTEXT')||{},client=context.client||{};
+        const version=client.clientVersion||config('INNERTUBE_CONTEXT_CLIENT_VERSION');
+        const url=new URL('/youtubei/v1/navigation/resolve_url',location.origin);url.searchParams.set('prettyPrint','false');
+        const apiKey=config('INNERTUBE_API_KEY');if(typeof apiKey==='string'&&apiKey)url.searchParams.set('key',apiKey);
+        const timeout=setTimeout(()=>state.controller.abort(),5000);
+        let result;
+        try{
+            const response=await fetch(url.href,{method:'POST',credentials:'same-origin',signal:state.controller.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({url:route.href,context:{...context,client:{...client,clientName:client.clientName||'WEB',clientVersion:version}}})});
+            if(!response.ok)throw new Error('Channel URL resolution failed');
+            result=await response.json();
+        }finally{clearTimeout(timeout);}
+        const command=result.endpoint?.innertubeCommand||result.endpoint,id=channelId(responses(browse),base(target.pathname));
+        const resolved=new URL(command?.commandMetadata?.webCommandMetadata?.url||'',location.origin);
+        // Never use a command for another channel, a different tab or a generic
+        // channel home response in place of Live. Params come from YouTube.
+        const browseId=command?.browseEndpoint?.browseId,params=command?.browseEndpoint?.params;
+        const sameChannel=base(resolved.pathname)===base(target.pathname)||base(resolved.pathname)==='/channel/'+String(browseId).toLowerCase();
+        if(!/^UC[\w-]+$/.test(browseId||'')||typeof params!=='string'||!params||id&&browseId!==id||resolved.origin!==location.origin||section(resolved.pathname)!==wanted||!sameChannel)throw new Error('Wrong channel section');
+        const endpoint=JSON.parse(JSON.stringify(command));
+        endpoint.commandMetadata.webCommandMetadata.url=route.pathname+route.search+route.hash;
+        if(wanted==='search')endpoint.browseEndpoint.query=route.searchParams.get('query')||'';
+        else delete endpoint.browseEndpoint.query;
+        // Keep immutable snapshots, not objects a native controller can reuse
+        // or mutate. Search queries are not cached.
+        if(wanted!=='search'){
+            resolvedEndpoints.set(key,JSON.stringify(endpoint));
+            if(resolvedEndpoints.size>32)resolvedEndpoints.delete(resolvedEndpoints.keys().next().value);
+        }
+        return endpoint;
+    }
+    function cancel(nav){if(active?.nav===nav){active.controller.abort();active=null;}}
+    document.addEventListener('minimal-youtube:channel-navigation-cancel',event=>cancel(event.target));
     document.addEventListener('minimal-youtube:channel-navigate',event=>{
         const nav=event.target;
         if(!(nav instanceof Element)||nav.id!=='myt-channel-nav'||!document.documentElement.classList.contains('minimal-youtube'))return;
@@ -101,6 +144,25 @@
         try{
             const target=new URL(request.href,location.origin);
             if(target.origin!==location.origin||base(target.pathname)!==base(location.pathname)||!allowed.has(section(target.pathname)))throw new Error('Not a channel section');
+            cancel(nav);
+            const context=config('INNERTUBE_CONTEXT'),version=context?.client?.clientVersion||config('INNERTUBE_CONTEXT_CLIENT_VERSION');
+            if(typeof version==='string'&&version){
+                const state={nav,controller:new AbortController()};active=state;
+                const current=()=>active===state&&nav.isConnected&&document.documentElement.classList.contains('minimal-youtube')&&base(location.pathname)===base(target.pathname);
+                nav.setAttribute('data-myt-channel-navigation-result',JSON.stringify({id:request.id,started:true,resolving:true}));
+                resolveURL(browse,target,state).then(command=>{
+                    if(!current())return;
+                    const app=document.querySelector('ytd-app');if(!app)throw new Error('Missing app');
+                    app.dispatchEvent(new CustomEvent('yt-navigate',{bubbles:true,composed:true,cancelable:true,detail:{endpoint:command}}));
+                }).catch(()=>{
+                    if(!current())return;
+                    nav.setAttribute('data-myt-channel-navigation-result',JSON.stringify({id:request.id,started:false}));
+                    nav.dispatchEvent(new Event('minimal-youtube:channel-navigation-result',{bubbles:true}));
+                });
+                return;
+            }
+            // Older clients without URL resolution can still use their native
+            // tab models, with the existing navigation watchdog as a fallback.
             const command=endpoint(browse,target),app=document.querySelector('ytd-app');
             if(command&&app){
                 app.dispatchEvent(new CustomEvent('yt-navigate',{bubbles:true,composed:true,cancelable:true,detail:{endpoint:command}}));

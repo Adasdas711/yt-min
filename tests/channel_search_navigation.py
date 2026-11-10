@@ -33,14 +33,17 @@ def labels_and_sections(browser,width):
             Path('/tmp/yt-min-qa').mkdir(exist_ok=True)
             page.screenshot(path=f'/tmp/yt-min-qa/channel-query-label-{width}.png')
         count=len(requests);nav.get_by_role('link',name=title,exact=True).click()
+        page.wait_for_function('section=>__native.events.at(-1)?.browseEndpoint.params==="native-"+section',arg=section)
+        assert len(requests)==count+1 and len(pending)==1,(section,requests,len(pending),documents)
+        assert finish(pending)==section
         wait_section(page,section)
-        assert len(requests)==count and not pending
+        assert not pending
         expect(root.locator('.media-title')).to_have_text([expected])
         expect(root.locator('.media-channel')).to_be_visible()
         expect(root.get_by_role('heading',name='Результаты поиска',exact=True)).to_be_hidden()
         expect(root.locator('.empty')).to_be_hidden()
         expect(nav.get_by_role('link',name=title,exact=True)).to_have_attribute('aria-current','page')
-    assert len(documents)==3 and not errors,(documents,errors)
+    assert len(documents)==1 and not errors,(documents,errors)
     context.close()
     print(f'PASS search heading and Videos/Playlists after search: {width}px',flush=True)
 
@@ -125,10 +128,11 @@ def empty_search_loading(browser):
     pending.pop().fulfill(content_type='application/json',body='{"html":"<ytd-message-renderer>No results found</ytd-message-renderer>"}')
     page.wait_for_url('**/search?**');expect(page.locator('#myt-search .empty')).to_be_visible()
     nav.get_by_role('link',name='Videos',exact=True).click()
+    assert finish(pending)=='videos'
     wait_section(page,'videos')
     expect(page.locator('#myt-search .media-title')).to_have_text(['Regular video 20'])
     expect(page.locator('#myt-search .empty')).to_be_hidden()
-    assert len(documents)==2 and not pending and not errors,(documents,errors)
+    assert len(documents)==1 and not pending and not errors,(documents,errors)
     context.close()
     print('PASS genuine zero search results do not flash as an error while loading Videos',flush=True)
 
