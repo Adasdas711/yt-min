@@ -136,6 +136,31 @@ def own_links(browser):
     print('PASS own links route locally; external links and disabled state stay native', flush=True)
 
 
+def native_links(browser):
+    body = ('<ytd-app><ytd-page-manager><ytd-browse>'
+            '<a id="unhandled" href="/watch?v=abcdefghijk">Unhandled</a>'
+            '<a id="handled" href="/watch?v=bbbbbbbbbbb">Handled</a>'
+            '<a id="account" href="/account">Account</a>'
+            '</ytd-browse></ytd-page-manager></ytd-app>')
+    page = prepare(browser, '/feed/library', body)
+    start = len(page.documents)
+    # YouTube handles this one itself: the router must not run twice.
+    page.evaluate("document.querySelector('#handled').addEventListener('click', e => e.preventDefault())")
+    page.evaluate("document.querySelector('#handled').click()")
+    page.evaluate("document.querySelector('#account').addEventListener('click', e => { window.__accountDefault = !e.defaultPrevented; e.preventDefault(); })")
+    page.evaluate("document.querySelector('#account').click()")
+    assert page.evaluate('__navigations.length') == 0
+    # A forwarded synthetic click that no native handler accepted would load
+    # a new document; it opens through the router instead.
+    page.evaluate("document.querySelector('#unhandled').click()")
+    page.wait_for_function('__navigations.length === 1')
+    assert page.evaluate('__navigations[0].watchEndpoint.videoId') == 'abcdefghijk'
+    page.wait_for_timeout(300)
+    assert len(page.documents) == start, page.documents
+    page.close()
+    print('PASS unhandled native links open through the router; handled and other links stay native', flush=True)
+
+
 if __name__ == '__main__':
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
@@ -144,4 +169,5 @@ if __name__ == '__main__':
         home_search(browser)
         watch_search(browser)
         own_links(browser)
+        native_links(browser)
         browser.close()
