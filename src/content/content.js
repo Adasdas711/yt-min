@@ -1157,6 +1157,13 @@
             if (!query) {
                 event.preventDefault();
                 input.focus();
+                return;
+            }
+            // Inside YouTube, search through its router: the home stays on
+            // screen until the results are ready, as on native YouTube.
+            if (!standaloneHome && globalThis.MinimalYouTubeNavigation?.search(query)) {
+                event.preventDefault();
+                return;
             }
             if (standaloneHome && language) {
                 for (const [name, value] of [["hl", language], ["persist_hl", "1"]]) {
@@ -1578,7 +1585,8 @@
         if (anchor && shortsDestination(anchor.href) !== null) {
             event.preventDefault();
             event.stopImmediatePropagation();
-            location.assign(shortsDestination(anchor.href));
+            const destination = shortsDestination(anchor.href);
+            if (!globalThis.MinimalYouTubeNavigation?.go(destination)) location.assign(destination);
         }
     }, true);
     document.addEventListener("focusin", () => { if (enabled) schedule(); });
