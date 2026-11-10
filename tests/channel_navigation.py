@@ -326,11 +326,17 @@ def invalid_resolution(browser):
         context,page,nav,documents,requests,pending,errors=setup(browser,resolve_urls=True)
         context.route('**/navigation/resolve_url?**',lambda route:resolve_url(route,'videos') if mode=='wrong-section' else route.fulfill(status=503,body='Unavailable'))
         nav.get_by_role('link',name='Live',exact=True).click()
+        if mode=='http-error':
+            # A failed request is not an answer: the channel's own Live tab
+            # command keeps the page on screen instead of loading a document.
+            page.wait_for_function('__native.events.length===1')
+            assert finish(pending)=='streams'
         wait_section(page,'streams')
         expect(page.locator('#myt-search .media-title')).to_have_text(['Regular video 21'])
-        assert len(documents)==2 and not requests and not errors,(mode,documents,errors)
+        if mode=='http-error':assert len(documents)==1 and len(requests)==1 and not errors,(mode,documents,requests,errors)
+        else:assert len(documents)==2 and not requests and not errors,(mode,documents,errors)
         context.close()
-    print('PASS wrong section commands and URL resolution errors recover with the actual Live document',flush=True)
+    print('PASS a wrong-section answer loads the actual Live document; a failed resolution uses the Live tab command',flush=True)
 
 
 if __name__=='__main__':
