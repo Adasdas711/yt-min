@@ -43,7 +43,7 @@ def tabbed_fixture():
     tabs=''.join(f'<yt-tab-shape role="tab"><a href="/@JoeSpeen/{path}">{label}</a></yt-tab-shape>' for path,label in [('featured','Home'),('videos','Videos'),('streams','Live'),('playlists','Playlists'),('posts','Posts')])
     return f'''<style>ytd-browse,ytd-tabbed-page-header,tp-yt-app-header-layout,tp-yt-app-header,tp-yt-app-toolbar,tp-yt-paper-tabs,yt-page-header-renderer,yt-page-header-view-model{{display:block}}
       tp-yt-app-header{{background:#0f0f0f}}#tabsContainer{{position:relative;overflow:hidden;height:48px}}#tabsContent{{display:flex;position:absolute;left:0;top:0}}
-      ytd-tabbed-page-header #page-header{{max-width:1284px;margin:0 auto;padding:0 24px}}</style><ytd-app>{MASTHEAD}<ytd-page-manager><ytd-browse page-subtype="channels">
+      ytd-tabbed-page-header #page-header{{max-width:1284px;margin:0 auto;padding:0 24px}}ytd-app > #content{{display:block;overflow-x:hidden}}html[dark],ytd-app{{background:#0f0f0f}}</style><ytd-app>{MASTHEAD}<div id="content"><ytd-page-manager><ytd-browse page-subtype="channels">
       <div id="header"><ytd-tabbed-page-header><tp-yt-app-header-layout><div id="wrapper"><tp-yt-app-header id="header" style="position:fixed;top:56px;left:0;right:0;z-index:2;transform:translateY(0)"><div id="contentContainer">
         <div id="page-header-container"><div id="page-header-banner"><img alt="" src="{avatar}" style="width:100%;height:120px"></div>
           <div id="page-header"><yt-page-header-renderer><yt-page-header-view-model><yt-image-banner-view-model><img alt="" src="{avatar}" style="width:100%;height:150px"></yt-image-banner-view-model>
@@ -53,7 +53,7 @@ def tabbed_fixture():
           </yt-page-header-view-model></yt-page-header-renderer></div></div>
         <tp-yt-app-toolbar><div id="tabs-container"><tp-yt-paper-tabs><div id="tabsContainer"><div id="tabsContent">{tabs}</div></div></tp-yt-paper-tabs></div></tp-yt-app-toolbar>
       </div></tp-yt-app-header><div id="contentContainer" style="padding-top:420px"></div></div></tp-yt-app-header-layout></ytd-tabbed-page-header></div>
-      <div id="contents" style="min-height:3000px"><ytd-rich-grid-renderer><div id="contents">{video(1)}</div></ytd-rich-grid-renderer></div></ytd-browse></ytd-page-manager></ytd-app>'''
+      <div id="contents" style="min-height:3000px"><ytd-rich-grid-renderer><div id="contents">{video(1)}</div></ytd-rich-grid-renderer></div></ytd-browse></ytd-page-manager></div></ytd-app>'''
 
 
 def tabbed_header(browser,width):
@@ -91,6 +91,12 @@ def tabbed_header(browser,width):
     assert page.evaluate('''async()=>{const nav=document.querySelector('#myt-channel-nav');let max=0;
       for(let y=1000;y<=2600;y+=37){scrollTo(0,y);max=Math.max(max,Math.abs(nav.getBoundingClientRect().top-56));}
       return max<1&&getComputedStyle(nav).position==='sticky'&&!document.querySelector('[data-myt-channel-sticky-header]');}''')
+    # Two backgrounds: the owned header, and one shade for everything else.
+    colors=page.evaluate('''()=>{const bg=s=>getComputedStyle(document.querySelector(s)).backgroundColor;
+      return {header:bg('#myt-channel-header'),nav:bg('#myt-channel-nav'),page:[bg('body'),bg('ytd-app'),bg('ytd-page-manager'),bg('ytd-browse'),bg('ytd-masthead')],
+        layers:[...document.querySelectorAll('ytd-browse > #header, ytd-browse > #header tp-yt-app-header')].map(e=>getComputedStyle(e).backgroundColor)};}''')
+    assert set(colors['page'])=={colors['nav']} and colors['header']!=colors['nav'],colors
+    assert all(c=='rgba(0, 0, 0, 0)' for c in colors['layers']),colors
     # The navigation row is centered in the window.
     links=page.evaluate('''()=>{const nav=document.querySelector('#myt-channel-nav').shadowRoot,items=[...nav.querySelectorAll('nav a,.channel-search > button')].filter(e=>e.getClientRects().length).map(e=>e.getBoundingClientRect());
       return {left:Math.min(...items.map(r=>r.left)),right:Math.max(...items.map(r=>r.right))};}''')
