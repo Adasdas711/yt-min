@@ -2020,7 +2020,14 @@ html.minimal-youtube[data-myt-page="channel"] tp-yt-app-header[data-myt-channel-
     background: transparent !important;
     background-image: none !important;
 }
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-header-slot],
+html.minimal-youtube[data-myt-page="channel"] ytd-browse[data-myt-channel-owned-header] {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    border-top-width: 0 !important;
+}
 html.minimal-youtube[data-myt-page="channel"] #myt-channel-header {
+    margin-top: var(--myt-channel-header-shift, 0px) !important;
     padding-bottom: 24px !important;
     background: var(--myt-bg) !important;
 }

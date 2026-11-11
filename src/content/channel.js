@@ -465,6 +465,30 @@
             for(const [name,value]of Object.entries(marks))if(browse&&browse.hasAttribute(name)!==value)browse.toggleAttribute(name,value);
             if(this.markedBrowse&&this.markedBrowse!==browse)for(const name of Object.keys(marks))this.markedBrowse.removeAttribute(name);
             this.markedBrowse=browse;
+            if(own)this.alignHeader(own,browse);
+        }
+        // The banner starts right under the masthead. Space YouTube keeps
+        // above its header (padding, margins or empty rows) is taken back.
+        alignHeader(own,browse){
+            const masthead=document.querySelector('#masthead-container')||document.querySelector('ytd-masthead');
+            if(!masthead||!own.getClientRects().length)return;
+            const fixed=getComputedStyle(masthead).position==='fixed';
+            const expected=masthead.getBoundingClientRect().bottom+(fixed?0:scrollY),gap=own.getBoundingClientRect().top+scrollY-expected;
+            if(Math.abs(gap)<1)return;
+            const current=parseFloat(own.style.getPropertyValue('--myt-channel-header-shift'))||0,shift=Math.round(Math.min(0,Math.max(-240,current-gap)));
+            if(shift===current)return;
+            own.style.setProperty('--myt-channel-header-shift',shift+'px');
+            if(gap>0&&this.reportedGap!==Math.round(gap)){
+                this.reportedGap=Math.round(gap);
+                let source='';
+                for(let node=own;node&&node!==browse.parentElement&&!source;node=node.parentElement){
+                    const style=getComputedStyle(node);
+                    if(node!==own&&parseFloat(style.paddingTop)+parseFloat(style.borderTopWidth)>0)source=node.localName+(node.id?'#'+node.id:'')+' padding '+style.paddingTop;
+                    else if(parseFloat(style.marginTop)>0)source=node.localName+(node.id?'#'+node.id:'')+' margin '+style.marginTop;
+                    else for(let sibling=node.previousElementSibling;sibling&&!source;sibling=sibling.previousElementSibling)if(sibling.getBoundingClientRect().height>0&&getComputedStyle(sibling).position!=='absolute'&&getComputedStyle(sibling).position!=='fixed')source=sibling.localName+(sibling.id?'#'+sibling.id:'')+' row '+Math.round(sibling.getBoundingClientRect().height)+'px';
+                }
+                console.info('[Minimal YouTube] channel header gap',Math.round(gap)+'px',source||'unknown');
+            }
         }
         sync(browse){
             const match=location.pathname.match(basePattern);if(!match)return;

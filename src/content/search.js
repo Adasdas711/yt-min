@@ -223,7 +223,7 @@
       .post{display:block;box-sizing:border-box;width:min(720px,100%);margin:0 auto 20px;padding:20px;border:1px solid var(--myt-border);border-radius:18px;background:var(--myt-surface);color:var(--myt-ink);font:400 15px/1.55 Roboto,Arial,sans-serif}
       .post-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}.post-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:none;background:var(--myt-soft)}
       .post-author{display:block;font-weight:600}.post-time{color:var(--myt-muted);font-size:13px;text-decoration:none}.post-time:hover{text-decoration:underline}
-      .post-text{margin:0 0 12px;white-space:pre-wrap;overflow-wrap:anywhere}.post-text:empty{display:none}
+      .post-text{margin:0 0 12px;white-space:pre-wrap;overflow-wrap:anywhere;font:400 15px/1.7 "SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace}.post-text:empty{display:none}
       .post-images{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:12px}.post-images img{display:block;width:100%;max-height:560px;object-fit:cover;border-radius:12px;background:var(--myt-soft)}
       .post-media{display:grid;grid-template-columns:minmax(0,200px) minmax(0,1fr);gap:14px;align-items:center;margin-bottom:12px;color:inherit;text-decoration:none}.post-media img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:10px;background:var(--myt-soft)}.post-media span{font-weight:600;overflow-wrap:anywhere}
       .post-poll{display:grid;gap:8px;margin:0 0 8px;padding:0;list-style:none}.post-poll li{padding:10px 14px;border:1px solid var(--myt-border);border-radius:10px}
@@ -231,7 +231,26 @@
       @media(max-width:600px){.post{padding:16px}.post-media{grid-template-columns:1fr}}@media(max-width:700px){.channels{grid-template-columns:1fr}.media-title{font-size:16px}.media.video .media-title{font-size:15px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}:host([data-channel]) .row{width:calc(85% + (var(--myt-columns,1) - 1)*2.4px)}}
     `;
     const videoIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3Z"/></svg>';
+    // Upload dates older than four months read as month and year. YouTube
+    // gives only a relative age, so the month is counted back from today.
+    const ageUnits={second:1/86400,minute:1/1440,hour:1/24,day:1,week:7,month:30.44,year:365.25,
+        'секунд':1/86400,'минут':1/1440,'час':1/24,'дн':1,'день':1,'недел':7,'месяц':30.44,'год':365.25,'лет':365.25};
+    function publishedLabel(value){
+        const text=String(value||'').trim();
+        const match=text.match(/^(.*?)(\d+)\s*(second|minute|hour|day|week|month|year|секунд|минут|час|день|дн|недел|месяц|год|лет)\S*\s+(?:ago|назад)$/iu);
+        if(!match)return text;
+        const days=Number(match[2])*ageUnits[match[3].toLowerCase()];
+        if(!(days>=4*30.44))return text;
+        const date=new Date();
+        if(/^(month|месяц)/i.test(match[3]))date.setMonth(date.getMonth()-Number(match[2]));
+        else if(/^(year|год|лет)/i.test(match[3]))date.setFullYear(date.getFullYear()-Number(match[2]));
+        else date.setTime(date.getTime()-days*86400000);
+        const prefix=match[1].trim();
+        return (prefix?prefix+' ':'')+date.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+    }
     const datedText=value=>(globalThis.MinimalYouTubeSearchData?.publishedPattern||/\bago\b|назад/iu).test(value);
+    // A content type label is not an owner.
+    const ownerLine=(name,href)=>/^(?:playlist|плейлист|mix|микс|podcast|подкаст)$/iu.test(name.trim())?{name:'',href:''}:{name,href};
     class MediaCard{
         constructor(source,kind){
             this.source=source;this.host=node('article','media '+kind);this.host.dataset.kind=kind;
@@ -255,7 +274,7 @@
             this.owner.hidden=!data.channel.name;if(data.channel.href)this.owner.href=data.channel.href;else this.owner.removeAttribute('href');
             if(this.image.getAttribute('src')!==data.image){if(data.image)this.image.src=data.image;else this.image.removeAttribute('src');}
             this.image.hidden=!data.image;
-            const date=data.published||'';if(this.date.textContent!==date)this.date.textContent=date;this.date.hidden=!date;
+            const date=publishedLabel(data.published);if(this.date.textContent!==date)this.date.textContent=date;this.date.hidden=!date;
             if(this.badge){const count=data.count||'';if(this.badgeCount.textContent!==count)this.badgeCount.textContent=count;this.badge.hidden=!count;this.badge.setAttribute('aria-label',count?count+(count==='1'?' video':' videos'):'');}
         }
         destroy(){this.host.remove();}
@@ -436,9 +455,10 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             let image=coverImage(source)||record?.image||cached?.image;
             if(!image&&parsed.searchParams.get('v')?.match(/^[-\w]{11}$/))image='https://i.ytimg.com/vi/'+parsed.searchParams.get('v')+'/hqdefault.jpg';
             const count=kind==='playlist'?([...source.querySelectorAll(countSelector)].map(node=>countNumber(node.getAttribute('data-video-count')||node.getAttribute('aria-label')||text(node))).find(Boolean)||countNumber(record?.count)||countNumber(cached?.count)):'';
-            const hideChannel=this.channel&&/\/search\/?$/.test(location.pathname);
+            // A channel's own cards need no owner line; it is the page's channel.
+            const hideChannel=this.channel;
             const published=kind==='video'?record?.published||[...source.querySelectorAll('#metadata-line span,.inline-metadata-item,.ytContentMetadataViewModelMetadataText,[class*="MetadataText"]')].map(text).find(value=>value&&value.length<100&&datedText(value))||'':'';
-            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,count,published,channel:hideChannel?{name:'',href:''}:{name:text(owner)||record?.channel?.name||'',href:channelURL(owner?.href||record?.channel?.href)}};
+            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,count,published,channel:hideChannel?{name:'',href:''}:ownerLine(text(owner)||record?.channel?.name||'',channelURL(owner?.href||record?.channel?.href))};
         }
         sync(searches){
             if(!this.nativeStyle.isConnected)document.documentElement.append(this.nativeStyle);
