@@ -538,6 +538,8 @@ def check_header_alignment_and_anonymous_icons(browser, width):
     expect(page.locator('[data-anonymous-icon] svg')).to_be_visible()
     page.evaluate('__setEnabled(true)')
     expect(page.locator('[data-anonymous-icon] svg')).to_be_hidden()
+    expect(own).to_have_value('alignment')
+    own.fill('mr beast')
     own.press('Enter')
     page.wait_for_url('**/results?**')
     assert parse_qs(urlparse(page.url).query)['search_query']==['mr beast']
