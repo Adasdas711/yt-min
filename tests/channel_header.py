@@ -42,12 +42,13 @@ def tabbed_fixture():
     avatar="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2780%27 height=%2780%27%3E%3Ccircle cx=%2740%27 cy=%2740%27 r=%2740%27 fill=%27%23e44%27/%3E%3C/svg%3E"
     tabs=''.join(f'<yt-tab-shape role="tab"><a href="/@JoeSpeen/{path}">{label}</a></yt-tab-shape>' for path,label in [('featured','Home'),('videos','Videos'),('streams','Live'),('playlists','Playlists'),('posts','Posts')])
     return f'''<style>ytd-browse,ytd-tabbed-page-header,tp-yt-app-header-layout,tp-yt-app-header,tp-yt-app-toolbar,tp-yt-paper-tabs,yt-page-header-renderer,yt-page-header-view-model{{display:block}}
-      tp-yt-app-header{{background:#0f0f0f}}#tabsContent{{display:flex}}</style><ytd-app>{MASTHEAD}<ytd-page-manager><ytd-browse page-subtype="channels">
+      tp-yt-app-header{{background:#0f0f0f}}#tabsContent{{display:flex}}
+      ytd-tabbed-page-header #page-header{{max-width:1284px;margin:0 auto;padding:0 24px}}</style><ytd-app>{MASTHEAD}<ytd-page-manager><ytd-browse page-subtype="channels">
       <div id="header"><ytd-tabbed-page-header><tp-yt-app-header-layout><div id="wrapper"><tp-yt-app-header id="header"><div id="contentContainer">
         <div id="page-header-container"><div id="page-header-banner"><img alt="" src="{avatar}" style="width:100%;height:120px"></div>
           <div id="page-header"><yt-page-header-renderer><yt-page-header-view-model><yt-image-banner-view-model><img alt="" src="{avatar}" style="width:100%;height:150px"></yt-image-banner-view-model>
             <div class="yt-page-header-view-model__page-header-headline"><yt-decorated-avatar-view-model><img alt="" src="{avatar}" style="width:160px;height:160px"></yt-decorated-avatar-view-model>
-            <div class="yt-page-header-view-model__page-header-headline-info"><h1>Joe Speen</h1><yt-content-metadata-view-model>@JoeSpeen · 2.24M subscribers · 2.4K videos</yt-content-metadata-view-model>
+            <div class="yt-page-header-view-model__page-header-headline-info"><h1>Joe Speen</h1><yt-content-metadata-view-model>@JoeSpeen · 2.24M subscribers · 2.4K videos</yt-content-metadata-view-model><yt-description-preview-view-model><span class="ytDescriptionPreviewViewModelTruncatedText">Пщщ! Я Joe Speen, а это мой канал.</span></yt-description-preview-view-model>
             <yt-flexible-actions-view-model><yt-subscribe-button-view-model><button id="subscribe">Subscribe</button></yt-subscribe-button-view-model></yt-flexible-actions-view-model></div></div>
           </yt-page-header-view-model></yt-page-header-renderer></div></div>
         <tp-yt-app-toolbar><div id="tabs-container"><tp-yt-paper-tabs><div id="tabsContainer"><div id="tabsContent">{tabs}</div></div></tp-yt-paper-tabs></div></tp-yt-app-toolbar>
@@ -63,6 +64,16 @@ def tabbed_header(browser,width):
     # header, so no empty native header band remains above it.
     assert page.evaluate("document.querySelector('#myt-channel-header').closest('tp-yt-app-header')!==null")
     assert abs(own.bounding_box()['y']-56)<1,own.bounding_box()
+    # Banner across the whole window; a larger avatar overlaps its bottom; the
+    # name, stats and description form one column right of the avatar.
+    banner=own.locator('.myt-ch-banner').bounding_box();avatar=own.locator('.myt-ch-avatar').bounding_box()
+    title=own.locator('h1').bounding_box();description=page.locator('#myt-channel-description').bounding_box()
+    assert banner['x']==0 and abs(banner['width']-width)<1,banner
+    assert abs(avatar['width']-(300 if width>600 else 120))<1,avatar
+    assert avatar['y']<banner['y']+banner['height']<avatar['y']+avatar['height']/2,(banner,avatar)
+    assert title['x']>=avatar['x']+avatar['width'] and title['y']>=banner['y']+banner['height'],(avatar,title)
+    assert abs(description['x']-title['x'])<1,(title,description)
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     # The owned navigation inside tp-yt-paper-tabs stays visible below it.
     nav=page.locator('#myt-channel-nav')
     expect(nav.get_by_role('link',name='Videos',exact=True)).to_be_visible()
@@ -102,7 +113,7 @@ def header(browser,legacy,width,dark):
     title=page.locator('#myt-channel-header h1').bounding_box();button=page.locator('#subscribe').bounding_box()
     assert button['x']>=title['x']+title['width']-1 and abs(button['y']+button['height']/2-title['y']-title['height']/2)<title['height']/2,(title,button)
     avatar=page.locator('#myt-channel-header .myt-ch-avatar').bounding_box()
-    assert abs(avatar['width']-(240 if width>600 else 96))<1,avatar
+    assert abs(avatar['width']-(300 if width>600 else 120))<1,avatar
     click_more(page)
     assert page.evaluate('__more')==1
     expect(page.get_by_role('button',name='Latest',exact=True)).to_be_visible()
