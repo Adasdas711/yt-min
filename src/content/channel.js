@@ -96,6 +96,7 @@
             document.addEventListener('minimal-youtube:channel-about-updated',this.aboutUpdated);
             this.stats=document.createElement('div');this.stats.id='myt-channel-stats';this.stats.lang='en';
             this.stats.attachShadow({mode:'open'}).innerHTML='<style>:host{display:block;color:var(--myt-muted);font:14px/1.6 Arial,sans-serif}.row{display:flex;align-items:center;flex-wrap:wrap;gap:0 8px}.metric{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}svg{width:15px;height:15px;flex:none}[hidden]{display:none!important}</style><div class="row"></div>';
+            this.unclipped=new Set();
             this.nav=document.createElement('div');this.nav.id='myt-channel-nav';this.nav.lang='en';
             this.nav.attachShadow({mode:'open'}).innerHTML=`<style>
                 :host{display:block!important;min-width:0;font:600 16px/1.4 Arial,sans-serif;color:var(--myt-ink)}*{box-sizing:border-box}[hidden]{display:none!important}
@@ -671,8 +672,26 @@
             const wrapper=tabbed&&[...browse.children].find(child=>child!==this.nav&&child.contains(tabbed));
             if(!wrapper)return false;
             if(this.nav.previousElementSibling!==wrapper||this.nav.parentElement!==browse)wrapper.after(this.nav);
+            this.unclipNavigation();
             return true;
         }
+        // An ancestor that hides overflow becomes the scroll container of the
+        // sticky navigation, so it would never pin to the window. Such
+        // ancestors clip instead, which keeps their look but not the scroller.
+        unclipNavigation(){
+            const next=new Set();
+            for(let node=this.nav.parentElement;node&&node!==document.body&&node!==document.documentElement;node=node.parentElement){
+                if(this.unclipped.has(node)){next.add(node);continue;}
+                const style=getComputedStyle(node),open=value=>value==='visible'||value==='clip';
+                if((!open(style.overflowX)||!open(style.overflowY))&&node.scrollHeight<=node.clientHeight+1){
+                    node.setAttribute('data-myt-channel-unclip','');next.add(node);
+                    console.info('[Minimal YouTube] sticky navigation: unclipped',node.localName+(node.id?'#'+node.id:''));
+                }
+            }
+            for(const node of this.unclipped)if(!next.has(node))node.removeAttribute('data-myt-channel-unclip');
+            this.unclipped=next;
+        }
+        restoreUnclipped(){for(const node of this.unclipped)node.removeAttribute('data-myt-channel-unclip');this.unclipped.clear();}
         navigation(browse,current){
             const tabs=[...browse.querySelectorAll(tabsSelector)].filter(node=>!node.parentElement.closest(tabsSelector));
             if(!tabs.length){
@@ -681,7 +700,7 @@
                 return;
             }
             const group=tabs[0].closest('yt-tab-group-shape,tp-yt-paper-tabs')||tabs[0];
-            if(!this.placeBelowHeader(browse,group)&&this.nav.nextElementSibling!==group)group.before(this.nav);
+            if(!this.placeBelowHeader(browse,group)){this.restoreUnclipped();if(this.nav.nextElementSibling!==group)group.before(this.nav);}
             const available=new Map();
             for(const tab of tabs){
                 const label=tab.textContent.trim()||tab.getAttribute('aria-label')||tab.querySelector('[aria-label]')?.getAttribute('aria-label')||'';
@@ -754,7 +773,7 @@
             this.releaseDescriptionScroll();
             window.removeEventListener('wheel',this.descriptionWheel,true);window.removeEventListener('touchstart',this.descriptionTouchStart,true);window.removeEventListener('touchmove',this.descriptionTouchMove,true);
             window.removeEventListener('click',this.click,true);window.removeEventListener('auxclick',this.click,true);window.removeEventListener('keydown',this.keydown,true);this.nav.remove();this.stats.remove();this.descriptionHost.remove();
-            this.restoreSubscribe();this.header?.remove();
+            this.restoreSubscribe();this.header?.remove();this.restoreUnclipped();
             for(const node of this.hidden)node.removeAttribute('data-myt-channel-source');this.hidden.clear();
             for(const [node,names]of this.previewNodes)for(const name of names)node.removeAttribute(name);this.previewNodes.clear();
             for(const [node,names]of this.aboutNodes)for(const name of names)node.removeAttribute(name);this.aboutNodes.clear();

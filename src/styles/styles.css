@@ -1998,7 +1998,29 @@ html.minimal-youtube[data-myt-page="channel"] ytd-browse > #myt-channel-nav {
     max-width: none !important;
     margin: 0 !important;
     padding: 6px 24px !important;
-    background: var(--yt-spec-base-background, var(--myt-bg)) !important;
+    background: var(--myt-bg) !important;
+}
+/* Two backgrounds on a channel: the owned header, and the page around it
+   (masthead, navigation and content). YouTube's header layers become
+   transparent so they add no third shade. */
+html.minimal-youtube[data-myt-page="channel"] { --myt-channel-header-bg: #f1f1f4; }
+html.minimal-youtube[data-myt-page="channel"][dark] { --myt-channel-header-bg: #0a0a0c; }
+html.minimal-youtube[data-myt-page="channel"],
+html.minimal-youtube[data-myt-page="channel"] :is(body, ytd-app, #masthead-container, ytd-masthead, ytd-masthead > #background, ytd-page-manager, ytd-browse) {
+    background: var(--myt-bg) !important;
+    background-image: none !important;
+}
+html.minimal-youtube[data-myt-page="channel"] ytd-browse:has(#myt-channel-header) > #header,
+html.minimal-youtube[data-myt-page="channel"] ytd-browse:has(#myt-channel-header) > #header :is(ytd-tabbed-page-header, tp-yt-app-header-layout, #wrapper, tp-yt-app-header, #background, #backgroundFrontLayer, #backgroundRearLayer, #contentContainer, #page-header-container, #page-header, yt-page-header-renderer, yt-page-header-view-model) {
+    background: transparent !important;
+    background-image: none !important;
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header {
+    padding-bottom: 24px !important;
+    background: var(--myt-channel-header-bg) !important;
+}
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-unclip] {
+    overflow: clip !important;
 }
 html.minimal-youtube[data-myt-page="channel"] ytd-browse:has(> #myt-channel-nav) ytd-tabbed-page-header tp-yt-app-toolbar {
     display: none !important;
