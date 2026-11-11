@@ -294,7 +294,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
         constructor(channel=false){
             this.channel=channel;
             this.nativeStyle=node('style');this.nativeStyle.id='myt-search-native-style';this.nativeStyle.textContent=channel?nativeStyles.replaceAll('ytd-search','[data-myt-channel-results]'):nativeStyles;document.documentElement.append(this.nativeStyle);
-            this.cards=new Map();this.channels=new Map();this.groups=new Map();this.sources=new Map();this.sequence=0;this.nativeNodes=new Set();this.filterText=new Map();this.filterAttributes=new Map();
+            this.cards=new Map();this.channels=new Map();this.groups=new Map();this.sources=new Map();this.virtualSources=new Map();this.sequence=0;this.nativeNodes=new Set();this.filterText=new Map();this.filterAttributes=new Map();
             this.host=node('div');this.host.id='myt-search';this.host.lang='en';if(channel)this.host.dataset.channel='';this.shadow=this.host.attachShadow({mode:'open'});
             this.shadow.innerHTML='<style>'+styles+'</style><h2 class="results-heading" lang="ru" hidden>Результаты поиска</h2><div class="channels" aria-label="Channels"></div><div class="stream"></div><p class="empty" hidden>No results found.</p>';
             this.q=selector=>this.shadow.querySelector(selector);
@@ -407,6 +407,19 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             }
             if(this.host.parentElement!==search)search.prepend(this.host);
             const sources=[...search.querySelectorAll(sourceSelector)].filter(source=>(!this.channel||nativeAvailable(source,search)&&!source.closest(channelExcludedSelector))&&!source.parentElement.closest(sourceSelector)&&!source.closest('[data-myt-hidden],[data-myt-hidden-section],ytd-reel-shelf-renderer')&&!/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(text(source.closest(shelfSelector)?.querySelector('#title-container,#header,h2'))));
+            // YouTube can keep a section's items in its data without stamping
+            // them into the grid. Draw such a section from its data instead.
+            const dataRecords=new Map();
+            if(this.channel&&!sources.length&&/\/(?:videos|streams|playlists)\/?$/.test(location.pathname)){
+                document.dispatchEvent(new Event('minimal-youtube:channel-feed-snapshot'));
+                let feed={};try{feed=JSON.parse(document.documentElement.getAttribute('data-myt-channel-feed')||'{}');}catch{}
+                if(feed.path===location.pathname.replace(/\/$/,'')&&Array.isArray(feed.records))for(const record of feed.records){
+                    if(typeof record?.href!=='string'||!youtubeURL(record.href))continue;
+                    let source=this.virtualSources.get(record.href);if(!source){source=document.createElement('div');this.virtualSources.set(record.href,source);}
+                    dataRecords.set(source,record);sources.push(source);
+                }
+            }
+            for(const [href,source]of this.virtualSources)if(!dataRecords.has(source))this.virtualSources.delete(href);
             const wanted=new Set(sources);
             for(const source of sources){
                 let kind=source.matches('ytd-channel-renderer,[content-type="channel"],[data-content-type="channel"]')?'channel':Search.isPlaylist(source)?'playlist':'video';
@@ -420,7 +433,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             try{for(const value of JSON.parse(document.documentElement.getAttribute('data-myt-search-channels')||'[]'))channelCache.set(value.id,value);}catch{}
             const stream=[],groups=new Map();
             for(const source of sources){
-                const record=records.get(this.sources.get(source)),kind=record?.kind||source.getAttribute('data-myt-search-source-kind');
+                const record=dataRecords.get(source)||records.get(this.sources.get(source)),kind=record?.kind||source.getAttribute('data-myt-search-source-kind');
                 if(kind==='channel'){
                     this.cards.get(source)?.destroy();this.cards.delete(source);
                     let card=this.channels.get(source);if(!card){card=new ChannelCard(source,()=>this.queue(),this.q('.channels'));this.channels.set(source,card);}card.update(channelCache,record||null);continue;

@@ -41,6 +41,27 @@ if __name__ == '__main__':
             expect(page.get_by_role('tab').filter(has_text='Home')).to_be_visible()
             page.close()
             print(f'PASS nested={nested} channel identity, tabs, sticky navigation, equal playlist/video cells, updates and disable at {width}px')
+        # YouTube can hold a section's items in its data without stamping them
+        # into the grid after an SPA switch: draw that section from its data.
+        empty=fixture().split('<ytd-rich-grid-renderer>')[0]+'<ytd-rich-grid-renderer><div id="contents"><ytd-continuation-item-renderer id="continuation"></ytd-continuation-item-renderer></div></ytd-rich-grid-renderer></div></ytd-browse></ytd-page-manager></ytd-app>'
+        page=setup(browser,path='/@creator/videos',body=empty)
+        page.evaluate('''()=>{const item=(id,title)=>({richItemRenderer:{content:{videoRenderer:{videoId:id,title:{runs:[{text:title}]},
+            thumbnail:{thumbnails:[{url:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg',width:480}]},navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/watch?v='+id}},watchEndpoint:{videoId:id}}}}}});
+            const tab=(name,selected,content)=>({tabRenderer:{title:name,selected,endpoint:{commandMetadata:{webCommandMetadata:{url:'/@creator/'+name.toLowerCase()}}},content}});
+            document.querySelector('ytd-browse').data={contents:{twoColumnBrowseResultsRenderer:{tabs:[
+                tab('Videos',true,{richGridRenderer:{contents:[item('dataVideo01','Data video one'),item('dataVideo02','Data video two')]}}),
+                tab('Playlists',false,{richGridRenderer:{contents:[item('otherTab001','Wrong section')]}})]}}};
+            document.dispatchEvent(new Event('yt-page-data-updated'));}''')
+        expect(page.locator('#myt-search .media-title')).to_have_text(['Data video one','Data video two'])
+        assert page.locator('#myt-search .media-title').first.get_attribute('href')=='https://www.youtube.com/watch?v=dataVideo01'
+        # A selected tab for another URL is never drawn under this one.
+        page.evaluate('''()=>{const tabs=document.querySelector('ytd-browse').data.contents.twoColumnBrowseResultsRenderer.tabs;tabs[0].tabRenderer.selected=false;tabs[1].tabRenderer.selected=true;document.dispatchEvent(new Event('yt-page-data-updated'));}''')
+        expect(page.locator('#myt-search .media')).to_have_count(0)
+        # Once YouTube stamps its own cards, they replace the data cards.
+        page.locator('ytd-rich-grid-renderer > #contents').evaluate('(e,html)=>e.insertAdjacentHTML("afterbegin",html)',video(1)+video(2)+video(3))
+        expect(page.locator('#myt-search .media')).to_have_count(3)
+        page.close()
+        print('PASS sections whose data was not stamped into the grid are drawn from that data, never another tab')
         page=setup(browser,path='/@creator/community',body=fixture())
         expect(page.locator('#myt-search')).to_have_count(0)
         expect(page.locator('#subscribe')).to_be_visible()
