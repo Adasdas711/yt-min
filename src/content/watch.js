@@ -69,14 +69,7 @@ main.has-sidecar .details { min-height:0; }
 @media(max-width:900px) { .layout.has-sidecar { grid-template-columns:minmax(0,1fr); } main { padding-inline:20px; }main.has-sidecar .primary { padding:20px 20px 0; }.has-sidecar .sidecar { width:calc(100% - 40px);margin:28px auto 0;border-radius:16px; }:host([theater]) .has-sidecar .details { width:calc(100% - 40px); }:host([theater]) .has-sidecar .sidecar { grid-column:1;grid-row:3;margin-top:0; } }
 @media(max-width:600px) { .header { height:66px;padding:10px 16px;gap:14px; }.brand svg { width:32px;height:24px; }.brand span { display:none; }.search { height:44px; }.search input { font-size:16px; } main { padding:12px 16px 48px; }.media { border-radius:12px; }.details { margin-top:24px;min-height:calc(100dvh - 114px); }.meta-row { gap:12px; }.channel-card { grid-template-columns:var(--owner-avatars-small,40px) minmax(0,1fr) 18px;padding:12px 18px;gap:2px 10px; }.owner img { width:40px;height:40px; }.actions { width:100%; }.actions button { flex:1 1 auto; }.description { --description-side:20px;--description-bottom:22px;--description-round:16px;padding:22px 20px;border-radius:16px; }.prose { font-size:16px;line-height:1.75; }.chapter { flex-basis:min(200px,calc((100% - 12px) / 2));padding:14px 12px;border-radius:20px; }.chapter-title { font-size:17px; } h2 { font-size:21px; }.avatar-group .avatar-link { width:40px;height:40px; }.transcript-card { padding:22px 20px; }.transcript-head>button { width:100%; }.transcript-intro { align-items:start; }.segment { grid-template-columns:55px minmax(0,1fr);gap:12px; }.person { width:100%; }.section { margin-top:28px; } }
 .expand { border-color:transparent;background:transparent; }.expand:hover,.expand:focus-visible { background:var(--soft); }.expand[aria-expanded=true] svg { transform:rotate(180deg); }
-.votes { display:inline-flex;align-items:stretch;min-width:0; }
-.votes .vote { border-radius:0;gap:7px;font-variant-numeric:tabular-nums; }
-.votes .vote:first-child { border-radius:12px 0 0 12px; }
-.votes .vote:last-child { border-radius:0 12px 12px 0; }
-.votes .vote:only-child { border-radius:12px; }
-.votes .vote + .vote { border-left:0; }
-.vote svg,.save svg { width:20px;height:20px;flex:none; }
-.vote[aria-pressed="true"] { background:var(--ink);color:var(--surface);border-color:var(--ink); }
+.save svg { width:20px;height:20px;flex:none; }
 .own-playlist { display:flex;flex-direction:column;height:100%;min-height:0;max-height:inherit; }
 .own-playlist-head { display:flex;align-items:flex-start;gap:12px;padding:16px 12px 12px 18px;border-bottom:1px solid var(--border); }
 .own-playlist-info { flex:1;min-width:0; }
@@ -102,7 +95,7 @@ main.has-sidecar .details { min-height:0; }
         ru: { search:"Поиск на YouTube", clear:"Очистить поиск", description:"Описание", more:"Показать полностью", less:"Свернуть", chapters:"Эпизоды", people:"Упомянутые люди", transcript:"Расшифровка видео", transcriptHint:"Читайте текст и переходите к нужному моменту видео.", showTranscript:"Открыть расшифровку", hideTranscript:"Свернуть", find:"Найти в расшифровке", loading:"Загружаем расшифровку…", unavailable:"Текст пока не загрузился. Попробуйте ещё раз.", retry:"Повторить", noResults:"Совпадений нет", socials:"Ссылки канала", comments:"Комментарии", subscribe:"Подписаться", subscribed:"Вы подписаны", subscribeChannel:"Подписаться на канал", unsubscribeChannel:"Отписаться от канала", subscribing:"Подписываем…", unsubscribing:"Отписываем…", share:"Поделиться", openPlaylist:"Открыть плейлист", closePlaylist:"Закрыть плейлист", menu:"Ещё", otherActions:"Другие действия", video:"Видео" },
         en: { search:"Search YouTube", clear:"Clear search", description:"Description", more:"Show more", less:"Show less", chapters:"Chapters", people:"Mentioned people", transcript:"Video transcript", transcriptHint:"Read along and jump to any moment in the video.", showTranscript:"Open transcript", hideTranscript:"Collapse", find:"Search transcript", loading:"Loading transcript…", unavailable:"The transcript has not loaded yet. Please try again.", retry:"Try again", noResults:"No matches", socials:"Channel links", comments:"Comments", subscribe:"Subscribe", subscribed:"Subscribed", subscribeChannel:"Subscribe to", unsubscribeChannel:"Unsubscribe from", subscribing:"Subscribing…", unsubscribing:"Unsubscribing…", share:"Share", openPlaylist:"Playlist", closePlaylist:"Close playlist", menu:"More", otherActions:"Other actions", video:"Video" }
     };
-    const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${({like:'<path d="M7 11v9H4v-9Zm0 0 4-7a2 2 0 0 1 3 2l-1 4h5a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 16.8 20H7"/>',dislike:'<path d="M17 13V4h3v9Zm0 0-4 7a2 2 0 0 1-3-2l1-4H6a2 2 0 0 1-2-2.3l1.2-6A2 2 0 0 1 7.2 4H17"/>',save:'<path d="M6 4h12v16l-6-4-6 4Z"/>',chevron:'<path d="m6 9 6 6 6-6"/>', transcript:'<path d="M5 3h14v18H5Z"/><path d="M8 8h8M8 12h8M8 16h5"/>', arrow:'<path d="m7 17 10-10M7 7h10v10"/>', share:'<path d="m15 4 6 6-6 6v-4C8 12 5 14 3 19c0-8 3-12 12-12Z"/>', close:'<path d="m6 6 12 12M18 6 6 18"/>', playlist:'<path d="M8 6h12M8 12h12M8 18h12M3 6h.01M3 12h.01M3 18h.01"/>', eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>', menu:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'})[name] || ''}</svg>`;
+    const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${({save:'<path d="M6 4h12v16l-6-4-6 4Z"/>',chevron:'<path d="m6 9 6 6 6-6"/>', transcript:'<path d="M5 3h14v18H5Z"/><path d="M8 8h8M8 12h8M8 16h5"/>', arrow:'<path d="m7 17 10-10M7 7h10v10"/>', share:'<path d="m15 4 6 6-6 6v-4C8 12 5 14 3 19c0-8 3-12 12-12Z"/>', close:'<path d="m6 6 12 12M18 6 6 18"/>', playlist:'<path d="M8 6h12M8 12h12M8 18h12M3 6h.01M3 12h.01M3 18h.01"/>', eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>', menu:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'})[name] || ''}</svg>`;
     const text = element => element?.textContent.replace(/\s+/g," ").trim() || "";
     const seconds = value => {
         const parts = value?.trim().split(":");
@@ -715,28 +708,12 @@ main.has-sidecar .details { min-height:0; }
             const content=this.node('div','owner-text'),names=this.node('div','owner-names'),name=this.node(href?'a':'span','owner-link owner-name',owner.name);
             if(href)name.href=href;names.append(name);content.append(names);box.append(content);
         }
+        // Save is an owned button that presses YouTube's own; video votes
+        // (likes, dislikes and their counts) are not shown.
         voteControls(nativeActions) {
-            const scope=this.native.querySelector('ytd-watch-metadata,ytd-video-primary-info-renderer')||nativeActions;if(!scope)return [];
-            let like=scope.querySelector('like-button-view-model button,#segmented-like-button button,ytd-segmented-like-dislike-button-renderer #segmented-like-button button');
-            let dislike=scope.querySelector('dislike-button-view-model button,#segmented-dislike-button button,ytd-segmented-like-dislike-button-renderer #segmented-dislike-button button');
-            // A bare segmented control holds Like then Dislike.
-            const segmented=like||dislike?[]:[...(scope.querySelector('segmented-like-dislike-button-view-model,ytd-segmented-like-dislike-button-renderer')?.querySelectorAll('button')||[])];
-            if(segmented.length===2){like=segmented[0];dislike=segmented[1];}
-            const save=[...(nativeActions?.querySelectorAll('button')||[])].find(button=>!button.closest('like-button-view-model,dislike-button-view-model,#segmented-like-button,#segmented-dislike-button')&&/^(?:save|сохранить)\b/iu.test(((button.getAttribute('aria-label')||'')+' '+text(button)).trim()));
-            const nodes=[];
-            if(like||dislike){
-                const group=this.node('div','votes');group.setAttribute('role','group');group.setAttribute('aria-label','Rating');
-                for(const [source,kind,label] of [[like,'like','Like'],[dislike,'dislike','Dislike']]){
-                    if(!source)continue;
-                    const count=kind==='like'&&/^\d[\d\s.,]*\s*[kmbкмтысмлнрд.]*$/iu.test(text(source))?text(source):'';
-                    const button=this.button(count,source,kind);button.classList.add('vote');button.setAttribute('aria-label',label);
-                    button.setAttribute('aria-pressed',String(source.getAttribute('aria-pressed')==='true'));
-                    group.append(button);
-                }
-                nodes.push(group);
-            }
-            if(save){const button=this.button('Save',save,'save');button.classList.add('save');nodes.push(button);}
-            return nodes;
+            const save=[...(nativeActions?.querySelectorAll('button')||[])].find(button=>!button.closest('like-button-view-model,dislike-button-view-model,segmented-like-dislike-button-view-model,ytd-segmented-like-dislike-button-renderer,#segmented-like-button,#segmented-dislike-button,[data-myt-votes]')&&/^(?:save|сохранить)\b/iu.test(((button.getAttribute('aria-label')||'')+' '+text(button)).trim()));
+            if(!save)return [];
+            const button=this.button('Save',save,'save');button.classList.add('save');return [button];
         }
         formatSeconds(value) {
             const total=Math.max(0,Math.floor(value)),h=Math.floor(total/3600),m=Math.floor(total%3600/60),sec=String(total%60).padStart(2,'0');
@@ -997,7 +974,7 @@ main.has-sidecar .details { min-height:0; }
             const sectionData=[...this.native.querySelectorAll('ytd-macro-markers-list-item-renderer,ytd-info-card-contents-renderer,ytd-video-description-channel-section-renderer')].map(node=>[text(node),node.querySelector('a[href]')?.href]);
             // Only native source data forms this signature. Typing, focus and scroll
             // in our shadow tree do not rebuild controls or disturb selection.
-            const signature=JSON.stringify([model,[...(nativeActions?.querySelectorAll('button[aria-pressed]')||[])].map(button=>button.getAttribute('aria-pressed')),options.video,options.language,Boolean(options.commentsButton),this.transcriptAvailable,text(metadata?.querySelector('h1'))||document.title,ownerData.name,(ownerData.avatars||[]).map(a=>[a.image.currentSrc||a.image.getAttribute('src'),a.image.naturalWidth]),text(nativeActions),text(descriptionData.body),sectionData,[...this.native.querySelectorAll('ytd-watch-metadata a[href],ytd-video-secondary-info-renderer a[href],ytd-watch-metadata img,ytd-video-secondary-info-renderer img,#description a[href],#description img')].map(node=>[node.href,node.currentSrc||node.getAttribute('src'),node.getAttribute('srcset'),node.getAttribute('data-src'),node.naturalWidth])]);
+            const signature=JSON.stringify([model,options.video,options.language,Boolean(options.commentsButton),this.transcriptAvailable,text(metadata?.querySelector('h1'))||document.title,ownerData.name,(ownerData.avatars||[]).map(a=>[a.image.currentSrc||a.image.getAttribute('src'),a.image.naturalWidth]),text(nativeActions),text(descriptionData.body),sectionData,[...this.native.querySelectorAll('ytd-watch-metadata a[href],ytd-video-secondary-info-renderer a[href],ytd-watch-metadata img,ytd-video-secondary-info-renderer img,#description a[href],#description img')].map(node=>[node.href,node.currentSrc||node.getAttribute('src'),node.getAttribute('srcset'),node.getAttribute('data-src'),node.naturalWidth])]);
             if(signature!==this.signature||[...this.sources.values()].some(node=>!node.isConnected)){
                 if(this.video!==options.video){this.video=options.video;this.expanded=false;this.closeTranscript();this.viewport.scrollTop=0;}
                 this.signature=signature;this.sources.clear();this.sequence=0;

@@ -55,17 +55,15 @@ def check(browser, width):
     expect(chapters.locator('.chapter-title')).to_have_text(['Opening', 'Data chapter'])
     chapters.first.click()
     assert page.evaluate("document.querySelector('video').currentTime") == 0
-    # Votes: owned buttons mirror YouTube's like state and count and press them.
-    page.evaluate('''()=>{const meta=document.querySelector('ytd-watch-metadata');meta.insertAdjacentHTML('beforeend','<div id="actions"><div id="top-level-buttons-computed"><segmented-like-dislike-button-view-model><like-button-view-model><button aria-pressed="true" aria-label="like this video along with 12,345 other people" onclick="window.__like=(window.__like||0)+1;this.setAttribute(\\'aria-pressed\\',String(this.getAttribute(\\'aria-pressed\\')!==\\'true\\'))">12K</button></like-button-view-model><dislike-button-view-model><button aria-pressed="false" aria-label="Dislike this video" onclick="window.__dislike=true">Dislike</button></dislike-button-view-model></segmented-like-dislike-button-view-model><button aria-label="Save to playlist" onclick="window.__save=true">Save</button></div></div>');}''')
-    like = root.get_by_role('button', name='Like', exact=True)
-    expect(like).to_have_attribute('aria-pressed', 'true')
-    expect(like).to_have_text('12K')
-    like.click()
-    assert page.evaluate('window.__like') == 1
-    expect(like).to_have_attribute('aria-pressed', 'false')
-    root.get_by_role('button', name='Dislike', exact=True).click()
-    assert page.evaluate('window.__dislike') is True
-    root.locator('.actions').get_by_role('button', name='Save', exact=True).click()
+    # Votes are not offered: no like/dislike buttons or counts. Save presses YouTube's own.
+    page.evaluate('''()=>{const meta=document.querySelector('ytd-watch-metadata');meta.insertAdjacentHTML('beforeend','<div id="actions"><div id="top-level-buttons-computed"><segmented-like-dislike-button-view-model><like-button-view-model><button aria-pressed="true" aria-label="like this video along with 12,345 other people">12K</button></like-button-view-model><dislike-button-view-model><button aria-pressed="false" aria-label="Dislike this video">Dislike</button></dislike-button-view-model></segmented-like-dislike-button-view-model><button aria-label="Save to playlist" onclick="window.__save=true">Save</button></div></div>');}''')
+    save = root.locator('.actions').get_by_role('button', name='Save', exact=True)
+    expect(save).to_be_visible()
+    expect(root.get_by_role('button', name='Like', exact=True)).to_have_count(0)
+    expect(root.get_by_role('button', name='Dislike', exact=True)).to_have_count(0)
+    expect(root.locator('.actions')).not_to_contain_text('12K')
+    assert page.locator('like-button-view-model button').evaluate('e=>!e.checkVisibility()')
+    save.click()
     assert page.evaluate('window.__save') is True
     # The owned playlist panel: rows from data, the current video marked.
     panel = root.locator('.own-playlist')
