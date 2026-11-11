@@ -233,20 +233,22 @@
     const videoIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3Z"/></svg>';
     // Upload dates older than four months read as month and year. YouTube
     // gives only a relative age, so the month is counted back from today.
-    const ageUnits={second:1/86400,minute:1/1440,hour:1/24,day:1,week:7,month:30.44,year:365.25,
+    const ageUnits={second:1/86400,minute:1/1440,hour:1/24,day:1,week:7,month:30.44,year:365.25,sec:1/86400,min:1/1440,hr:1/24,wk:7,mo:30.44,yr:365.25,
         'секунд':1/86400,'минут':1/1440,'час':1/24,'дн':1,'день':1,'недел':7,'месяц':30.44,'год':365.25,'лет':365.25};
     function publishedLabel(value){
-        const text=String(value||'').trim();
-        const match=text.match(/^(.*?)(\d+)\s*(second|minute|hour|day|week|month|year|секунд|минут|час|день|дн|недел|месяц|год|лет)\S*\s+(?:ago|назад)$/iu);
+        // YouTube may wrap numbers in invisible direction marks and append
+        // notes such as "(edited)"; both stay out of the way of the match.
+        const text=String(value||'').replace(/[\u00ad\u200b-\u200f\u2060-\u2069\ufeff]/g,'').replace(/[\s\u00a0\u202f]+/g,' ').trim();
+        const match=text.match(/^(.*?)(\d+)\s*(second|minute|hour|day|week|month|year|секунд|минут|час|день|дн|недел|месяц|год|лет|sec|min|hr|wk|mo|yr)\S*\s+(?:ago|назад)(.*)$/iu);
         if(!match)return text;
-        const days=Number(match[2])*ageUnits[match[3].toLowerCase()];
+        const days=Number(match[2])*ageUnits[match[3].toLowerCase()],suffix=match[4].trim();
         if(!(days>=4*30.44))return text;
         const date=new Date();
-        if(/^(month|месяц)/i.test(match[3]))date.setMonth(date.getMonth()-Number(match[2]));
-        else if(/^(year|год|лет)/i.test(match[3]))date.setFullYear(date.getFullYear()-Number(match[2]));
+        if(/^(month|месяц|mo$)/i.test(match[3]))date.setMonth(date.getMonth()-Number(match[2]));
+        else if(/^(year|год|лет|yr$)/i.test(match[3]))date.setFullYear(date.getFullYear()-Number(match[2]));
         else date.setTime(date.getTime()-days*86400000);
         const prefix=match[1].trim();
-        return (prefix?prefix+' ':'')+date.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+        return (prefix?prefix+' ':'')+date.toLocaleDateString('en-US',{month:'long',year:'numeric'})+(suffix?' '+suffix:'');
     }
     const datedText=value=>(globalThis.MinimalYouTubeSearchData?.publishedPattern||/\bago\b|назад/iu).test(value);
     // A content type label is not an owner.
@@ -289,7 +291,7 @@
             const head=node('div','post-head'),who=node('div','post-who');
             const avatar=safeURL(data.avatar);if(avatar){const image=node('img','post-avatar');image.alt='';image.decoding='async';image.loading='lazy';image.src=avatar.href;head.append(image);}
             who.append(node('span','post-author',data.author||''));
-            const time=node(data.href?'a':'span','post-time',data.published||'');if(data.href&&safeURL(data.href))time.href=safeURL(data.href).href;who.append(time);head.append(who);
+            const time=node(data.href?'a':'span','post-time',publishedLabel(data.published));if(data.href&&safeURL(data.href))time.href=safeURL(data.href).href;who.append(time);head.append(who);
             const parts=[head,node('p','post-text',data.text||'')];
             const images=(data.images||[]).map(safeURL).filter(Boolean);
             if(images.length){const grid=node('div','post-images');for(const url of images){const image=node('img');image.alt='';image.decoding='async';image.loading='lazy';image.src=url.href;grid.append(image);}parts.push(grid);}

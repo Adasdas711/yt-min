@@ -70,7 +70,7 @@
         if(kind==='video'){
             published=label(value.publishedTimeText).trim();
             if(!published)for(const row of metadata.metadata?.contentMetadataViewModel?.metadataRows||metadata.metadataRows||[])for(const part of row.metadataParts||[]){
-                const text=label(part.text).trim();if(!published&&publishedPattern.test(text))published=text;
+                for(const text of label(part.text).split(/\s*[•·]\s*/))if(!published&&publishedPattern.test(text.trim()))published=text.trim();
             }
         }
         return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,kind==='channel'?8:4),count:kind==='playlist'?playlistCount(value):'',published:published.slice(0,100)};

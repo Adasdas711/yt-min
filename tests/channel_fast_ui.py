@@ -42,7 +42,7 @@ def boot(browser,enabled=True,standalone=False):
 
 
 def active_and_empty(browser,width):
-    body=fixture(contents='').replace('</ytd-browse>','<section class="new-empty-feed"><ytd-message-renderer>No results found.</ytd-message-renderer></section></ytd-browse>')
+    body=fixture(contents='').replace('</ytd-browse>','<section class="new-empty-feed" style="background:#0f0f0f"><ytd-message-renderer>No results found.</ytd-message-renderer></section></ytd-browse>')
     page=setup(browser,'/@JoeSpeen/search?query=missing',body,width=width,native_dark=True)
     own=page.locator('#myt-search')
     expect(own.locator('.empty')).to_be_visible()
@@ -50,6 +50,9 @@ def active_and_empty(browser,width):
     assert page.get_by_text('No results found.',exact=True).evaluate_all('nodes=>nodes.filter(node=>node.getClientRects().length&&getComputedStyle(node).visibility!=="hidden"&&getComputedStyle(node).display!=="none").length')==1
     # A channel search is not a section: no section link is current.
     expect(page.locator('#myt-channel-nav').locator('nav a[aria-current]')).to_have_count(0)
+    # One background behind an empty search: every container is transparent.
+    shades=page.evaluate('''()=>{const out=new Set();for(let n=document.querySelector('#myt-search');n&&n!==document.querySelector('ytd-browse');n=n.parentElement){const c=getComputedStyle(n).backgroundColor;if(c!=='rgba(0, 0, 0, 0)')out.add(n.localName+'#'+n.id+' '+c);}return [...out]}''')
+    assert not shades,shades
     # The empty search message is one large centered line, without a heading.
     expect(own.locator('.results-heading')).to_be_hidden()
     box=own.locator('.empty').bounding_box();assert float(own.locator('.empty').evaluate('e=>parseFloat(getComputedStyle(e).fontSize)'))>=28
