@@ -62,7 +62,7 @@ def full_card(browser,width,dark):
     for x,y in [(12,12),(box['width']-12,12),(12,box['height']-12),(box['width']-12,box['height']-12),(box['width']-24,box['height']/2)]:
         link.click(position={'x':x,'y':y})
         assert page.evaluate('__destinations.at(-1)')=='https://www.youtube.com/@MrBeast'
-    page.locator('ytd-masthead input').focus();page.keyboard.press('Tab');expect(link).to_be_focused()
+    page.locator('#myt-masthead input').focus();page.keyboard.press('Tab');expect(link).to_be_focused()
     page.keyboard.press('Enter')
     assert page.evaluate('__destinations.length')==10
     page.keyboard.press('Tab');expect(cards.nth(1).locator('.channel-link')).to_be_focused()

@@ -56,6 +56,11 @@ def header(browser,legacy,width,dark):
     expect(page.locator('h1')).to_have_text('Joe Speen — Мой канал')
     expect(page.locator('#subscribe')).to_have_text('Subscribe')
     expect(page.locator('#description-more')).to_have_text('More')
+    # Subscribe sits on the title row, right of the channel name, and the
+    # avatar is one and a half times its native size.
+    title=page.locator('h1').bounding_box();button=page.locator('#subscribe').bounding_box()
+    assert button['x']>=title['x']+title['width']-1 and abs(button['y']+button['height']/2-title['y']-title['height']/2)<title['height']/2,(title,button)
+    assert abs(page.locator('#avatar').bounding_box()['width']-120)<1,page.locator('#avatar').bounding_box()
     click_more(page)
     assert page.evaluate('__more')==1
     expect(page.get_by_role('button',name='Latest',exact=True)).to_be_visible()

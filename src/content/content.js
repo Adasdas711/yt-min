@@ -669,6 +669,54 @@
         }
     }
 
+    // Own site header: YouTube's masthead container keeps its position,
+    // background and height; its logo and searchbox are replaced by an owned
+    // logo link and search form in the same design.
+    function createMasthead() {
+        const own = document.createElement("div");
+        own.id = "myt-masthead";
+        own.innerHTML = `<a class="myt-masthead-link" href="/" aria-label="YouTube"><span class="myt-masthead-brand">${brandMarkup}</span></a>` +
+            '<form class="myt-masthead-search" role="search" action="/results" method="get" accept-charset="UTF-8">' +
+            '<input class="myt-masthead-query" name="search_query" type="search" placeholder="Search" aria-label="Search" autocomplete="off" spellcheck="false">' +
+            '<button class="myt-masthead-clear" type="button" aria-label="Clear" hidden>×</button></form>';
+        const form = own.querySelector("form"), input = own.querySelector("input"), clear = own.querySelector("button");
+        input.addEventListener("input", () => { clear.hidden = !input.value; });
+        input.addEventListener("keydown", event => {
+            if (event.key === "Escape" && input.value) { event.preventDefault(); input.value = ""; clear.hidden = true; }
+        });
+        clear.addEventListener("click", () => { input.value = ""; clear.hidden = true; input.focus(); });
+        form.addEventListener("submit", event => {
+            input.value = input.value.trim();
+            clear.hidden = !input.value;
+            if (!input.value) { event.preventDefault(); input.focus(); return; }
+            // A native GET form encodes the query; the router keeps the page.
+            if (globalThis.MinimalYouTubeNavigation?.search(input.value)) event.preventDefault();
+        });
+        return own;
+    }
+
+    function syncMasthead() {
+        if (!enabled) return;
+        for (const container of document.querySelectorAll("ytd-masthead > #container")) {
+            let own = container.querySelector(":scope > #myt-masthead");
+            if (!own) { own = createMasthead(); container.append(own); }
+            const masthead = container.parentElement;
+            if (!masthead.hasAttribute("data-myt-own-masthead")) masthead.setAttribute("data-myt-own-masthead", "");
+            // The field shows the current query unless the user is editing it.
+            const input = own.querySelector("input");
+            if (document.activeElement !== input) {
+                const url = new URL(pageLocation());
+                const query = url.pathname === "/results" ? url.searchParams.get("search_query") || "" : "";
+                if (input.value !== query) { input.value = query; own.querySelector("button").hidden = !query; }
+            }
+        }
+    }
+
+    function restoreMasthead() {
+        for (const own of document.querySelectorAll("#myt-masthead")) own.remove();
+        for (const masthead of document.querySelectorAll("[data-myt-own-masthead]")) masthead.removeAttribute("data-myt-own-masthead");
+    }
+
     function restoreBrand() {
         syncSearchDecorations();
         for (const brand of document.querySelectorAll("ytd-masthead .myt-masthead-brand")) brand.remove();
@@ -1369,6 +1417,7 @@
             }
             if (!watchView) {
                 syncBrand();
+                syncMasthead();
                 syncSearchDecorations();
             }
             if (!settingsReady && !settingsKnown) { syncWatchDetails(); return; }
@@ -1509,6 +1558,7 @@
             });
             updateRoute(true);
             syncBrand();
+            syncMasthead();
             syncSearchDecorations();
             cleanTitle();
         } else {
@@ -1526,6 +1576,7 @@
             home = null;
             resetWatch();
             restoreBrand();
+            restoreMasthead();
             syncPlaylistLayout();
             syncWatchDetails();
             syncSections();
@@ -1600,12 +1651,14 @@
     }, true);
     document.addEventListener("focusin", () => { if (enabled) schedule(); });
     document.addEventListener("keydown", event => {
-        if (!enabled || root.dataset.mytPage !== "home" || event.key !== "/" ||
+        if (!enabled || event.key !== "/" || watchView ||
             event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
         const target = event.composedPath()[0];
         if (target instanceof Element && target.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) return;
+        const field = root.dataset.mytPage === "home" ? home?.firstElementChild.shadowRoot.querySelector("input") : document.querySelector("#myt-masthead input");
+        if (!field) return;
         event.preventDefault();
-        home?.firstElementChild.shadowRoot.querySelector("input").focus();
+        field.focus();
     });
 
     // Some YouTube layouts scroll inside a centered native container. Wheel
