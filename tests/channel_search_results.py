@@ -40,7 +40,7 @@ def check(browser,width,cached,primary=True):
     for key in ('display','direction','padding','border','background','title','columns'):assert after[key]==before[key],(key,before,after)
     assert abs(after['width']-before['width'])<1,(before,after)
     assert abs(after['ratio']-16/9)<.01,after
-    expect(page.locator('#myt-channel-nav').get_by_role('link',name='Videos',exact=True)).to_have_attribute('aria-current','page')
+    expect(page.locator('#myt-channel-nav').locator('nav a[aria-current]')).to_have_count(0)
     expect(page.get_by_role('searchbox',name='Search this channel')).to_have_value('test')
     expect(page.locator('#video-201')).to_be_hidden()
     expect(page.locator('#video-202')).to_be_hidden()
@@ -92,7 +92,7 @@ def direct_search(browser,width):
     body=fixture().replace('<div id="contents"><ytd-feed-filter-chip-bar-renderer>','<ytd-two-column-browse-results-renderer><div id="primary"><div id="contents"><ytd-feed-filter-chip-bar-renderer>').replace('</ytd-browse>','</div></ytd-two-column-browse-results-renderer></ytd-browse>')
     page=setup(browser,'/@JoeSpeen/search?query=direct',body,width=width,native_dark=True)
     expect(page.locator('#myt-search .media')).to_have_count(2)
-    expect(page.locator('#myt-channel-nav').get_by_role('link',name='Videos',exact=True)).to_have_attribute('aria-current','page')
+    expect(page.locator('#myt-channel-nav').locator('nav a[aria-current]')).to_have_count(0)
     expect(page.get_by_role('searchbox',name='Search this channel')).to_have_value('direct')
     assert geometry(page)['direction']=='column'
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
@@ -120,7 +120,7 @@ def changed_wrappers(browser,width,untyped=False):
     assert abs(after['width']-before['width'])<1,(before,after)
     expect(page.locator('#video-401')).to_be_hidden()
     expect(page.locator('#video-402')).to_be_hidden()
-    expect(page.locator('#myt-channel-nav').get_by_role('link',name='Videos',exact=True)).to_have_attribute('aria-current','page')
+    expect(page.locator('#myt-channel-nav').locator('nav a[aria-current]')).to_have_count(0)
     expect(page.locator('#subscribe')).to_be_visible()
     sentinel=page.locator('#changed-continuation')
     sentinel.evaluate('(e,html)=>e.insertAdjacentHTML("beforebegin",html)',video(403))
@@ -164,7 +164,7 @@ def separate_worlds(browser):
     after=geometry(page)
     assert abs(after['width']-before['width'])<1,(before,after)
     assert after['direction']=='column' and after['columns']==before['columns'],(before,after)
-    expect(nav.get_by_role('link',name='Videos',exact=True)).to_have_attribute('aria-current','page')
+    expect(nav.locator('nav a[aria-current]')).to_have_count(0)
     assert requests[-1]['query']=='new layout'
     assert len(documents)==1,'Search must not fall back to reloading the page'
     assert not errors,errors

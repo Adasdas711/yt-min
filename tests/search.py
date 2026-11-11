@@ -67,7 +67,11 @@ def check(browser,width,dark,prune=True):
     expect(root.locator('.subscriber-value')).to_have_text(['525 M','2.24 M'])
     sources=page.locator('ytd-playlist-renderer,yt-lockup-view-model[content-type="playlist"]')
     for index,count in enumerate([256,64]):sources.nth(index).evaluate('(node,count)=>node.insertAdjacentHTML("beforeend",`<span id="video-count-text">${count} videos</span>`)',count)
-    expect(root.locator('.playlist-badge')).to_have_text(['256 videos','64 videos'])
+    expect(root.locator('.playlist-badge')).to_have_text(['256','64'])
+    # The count reads as a number with a video icon; no "Playlist" fallback.
+    expect(root.locator('.playlist-badge svg')).to_have_count(2)
+    expect(root.locator('.playlist-badge').first).to_have_attribute('aria-label','256 videos')
+    assert 'monospace' in root.locator('.media.playlist .media-title').first.evaluate('e=>getComputedStyle(e).fontFamily')
     dimensions=page.evaluate('''()=>{const search=document.querySelector('#myt-search').parentElement,s=getComputedStyle(search),box=search.getBoundingClientRect(),result=document.querySelector('#myt-search').getBoundingClientRect();return{before:search.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight),after:result.width,offset:result.x+result.width/2-box.x-box.width/2};}''')
     assert abs(dimensions['after']-dimensions['before']*.9*.9)<.05,dimensions
     assert abs(dimensions['offset'])<1,dimensions
@@ -80,13 +84,13 @@ def check(browser,width,dark,prune=True):
         assert abs(cover_box['height']-cover_box['width']*9/16)<1,cover_box
     count_source=sources.first.locator('#video-count-text')
     count_source.evaluate('node=>node.firstChild.data="257 videos"')
-    expect(root.locator('.playlist-badge').first).to_have_text('257 videos')
-    for count,label in [(0,'0 videos'),(1,'1 video'),(256,'256 videos')]:
+    expect(root.locator('.playlist-badge').first).to_have_text('257')
+    for count,label in [(0,'0'),(1,'1'),(256,'256')]:
         count_source.evaluate('(node,count)=>node.setAttribute("data-video-count",String(count))',count)
         expect(root.locator('.playlist-badge').first).to_have_text(label)
     page.locator('.native-results').evaluate('(node,html)=>node.insertAdjacentHTML("beforeend",html)',playlist(99))
     page.evaluate('document.documentElement.setAttribute("data-myt-search-playlists",JSON.stringify([{id:"PL99",count:"347"}]))')
-    expect(root.locator('.playlist-badge')).to_have_text(['256 videos','64 videos','347 videos'])
+    expect(root.locator('.playlist-badge')).to_have_text(['256','64','347'])
     page.locator('ytd-playlist-renderer').last.evaluate('node=>node.remove()')
     expect(root.locator('.media')).to_have_count(11)
     expect(root.locator('.group h2')).to_have_text(['For you','Watch again'])

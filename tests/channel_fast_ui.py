@@ -48,12 +48,21 @@ def active_and_empty(browser,width):
     expect(own.locator('.empty')).to_be_visible()
     expect(page.locator('ytd-message-renderer')).to_be_hidden()
     assert page.get_by_text('No results found.',exact=True).evaluate_all('nodes=>nodes.filter(node=>node.getClientRects().length&&getComputedStyle(node).visibility!=="hidden"&&getComputedStyle(node).display!=="none").length')==1
-    nav=page.locator('#myt-channel-nav');active=nav.get_by_role('link',name='Videos',exact=True);inactive=nav.get_by_role('link',name='Playlists',exact=True)
+    # A channel search is not a section: no section link is current.
+    expect(page.locator('#myt-channel-nav').locator('nav a[aria-current]')).to_have_count(0)
+    # The empty search message is one large centered line, without a heading.
+    expect(own.locator('.results-heading')).to_be_hidden()
+    box=own.locator('.empty').bounding_box();assert float(own.locator('.empty').evaluate('e=>parseFloat(getComputedStyle(e).fontSize)'))>=28
+    assert abs(box['x']+box['width']/2-page.evaluate('document.querySelector("#myt-search").getBoundingClientRect().left+document.querySelector("#myt-search").getBoundingClientRect().width/2'))<=2,box
+    section=setup(browser,'/@JoeSpeen/videos',fixture(),width=width,native_dark=True)
+    nav=section.locator('#myt-channel-nav');active=nav.get_by_role('link',name='Videos',exact=True);inactive=nav.get_by_role('link',name='Playlists',exact=True)
     expect(active).to_have_attribute('aria-current','page')
     assert active.evaluate('e=>getComputedStyle(e).backgroundColor')!=inactive.evaluate('e=>getComputedStyle(e).backgroundColor')
     assert int(active.evaluate('e=>getComputedStyle(e).fontWeight'))>=700
     assert active.evaluate('e=>getComputedStyle(e).boxShadow')=='none'
     assert active.evaluate('e=>getComputedStyle(e).borderBottomColor')=='rgba(0, 0, 0, 0)'
+    section.close()
+    nav=page.locator('#myt-channel-nav')
     field=nav.get_by_role('searchbox',name='Search this channel');field.fill('')
     expect(own.locator('.empty')).to_be_hidden();expect(page.locator('ytd-message-renderer')).to_be_hidden()
     assert page.get_by_text('No results found.',exact=True).evaluate_all('nodes=>nodes.filter(node=>node.getClientRects().length&&getComputedStyle(node).visibility!=="hidden"&&getComputedStyle(node).display!=="none").length')==0

@@ -91,12 +91,15 @@ def tabbed_header(browser,width):
     assert page.evaluate('''async()=>{const nav=document.querySelector('#myt-channel-nav');let max=0;
       for(let y=1000;y<=2600;y+=37){scrollTo(0,y);max=Math.max(max,Math.abs(nav.getBoundingClientRect().top-56));}
       return max<1&&getComputedStyle(nav).position==='sticky'&&!document.querySelector('[data-myt-channel-sticky-header]');}''')
-    # Two backgrounds: the owned header, and one shade for everything else.
+    # One background: the owned header shares the page's shade.
     colors=page.evaluate('''()=>{const bg=s=>getComputedStyle(document.querySelector(s)).backgroundColor;
       return {header:bg('#myt-channel-header'),nav:bg('#myt-channel-nav'),page:[bg('body'),bg('ytd-app'),bg('ytd-page-manager'),bg('ytd-browse'),bg('ytd-masthead')],
         layers:[...document.querySelectorAll('ytd-browse > #header, ytd-browse > #header tp-yt-app-header')].map(e=>getComputedStyle(e).backgroundColor)};}''')
-    assert set(colors['page'])=={colors['nav']} and colors['header']!=colors['nav'],colors
+    assert set(colors['page'])=={colors['nav']}=={colors['header']},colors
     assert all(c=='rgba(0, 0, 0, 0)' for c in colors['layers']),colors
+    # A fixed banner height; YouTube's scroll script on its header is off.
+    assert abs(own.locator('.myt-ch-banner').bounding_box()['height']-(320 if width>900 else 150))<1,own.locator('.myt-ch-banner').bounding_box()
+    assert page.evaluate("document.querySelector('tp-yt-app-header').hasAttribute('disabled')")
     # The navigation row is centered in the window.
     links=page.evaluate('''()=>{const nav=document.querySelector('#myt-channel-nav').shadowRoot,items=[...nav.querySelectorAll('nav a,.channel-search > button')].filter(e=>e.getClientRects().length).map(e=>e.getBoundingClientRect());
       return {left:Math.min(...items.map(r=>r.left)),right:Math.max(...items.map(r=>r.right))};}''')
@@ -108,6 +111,10 @@ def tabbed_header(browser,width):
     expect(nav.get_by_role('link',name='Videos',exact=True)).to_be_visible()
     assert nav.bounding_box()['y']>=own.bounding_box()['y']+own.bounding_box()['height']-1
     expect(own.locator('.myt-ch-actions #subscribe')).to_be_visible()
+    # Disabling restores YouTube's header: its scroll effects and no marks.
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('#myt-channel-header')).to_have_count(0)
+    assert page.evaluate("!document.querySelector('tp-yt-app-header').hasAttribute('disabled')&&!document.querySelector('[data-myt-channel-header-slot],[data-myt-channel-nav-below],[data-myt-channel-unclip]')")
     page.close()
     print(f'PASS live tabbed header: owned header in the native profile slot, centered navigation pinned by CSS: {width}px',flush=True)
 

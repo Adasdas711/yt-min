@@ -38,6 +38,7 @@
         }
         return '';
     }
+    const publishedPattern=/\bago\b|назад|^(?:streamed|premiered|scheduled)\b|^(?:трансляция|премьера)/iu;
     function record(input,hint=''){
         if(!input||typeof input!=='object')return null;
         let kind=hint,value=input;
@@ -64,7 +65,15 @@
         const metadataText=[...new Set([label(value.subscriberCountText),label(value.videoCountText),...rows.flatMap(row=>(row.metadataParts||[]).map(part=>label(part.text)))].filter(Boolean))];
         const handle=metadataText.find(text=>/^@\S+$/.test(text))||'';
         const avatar=image([value.thumbnail,value.thumbnails,value.avatar,value.contentImage]);
-        return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,kind==='channel'?8:4),count:kind==='playlist'?playlistCount(value):''};
+        // Upload date: the renderer's own field, or the dated part of a lockup.
+        let published='';
+        if(kind==='video'){
+            published=label(value.publishedTimeText).trim();
+            if(!published)for(const row of metadata.metadata?.contentMetadataViewModel?.metadataRows||metadata.metadataRows||[])for(const part of row.metadataParts||[]){
+                const text=label(part.text).trim();if(!published&&publishedPattern.test(text))published=text;
+            }
+        }
+        return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,kind==='channel'?8:4),count:kind==='playlist'?playlistCount(value):'',published:published.slice(0,100)};
     }
     function collect(root){
         const records=[],filters=[],seen=new Set(),stack=[root];let scans=0;
@@ -76,7 +85,7 @@
         }
         return {records,filters};
     }
-    globalThis.MinimalYouTubeSearchData={label,url,youtube,channelURL,endpoint,image,playlistCount,record,collect};
+    globalThis.MinimalYouTubeSearchData={label,url,youtube,channelURL,endpoint,image,playlistCount,record,collect,publishedPattern};
     // Static MAIN injection also serves the first page after installation,
     // before the background has registered its optional response-pruning hook.
     if(typeof document!=='undefined'&&!globalThis.chrome?.runtime?.id)document.addEventListener('minimal-youtube:search-snapshot',()=>{

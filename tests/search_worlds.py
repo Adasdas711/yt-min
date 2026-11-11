@@ -66,7 +66,7 @@ def check(browser,prune,adapter=True):
     }''',late)
     assert hidden_before_update, 'Unmarked native results painted before rendering'
     expect(root.locator('.media')).to_have_count(4)
-    expect(root.locator('.playlist-badge')).to_have_text('72 videos')
+    expect(root.locator('.playlist-badge')).to_have_text('72')
     expect(root.locator('.group h2')).to_have_text('Latest from Creator')
     expect(root.locator('.media-title',has_text='Modern nested video title')).to_have_count(1)
     expect(root.locator('.media-channel',has_text='Creator')).to_have_count(4)

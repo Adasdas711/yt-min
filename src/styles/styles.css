@@ -1803,7 +1803,7 @@ html.minimal-youtube[data-myt-page="channel"] #myt-channel-header {
 }
 /* YouTube centers its profile slot; the owned header's banner spans the
    whole window, so the slot holding it is not width-constrained. */
-html.minimal-youtube[data-myt-page="channel"] :is(#page-header-container, #page-header):has(#myt-channel-header) {
+html.minimal-youtube[data-myt-page="channel"] :is(#page-header-container, #page-header)[data-myt-channel-header-slot] {
     box-sizing: border-box;
     flex: 1 1 100%;
     width: 100% !important;
@@ -1815,7 +1815,7 @@ html.minimal-youtube[data-myt-page="channel"] :is(#page-header-container, #page-
 html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-banner {
     display: block;
     width: 100%;
-    aspect-ratio: 6.2 / 1;
+    height: 320px;
     overflow: hidden;
     background: var(--myt-soft);
 }
@@ -1827,6 +1827,14 @@ html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-banner
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: center;
+}
+/* A fixed banner height: the art is cropped at the sides, never squeezed. */
+@media (max-width: 900px) {
+    html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-banner { height: 220px; }
+}
+@media (max-width: 600px) {
+    html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-banner { height: 150px; }
 }
 /* The avatar overlaps the banner's bottom edge by about a third; the name,
    subscribe control, stats and description form one column beside it,
@@ -1871,7 +1879,7 @@ html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-info {
    (position: fixed plus a transform), which lags behind the page. Make it
    ordinary page content that the browser scrolls, and drop the space
    YouTube reserves for it. The tabs stay pinned by the sticky header. */
-html.minimal-youtube[data-myt-page="channel"] ytd-tabbed-page-header tp-yt-app-header:has(#myt-channel-header) {
+html.minimal-youtube[data-myt-page="channel"] ytd-tabbed-page-header tp-yt-app-header[data-myt-channel-header-slot] {
     position: relative !important;
     top: auto !important;
     right: auto !important;
@@ -1879,7 +1887,7 @@ html.minimal-youtube[data-myt-page="channel"] ytd-tabbed-page-header tp-yt-app-h
     width: 100% !important;
     transform: none !important;
 }
-html.minimal-youtube[data-myt-page="channel"] ytd-tabbed-page-header tp-yt-app-header-layout:has(#myt-channel-header) > #wrapper > #contentContainer {
+html.minimal-youtube[data-myt-page="channel"] ytd-tabbed-page-header tp-yt-app-header-layout[data-myt-channel-header-slot] > #wrapper > #contentContainer {
     padding-top: 0 !important;
 }
 html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-title-row {
@@ -1935,7 +1943,7 @@ html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-action
 /* The subscribe control sits on the title row, right of the channel name.
    The row is found by its children (name and actions), not by class names
    YouTube renames; every other header line spans the full width below. */
-html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#page-header, #header, yt-page-header-view-model, yt-page-header-renderer, ytd-page-header-renderer, ytd-c4-tabbed-header-renderer) :has(> :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]))):has(> :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) {
+html.minimal-youtube[data-myt-page="channel"] ytd-browse:not([data-myt-channel-owned-header]) :is(#page-header, #header, yt-page-header-view-model, yt-page-header-renderer, ytd-page-header-renderer, ytd-c4-tabbed-header-renderer) :has(> :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]))):has(> :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) {
     display: grid !important;
     /* Name and button size the first two columns; full-width lines span a
        flexible third one, so they never widen the name or button column. */
@@ -1943,15 +1951,15 @@ html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#page-header, #head
     column-gap: 24px;
     align-items: center;
 }
-html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#page-header, #header, yt-page-header-view-model, yt-page-header-renderer, ytd-page-header-renderer, ytd-c4-tabbed-header-renderer) :has(> :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]))):has(> :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) > * {
+html.minimal-youtube[data-myt-page="channel"] ytd-browse:not([data-myt-channel-owned-header]) :is(#page-header, #header, yt-page-header-view-model, yt-page-header-renderer, ytd-page-header-renderer, ytd-c4-tabbed-header-renderer) :has(> :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]))):has(> :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) > * {
     grid-column: 1 / -1;
 }
-html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#page-header, #header, yt-page-header-view-model, yt-page-header-renderer, ytd-page-header-renderer, ytd-c4-tabbed-header-renderer) :has(> :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]))):has(> :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) > :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) {
+html.minimal-youtube[data-myt-page="channel"] ytd-browse:not([data-myt-channel-owned-header]) :is(#page-header, #header, yt-page-header-view-model, yt-page-header-renderer, ytd-page-header-renderer, ytd-c4-tabbed-header-renderer) :has(> :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]))):has(> :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) > :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) {
     grid-column: 1;
     grid-row: 1;
     min-width: 0;
 }
-html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#page-header, #header, yt-page-header-view-model, yt-page-header-renderer, ytd-page-header-renderer, ytd-c4-tabbed-header-renderer) :has(> :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]))):has(> :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) > :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]) {
+html.minimal-youtube[data-myt-page="channel"] ytd-browse:not([data-myt-channel-owned-header]) :is(#page-header, #header, yt-page-header-view-model, yt-page-header-renderer, ytd-page-header-renderer, ytd-c4-tabbed-header-renderer) :has(> :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]))):has(> :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) > :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]) {
     grid-column: 2;
     grid-row: 1;
     justify-self: start;
@@ -2000,29 +2008,26 @@ html.minimal-youtube[data-myt-page="channel"] ytd-browse > #myt-channel-nav {
     padding: 6px 24px !important;
     background: var(--myt-bg) !important;
 }
-/* Two backgrounds on a channel: the owned header, and the page around it
-   (masthead, navigation and content). YouTube's header layers become
-   transparent so they add no third shade. */
-html.minimal-youtube[data-myt-page="channel"] { --myt-channel-header-bg: #f1f1f4; }
-html.minimal-youtube[data-myt-page="channel"][dark] { --myt-channel-header-bg: #0a0a0c; }
+/* One background on a channel: header, masthead, navigation and content.
+   YouTube's header layers become transparent so they add no other shade. */
 html.minimal-youtube[data-myt-page="channel"],
 html.minimal-youtube[data-myt-page="channel"] :is(body, ytd-app, #masthead-container, ytd-masthead, ytd-masthead > #background, ytd-page-manager, ytd-browse) {
     background: var(--myt-bg) !important;
     background-image: none !important;
 }
-html.minimal-youtube[data-myt-page="channel"] ytd-browse:has(#myt-channel-header) > #header,
-html.minimal-youtube[data-myt-page="channel"] ytd-browse:has(#myt-channel-header) > #header :is(ytd-tabbed-page-header, tp-yt-app-header-layout, #wrapper, tp-yt-app-header, #background, #backgroundFrontLayer, #backgroundRearLayer, #contentContainer, #page-header-container, #page-header, yt-page-header-renderer, yt-page-header-view-model) {
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-header-slot],
+html.minimal-youtube[data-myt-page="channel"] tp-yt-app-header[data-myt-channel-header-slot] :is(#background, #backgroundFrontLayer, #backgroundRearLayer) {
     background: transparent !important;
     background-image: none !important;
 }
 html.minimal-youtube[data-myt-page="channel"] #myt-channel-header {
     padding-bottom: 24px !important;
-    background: var(--myt-channel-header-bg) !important;
+    background: var(--myt-bg) !important;
 }
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-unclip] {
     overflow: clip !important;
 }
-html.minimal-youtube[data-myt-page="channel"] ytd-browse:has(> #myt-channel-nav) ytd-tabbed-page-header tp-yt-app-toolbar {
+html.minimal-youtube[data-myt-page="channel"] ytd-browse[data-myt-channel-nav-below] ytd-tabbed-page-header tp-yt-app-toolbar {
     display: none !important;
 }
 
@@ -2045,7 +2050,7 @@ html.minimal-youtube[data-myt-page="channel"]:not([data-myt-channel-section="pos
 }
 /* The owned navigation can live inside the native group (tp-yt-paper-tabs
    #tabsContent on live YouTube): never hide the group that contains it. */
-html.minimal-youtube[data-myt-page="channel"] ytd-browse:has(#myt-channel-nav) :is(yt-tab-group-shape, tp-yt-paper-tabs):not(:has(#myt-channel-nav)) {
+html.minimal-youtube[data-myt-page="channel"] ytd-browse[data-myt-channel-nav-ready] :is(yt-tab-group-shape, tp-yt-paper-tabs):not(:has(#myt-channel-nav)) {
     display: none !important;
 }
 

@@ -39,6 +39,9 @@
         const number=Number(amount)*10**power;if(!Number.isFinite(number))return '';
         return compact.formatToParts(number).map(part=>part.type==='compact'?' '+part.value:part.value).join('');
     }
+    // YouTube serves the banner as a crop of the full channel art; without the
+    // crop parameter the whole art loads, so a taller banner keeps its detail.
+    const fullArt=value=>value.replace(/=w\d+-fcrop64=1,[0-9a-f]+(?=-|$)/i,'=w2560');
     const svg=kind=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">${kind==='subscribers'?'<circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/>':'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3Z"/>'}</svg>`;
     class Channel {
         static landing(url){
@@ -96,7 +99,7 @@
             document.addEventListener('minimal-youtube:channel-about-updated',this.aboutUpdated);
             this.stats=document.createElement('div');this.stats.id='myt-channel-stats';this.stats.lang='en';
             this.stats.attachShadow({mode:'open'}).innerHTML='<style>:host{display:block;color:var(--myt-muted);font:14px/1.6 Arial,sans-serif}.row{display:flex;align-items:center;flex-wrap:wrap;gap:0 8px}.metric{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}svg{width:15px;height:15px;flex:none}[hidden]{display:none!important}</style><div class="row"></div>';
-            this.unclipped=new Set();
+            this.unclipped=new Set();this.headerSlots=new Set();this.scrollEffects=null;this.markedBrowse=null;
             this.nav=document.createElement('div');this.nav.id='myt-channel-nav';this.nav.lang='en';
             this.nav.attachShadow({mode:'open'}).innerHTML=`<style>
                 :host{display:block!important;min-width:0;font:600 16px/1.4 Arial,sans-serif;color:var(--myt-ink)}*{box-sizing:border-box}[hidden]{display:none!important}
@@ -329,7 +332,7 @@
         renderNavigationState(){
             const pending=this.navigationPending,href=pending?.href||location.href;
             const section=new URL(href,location.href).pathname.replace(/\/$/,'').split('/').pop();
-            const destination=section==='community'?'posts':section,current=destination==='search'?'videos':destination;
+            const destination=section==='community'?'posts':section,current=destination;
             for(const control of this.nav.shadowRoot.querySelectorAll('nav [data-section]')){
                 const active=control.dataset.section===current;
                 if(active)control.setAttribute('aria-current','page');else control.removeAttribute('aria-current');
@@ -385,6 +388,8 @@
             if(!this.header){
                 this.header=document.createElement('div');this.header.id='myt-channel-header';this.header.lang='en';
                 this.header.innerHTML='<div class="myt-ch-banner" hidden><img alt="" decoding="async"></div><div class="myt-ch-profile"><img class="myt-ch-avatar" alt="" decoding="async" hidden><div class="myt-ch-info"><div class="myt-ch-title-row"><h1 class="myt-ch-title"><span class="myt-ch-name"></span><svg class="myt-ch-verified" viewBox="0 0 24 24" role="img" aria-label="Verified" hidden><circle cx="12" cy="12" r="11" fill="currentColor"/><path d="m7 12.4 3.2 3.2L17.2 8.6" fill="none" stroke="var(--myt-bg,#101012)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></h1><div class="myt-ch-actions"></div></div></div></div>';
+                // The full art falls back to YouTube's own banner image.
+                const art=this.header.querySelector('.myt-ch-banner img');art.addEventListener('error',()=>{const source=art.dataset.source;if(source&&art.getAttribute('src')!==source)art.src=source;});
             }
             return selector?this.header.querySelector(selector):this.header;
         }
@@ -413,7 +418,7 @@
             const nameNode=this.headerPart('.myt-ch-name');if(nameNode.textContent!==name){nameNode.textContent=name;globalThis.MinimalYouTubeWatch?.loadTitleFonts?.(name);}
             this.headerPart('.myt-ch-verified').toggleAttribute('hidden',!verified);
             const avatarNode=this.headerPart('.myt-ch-avatar');if(avatar&&avatarNode.getAttribute('src')!==avatar)avatarNode.src=avatar;avatarNode.hidden=!avatar;avatarNode.alt=name;
-            const bannerNode=this.headerPart('.myt-ch-banner');if(banner&&bannerNode.firstElementChild.getAttribute('src')!==banner)bannerNode.firstElementChild.src=banner;bannerNode.hidden=!banner;
+            const bannerNode=this.headerPart('.myt-ch-banner'),bannerImg=bannerNode.firstElementChild,fullBanner=banner&&fullArt(banner);if(banner&&bannerImg.dataset.source!==banner){bannerImg.dataset.source=banner;bannerImg.src=fullBanner;}bannerNode.hidden=!banner;
             // Move YouTube's current subscribe control into the action slot.
             const subscribeSelector='ytd-subscribe-button-renderer,yt-subscribe-button-view-model,#subscribe-button,#subscribe';
             const subscribe=native(subscribeSelector).find(node=>!node.parentElement.closest(subscribeSelector));
@@ -441,6 +446,26 @@
             if(state.parent.isConnected){try{state.parent.insertBefore(state.node,state.next&&state.next.parentNode===state.parent?state.next:null);}catch{state.node.remove();}}
             else state.node.remove();
         }
+        // Layout marks replace :has() selectors, which the browser would
+        // recheck while YouTube updates its header during scrolling. YouTube's
+        // own scroll effects on the app header (a script reading layout on
+        // every scroll) are disabled while the owned header sits inside it.
+        markLayout(browse){
+            const own=browse&&this.header?.isConnected&&browse.contains(this.header)?this.header:null,slots=new Set();
+            if(own)for(let node=own.parentElement;node&&node!==browse;node=node.parentElement)slots.add(node);
+            for(const node of slots)if(!node.hasAttribute('data-myt-channel-header-slot'))node.setAttribute('data-myt-channel-header-slot','');
+            for(const node of this.headerSlots)if(!slots.has(node))node.removeAttribute('data-myt-channel-header-slot');
+            this.headerSlots=slots;
+            const app=[...slots].find(node=>node.localName==='tp-yt-app-header')||null;
+            if(this.scrollEffects!==app){
+                this.scrollEffects?.removeAttribute('disabled');this.scrollEffects=null;
+                if(app&&!app.hasAttribute('disabled')){app.setAttribute('disabled','');this.scrollEffects=app;}
+            }
+            const marks={'data-myt-channel-owned-header':Boolean(own),'data-myt-channel-nav-ready':Boolean(browse&&this.nav.isConnected&&browse.contains(this.nav)),'data-myt-channel-nav-below':Boolean(browse&&this.nav.parentElement===browse)};
+            for(const [name,value]of Object.entries(marks))if(browse&&browse.hasAttribute(name)!==value)browse.toggleAttribute(name,value);
+            if(this.markedBrowse&&this.markedBrowse!==browse)for(const name of Object.keys(marks))this.markedBrowse.removeAttribute(name);
+            this.markedBrowse=browse;
+        }
         sync(browse){
             const match=location.pathname.match(basePattern);if(!match)return;
             if(this.browse!==browse){this.browse?.removeAttribute('data-myt-channel-ready');this.browse?.removeAttribute('data-myt-channel-section');this.browse=browse;}
@@ -453,6 +478,7 @@
             this.preview(header);
             this.ownHeader(header);
             this.navigation(browse,match[2]?.replace(/\/$/,'')||'videos');
+            this.markLayout(browse);
             this.about();
             if(this.descriptionDialog.open&&this.nativeAboutOpen()){this.restoreDescriptionFocus=false;this.descriptionDialog.close();}
             this.translate(browse);
@@ -773,7 +799,7 @@
             this.releaseDescriptionScroll();
             window.removeEventListener('wheel',this.descriptionWheel,true);window.removeEventListener('touchstart',this.descriptionTouchStart,true);window.removeEventListener('touchmove',this.descriptionTouchMove,true);
             window.removeEventListener('click',this.click,true);window.removeEventListener('auxclick',this.click,true);window.removeEventListener('keydown',this.keydown,true);this.nav.remove();this.stats.remove();this.descriptionHost.remove();
-            this.restoreSubscribe();this.header?.remove();this.restoreUnclipped();
+            this.restoreSubscribe();this.header?.remove();this.restoreUnclipped();this.markLayout(null);
             for(const node of this.hidden)node.removeAttribute('data-myt-channel-source');this.hidden.clear();
             for(const [node,names]of this.previewNodes)for(const name of names)node.removeAttribute(name);this.previewNodes.clear();
             for(const [node,names]of this.aboutNodes)for(const name of names)node.removeAttribute(name);this.aboutNodes.clear();
