@@ -374,14 +374,15 @@ def check_navigation_style_retention(browser):
       document.dispatchEvent(new CustomEvent('yt-navigate-start', {detail:{url:'/results?search_query=target'}}));
       return {page:document.documentElement.dataset.mytPage, hidden:getComputedStyle(document.querySelector('#secondary')).display==='none'};
     }""")
-    assert state == {'page':'search','hidden':True}, state
+    # The watch page stays on screen, styled, until the destination mounts.
+    assert state == {'page':'watch','hidden':True}, state
     page.evaluate("history.pushState({},'', '/results?search_query=target')")
     frames = page.evaluate("""async () => {
       const states=[];
-      for(let n=0;n<8;n++) { await new Promise(requestAnimationFrame); states.push(getComputedStyle(document.querySelector('#secondary')).display); }
+      for(let n=0;n<8;n++) { await new Promise(requestAnimationFrame); states.push([document.documentElement.dataset.mytPage,getComputedStyle(document.querySelector('#secondary')).display]); }
       return states;
     }""")
-    assert set(frames) == {'none'}, frames
+    assert all(frame == ['watch','none'] for frame in frames), frames
     page.evaluate("""() => {
       document.querySelector('#old-watch').hidden=true;
       document.querySelector('ytd-page-manager').insertAdjacentHTML('beforeend','<ytd-search><ytd-video-renderer><a id=video-title href=/watch?v=next>Next</a></ytd-video-renderer></ytd-search>');
@@ -2459,12 +2460,22 @@ def main():
           document.dispatchEvent(new CustomEvent('yt-navigate-start', {detail:{url:'/results?search_query=history'}}));
           return {enabled:document.documentElement.classList.contains('minimal-youtube'), page:document.documentElement.dataset.mytPage};
         }""")
-        assert state == {"enabled": True, "page": "search"}, state
+        # The watch page holds until YouTube mounts the destination page.
+        assert state == {"enabled": True, "page": "watch"}, state
+        swap = """kind => {
+          const manager=document.querySelector('ytd-page-manager');
+          let next=manager.querySelector(kind);
+          if(!next){next=document.createElement(kind);manager.append(next);}
+          for(const child of manager.children)child.hidden=child!==next;
+        }"""
+        page.evaluate(swap, "ytd-search")
         navigate_spa(page, "/results?search_query=history")
         expect(page.locator("html")).to_have_attribute("data-myt-page", "search")
         page.go_back()
+        page.evaluate(swap, "ytd-watch-flexy")
         expect(page.locator("html")).to_have_attribute("data-myt-page", "watch")
         page.go_forward()
+        page.evaluate(swap, "ytd-search")
         expect(page.locator("html")).to_have_attribute("data-myt-page", "search")
         page.evaluate("document.documentElement.className = 'native-theme'")
         expect(page.locator("html.minimal-youtube")).to_have_count(1)

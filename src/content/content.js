@@ -133,6 +133,8 @@
     let settingsReady = false;
     let currentURL = "";
     let pendingNavigation = null;
+    let holdStarted = 0;
+    let holdTimer = 0;
     let navigationSource = "";
     let redirectingURL = "";
     let transitionActive = false;
@@ -1325,6 +1327,14 @@
         playlistLayoutNodes.clear();for (const [node,names] of wanted) playlistLayoutNodes.set(node,names);
     }
 
+    function destinationReady(page, url) {
+        // The owned home needs no native page; the watch page is ready once
+        // YouTube shows its watch element.
+        if (page === "home") return true;
+        if (page === "watch") return [...document.querySelectorAll("ytd-watch-flexy")].some(node => !node.closest("[hidden]") && getComputedStyle(node).display !== "none");
+        return destinationMounted(url.pathname);
+    }
+
     function destinationMounted(path) {
         if(channelRoute.test(path))return Boolean(channelBrowse()?.getClientRects().length);
         const selector = path === "/watch" ? "ytd-watch-flexy" : path === "/results" ? "ytd-search" :
@@ -1353,6 +1363,19 @@
             }
             return;
         }
+        // Hold the page on screen until YouTube mounts the destination. A
+        // navigation (or back/forward, which changes the URL first) never
+        // restyles or removes the old page before the new one can replace it.
+        const shown = root.dataset.mytPage;
+        if (shown && shown !== nextPage && shown !== "shorts" && !destinationReady(nextPage, url)) {
+            holdStarted ||= performance.now();
+            if (performance.now() - holdStarted < 4000) {
+                clearTimeout(holdTimer);
+                holdTimer = setTimeout(() => { holdTimer = 0; if (enabled) { updateRoute(true); schedule(); } }, 100);
+                return;
+            }
+        }
+        holdStarted = 0; clearTimeout(holdTimer); holdTimer = 0;
         const channelDestination=nextPage==='channel'&&settingsReady&&!pendingNavigation?globalThis.MinimalYouTubeChannel?.destination(url,root.lang):null;
         if(channelDestination){
             root.dataset.mytPage='channel';
@@ -1631,9 +1654,6 @@
                     pendingNavigation = incoming.href;
                     navigationSource = pageLocation();
                     transitionActive = true;
-                    if (incoming.pathname !== "/watch" || incoming.searchParams.get("v") !== new URL(pageLocation()).searchParams.get("v")) {
-                        resetWatch();
-                    }
                 }
             } catch { /* A malformed native event must not disrupt navigation. */ }
         }
