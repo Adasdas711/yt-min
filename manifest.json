@@ -12,7 +12,7 @@
     },
     "content_scripts": [
         {
-            "js": ["src/content/search-data.js", "src/content/channel-main.js", "src/content/channel-navigation-main.js", "src/content/navigation-main.js"],
+            "js": ["src/content/search-data.js", "src/content/channel-main.js", "src/content/channel-navigation-main.js", "src/content/navigation-main.js", "src/content/page-data-main.js"],
             "world": "MAIN",
             "run_at": "document_start",
             "matches": ["https://*.youtube.com/*"],

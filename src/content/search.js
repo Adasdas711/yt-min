@@ -216,7 +216,7 @@
       :host([data-channel]) .media.playlist{display:flex;flex-direction:column;gap:14px;padding-bottom:18px}:host([data-channel]) .media.playlist .media-title{font-size:18px}
       /* Keep 20px gaps fixed while reducing channel column widths by 15%. */
       :host([data-channel]) :is(.row,.results-heading){width:calc(85% + (var(--myt-columns,1) - 1)*3px);margin-inline:auto}
-      .empty{padding:32px 0;color:var(--myt-muted)}@media(max-width:700px){.channels{grid-template-columns:1fr}.media-title{font-size:18px}.media.video .media-title{font-size:16px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}:host([data-channel]) .row{width:calc(85% + (var(--myt-columns,1) - 1)*2.4px)}}
+      .empty{padding:32px 0;color:var(--myt-muted)}.more{height:1px}@media(max-width:700px){.channels{grid-template-columns:1fr}.media-title{font-size:18px}.media.video .media-title{font-size:16px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}:host([data-channel]) .row{width:calc(85% + (var(--myt-columns,1) - 1)*2.4px)}}
     `;
     class MediaCard{
         constructor(source,kind){
@@ -280,6 +280,8 @@ html.minimal-youtube[data-myt-search-ui] ytd-search ytd-rich-grid-renderer[data-
 html.minimal-youtube[data-myt-search-ui] ytd-search ytd-rich-grid-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) [data-myt-search-layout-path] {
     display:block !important;position:static !important;width:100% !important;height:2px !important;margin:0 !important;padding:0 !important;overflow:hidden !important;
 }
+html.minimal-youtube[data-myt-search-ui][data-myt-page-data] ytd-search ytd-continuation-item-renderer,
+html.minimal-youtube[data-myt-search-ui][data-myt-page-data] ytd-search ytd-continuation-item-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) { display:none !important; }
 html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) {
     display:block !important;order:1 !important;height:2px !important;min-height:2px !important;pointer-events:none !important;
 }
@@ -296,9 +298,15 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             this.nativeStyle=node('style');this.nativeStyle.id='myt-search-native-style';this.nativeStyle.textContent=channel?nativeStyles.replaceAll('ytd-search','[data-myt-channel-results]'):nativeStyles;document.documentElement.append(this.nativeStyle);
             this.cards=new Map();this.channels=new Map();this.groups=new Map();this.sources=new Map();this.virtualSources=new Map();this.sequence=0;this.nativeNodes=new Set();this.filterText=new Map();this.filterAttributes=new Map();
             this.host=node('div');this.host.id='myt-search';this.host.lang='en';if(channel)this.host.dataset.channel='';this.shadow=this.host.attachShadow({mode:'open'});
-            this.shadow.innerHTML='<style>'+styles+'</style><h2 class="results-heading" lang="ru" hidden>Результаты поиска</h2><div class="channels" aria-label="Channels"></div><div class="stream"></div><p class="empty" hidden>No results found.</p>';
+            this.shadow.innerHTML='<style>'+styles+'</style><h2 class="results-heading" lang="ru" hidden>Результаты поиска</h2><div class="channels" aria-label="Channels"></div><div class="stream"></div><p class="empty" hidden>No results found.</p><div class="more" aria-hidden="true"></div>';
             this.q=selector=>this.shadow.querySelector(selector);
             this.resize=new ResizeObserver(()=>this.layout());this.resize.observe(this.host);
+            // Page data loads further results itself; this sentinel replaces
+            // the native continuation while results come from that data.
+            this.moreVisible=false;
+            this.moreObserver=new IntersectionObserver(entries=>{this.moreVisible=entries.some(entry=>entry.isIntersecting);this.requestMore();},{rootMargin:'0px 0px 1200px 0px'});
+            this.moreObserver.observe(this.q('.more'));
+            this.modelChanged=()=>this.queue();document.addEventListener('minimal-youtube:page-model-updated',this.modelChanged);
             this.observer=new MutationObserver(records=>{
                 if(records.every(record=>record.type==='attributes'&&record.attributeName?.startsWith('data-myt-search-')))return;
                 let rebuild=false;
@@ -406,22 +414,8 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
                 search.addEventListener('load',this.changed,true);
             }
             if(this.host.parentElement!==search)search.prepend(this.host);
-            const sources=[...search.querySelectorAll(sourceSelector)].filter(source=>(!this.channel||nativeAvailable(source,search)&&!source.closest(channelExcludedSelector))&&!source.parentElement.closest(sourceSelector)&&!source.closest('[data-myt-hidden],[data-myt-hidden-section],ytd-reel-shelf-renderer')&&!/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(text(source.closest(shelfSelector)?.querySelector('#title-container,#header,h2'))));
-            // YouTube can keep a section's items in its data without stamping
-            // them into the grid. Draw such a section from its data instead.
-            const dataRecords=new Map();
-            if(this.channel&&!sources.length&&/\/(?:videos|streams|playlists)\/?$/.test(location.pathname)){
-                document.dispatchEvent(new Event('minimal-youtube:channel-feed-snapshot'));
-                let feed={};try{feed=JSON.parse(document.documentElement.getAttribute('data-myt-channel-feed')||'{}');}catch{}
-                if(feed.path===location.pathname.replace(/\/$/,'')&&Array.isArray(feed.records))for(const record of feed.records){
-                    if(typeof record?.href!=='string'||!youtubeURL(record.href))continue;
-                    let source=this.virtualSources.get(record.href);if(!source){source=document.createElement('div');this.virtualSources.set(record.href,source);}
-                    dataRecords.set(source,record);sources.push(source);
-                }
-            }
-            for(const [href,source]of this.virtualSources)if(!dataRecords.has(source))this.virtualSources.delete(href);
-            const wanted=new Set(sources);
-            for(const source of sources){
+            const nativeSources=[...search.querySelectorAll(sourceSelector)].filter(source=>(!this.channel||nativeAvailable(source,search)&&!source.closest(channelExcludedSelector))&&!source.parentElement.closest(sourceSelector)&&!source.closest('[data-myt-hidden],[data-myt-hidden-section],ytd-reel-shelf-renderer')&&!/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(text(source.closest(shelfSelector)?.querySelector('#title-container,#header,h2'))));
+            for(const source of nativeSources){
                 let kind=source.matches('ytd-channel-renderer,[content-type="channel"],[data-content-type="channel"]')?'channel':Search.isPlaylist(source)?'playlist':'video';
                 if(!this.sources.has(source)){const key='result-'+(++this.sequence);this.sources.set(source,key);source.setAttribute('data-myt-search-source-key',key);}
                 source.setAttribute('data-myt-search-source-kind',kind);
@@ -431,6 +425,25 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             const records=new Map((this.snapshot.records||[]).map(record=>[record.key,record])),channelCache=new Map();
             this.playlistMetadata=new Map();try{for(const value of JSON.parse(document.documentElement.getAttribute('data-myt-search-playlists')||'[]').slice(-200))if(typeof value.id==='string')this.playlistMetadata.set(value.id,value);}catch{}
             try{for(const value of JSON.parse(document.documentElement.getAttribute('data-myt-search-channels')||'[]'))channelCache.set(value.id,value);}catch{}
+            // YouTube's page data is the source of results: it always holds
+            // the page's items, while its own grid can fail to stamp them.
+            // Channel cards in search stay on their native nodes, which keep
+            // YouTube's live subscribe controls. Without page data, the
+            // native result cards remain the source.
+            const model=this.pageModel(),dataRecords=new Map();
+            let sources=nativeSources;
+            if(model){
+                sources=this.channel?[]:nativeSources.filter(source=>(records.get(this.sources.get(source))?.kind||source.getAttribute('data-myt-search-source-kind'))==='channel');
+                for(const record of model.items){
+                    if(record?.kind==='channel'||typeof record?.href!=='string'||!youtubeURL(record.href))continue;
+                    const id=record.href+'|'+(record.group||'');
+                    let source=this.virtualSources.get(id);if(!source){source=document.createElement('div');this.virtualSources.set(id,source);}
+                    dataRecords.set(source,record);sources.push(source);
+                }
+            }
+            for(const [id,source]of this.virtualSources)if(!dataRecords.has(source))this.virtualSources.delete(id);
+            this.model=model;document.documentElement.toggleAttribute('data-myt-page-data',Boolean(model));
+            const wanted=new Set(sources);
             const stream=[],groups=new Map();
             for(const source of sources){
                 const record=dataRecords.get(source)||records.get(this.sources.get(source)),kind=record?.kind||source.getAttribute('data-myt-search-source-kind');
@@ -441,7 +454,8 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
                 this.channels.get(source)?.destroy();this.channels.delete(source);
                 const value=this.read(source,kind,record);if(!value)continue;
                 let card=this.cards.get(source);if(card&&card.host.dataset.kind!==kind){card.destroy();card=null;}if(!card){card=new MediaCard(source,kind);this.cards.set(source,card);}card.record=record;card.update(value);
-                const shelf=source.closest(shelfSelector),header=shelf?.querySelector('#title-container,#header,h2,[role="heading"]'),label=channelText(header?.querySelector('#title,h2,h3,.ytShelfHeaderLayoutTitle')||header);
+                const dataGroup=dataRecords.get(source)?.group||'';
+                const shelf=dataGroup?this.dataGroup(dataGroup):source.closest(shelfSelector),header=dataGroup?null:shelf?.querySelector('#title-container,#header,h2,[role="heading"]'),label=dataGroup||channelText(header?.querySelector('#title,h2,h3,.ytShelfHeaderLayoutTitle')||header);
                 if(shelf&&label){
                     let group=groups.get(shelf);if(!group){
                         group=this.groups.get(shelf)||{host:node('section','group'),title:node('h2'),stream:node('div','group-stream')};group.host.dataset.kind='group';
@@ -461,10 +475,23 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             const blank=this.channel&&/\/search\/?$/.test(url.pathname)&&(!query||document.documentElement.hasAttribute('data-myt-channel-search-empty'));
             this.q('.results-heading').hidden=!query||blank;this.q('.stream').hidden=blank;
             const busy=this.channel&&document.querySelector('#myt-channel-nav')?.getAttribute('aria-busy')==='true';
-            const confirmedEmpty=this.channel&&[...search.querySelectorAll('ytd-message-renderer,yt-message-view-model,ytd-background-promo-renderer')].some(node=>nativeAvailable(node,search));
+            const confirmedEmpty=this.channel&&(model?!model.items.length&&!model.more&&!model.loading:[...search.querySelectorAll('ytd-message-renderer,yt-message-view-model,ytd-background-promo-renderer')].some(node=>nativeAvailable(node,search)));
             this.q('.empty').textContent=this.channel&&!query?(/\/playlists\/?$/.test(url.pathname)?'No playlists yet.':'No videos yet.'):'No results found.';
             this.q('.channels').hidden=!this.channels.size||blank;this.q('.empty').hidden=Boolean(blank||this.channels.size||stream.length||busy||this.channel&&!query&&!confirmedEmpty);
-            this.prepareNative(search);this.translateFilters();this.layout();
+            this.prepareNative(search);this.translateFilters();this.layout();this.requestMore();
+        }
+        pageModel(){
+            document.dispatchEvent(new Event('minimal-youtube:page-model'));
+            let model=null;try{model=JSON.parse(document.documentElement.getAttribute('data-myt-page-model')||'null');}catch{}
+            return model&&Array.isArray(model.items)&&model.type===(this.channel?'channel':'search')?model:null;
+        }
+        dataGroup(label){
+            this.dataGroups ||=new Map();
+            let key=this.dataGroups.get(label);if(!key){key={label};this.dataGroups.set(label,key);}
+            return key;
+        }
+        requestMore(){
+            if(this.moreVisible&&this.model?.more&&!this.model.loading&&this.host.isConnected)document.dispatchEvent(new Event('minimal-youtube:page-model-more'));
         }
         prepareNative(search){
             // Keep native controllers in place. Only continuation paths contribute
@@ -528,6 +555,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             cancelAnimationFrame(this.cardFrame);this.pendingCards?.clear();
             cancelAnimationFrame(this.frame);this.observer.disconnect();this.resize.disconnect();this.search?.removeEventListener('load',this.changed,true);
             document.removeEventListener('yt-page-data-updated',this.changed);document.removeEventListener('yt-rendererstamper-finished',this.changed);
+            document.removeEventListener('minimal-youtube:page-model-updated',this.modelChanged);this.moreObserver.disconnect();document.documentElement.removeAttribute('data-myt-page-data');
             for(const card of [...this.cards.values(),...this.channels.values()])card.destroy();
             for(const source of this.sources.keys()){source.removeAttribute('data-myt-search-source-key');source.removeAttribute('data-myt-search-source-kind');}
             this.restoreNative();

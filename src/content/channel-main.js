@@ -111,32 +111,6 @@
         if(typeof browse?.browseId==='string'&&/^UC[\w-]+$/.test(browse.browseId)&&typeof browse.params==='string')return {browseId:browse.browseId,params:browse.params};
         return null;
     }
-    // The selected section's own data always holds its items, even when
-    // YouTube's grid fails to stamp them after an SPA section change. Publish
-    // public card fields so the isolated renderer can draw them directly.
-    document.addEventListener('minimal-youtube:channel-feed-snapshot',()=>{
-        const root=document.documentElement,model=globalThis.MinimalYouTubeSearchData;
-        if(!root?.classList.contains('minimal-youtube')||!model)return;
-        const path=location.pathname.replace(/\/$/,'');
-        let records=[];
-        try{
-            const browse=[...document.querySelectorAll('ytd-browse')].find(node=>!node.hidden&&node.getClientRects().length)||document.querySelector('ytd-browse');
-            const tabs=browse?.data?.contents?.twoColumnBrowseResultsRenderer?.tabs||[];
-            const selected=tabs.map(tab=>tab.tabRenderer||tab.expandableTabRenderer).find(tab=>tab?.selected);
-            const url=selected?.endpoint?.commandMetadata?.webCommandMetadata?.url||'';
-            // Never draw another section's feed under this URL.
-            if(selected?.content&&(!url||url.replace(/\/$/,'').toLowerCase()===path.toLowerCase())){
-                const seen=new Set();
-                for(const record of model.collect(selected.content).records){
-                    if((record.kind!=='video'&&record.kind!=='playlist')||seen.has(record.href))continue;
-                    if(record.kind==='video'&&!/[?&]v=[-\w]{11}/.test(record.href))continue;
-                    seen.add(record.href);records.push(record);if(records.length>=300)break;
-                }
-            }
-        }catch{records=[];}
-        const value=JSON.stringify({path,records});
-        if(root.getAttribute('data-myt-channel-feed')!==value)root.setAttribute('data-myt-channel-feed',value);
-    });
     document.addEventListener('minimal-youtube:channel-description',event=>{
         if(event.target instanceof Element)publish(event.target);
     });
