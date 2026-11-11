@@ -1659,7 +1659,12 @@ def check_watch_details(browser, dark, width=1440, legacy=False):
         assert page.evaluate('window.__share') is True
         expect(page.locator('#share-dialog')).to_be_visible()
         page.get_by_role('button',name='Close share dialog').click()
-        expect(page.locator('#myt-watch .actions').get_by_role('button',name='Save',exact=True)).to_have_count(0)
+        # Like, Dislike and Save are owned controls that press YouTube's own.
+        actions_row = page.locator('#myt-watch .actions')
+        expect(actions_row.get_by_role('group',name='Rating').get_by_role('button')).to_have_count(2)
+        expect(actions_row.get_by_role('button',name='Like',exact=True)).to_have_attribute('aria-pressed','false')
+        actions_row.get_by_role('button',name='Save',exact=True).click()
+        assert page.evaluate('window.__save') is True
         # Keyboard navigation and light dismissal must retain native More actions.
         page.locator('.more-toggle').press('Enter')
         expect(page.locator('.more-popup button').first).to_be_focused()

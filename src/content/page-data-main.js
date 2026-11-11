@@ -277,6 +277,100 @@
         for(const item of state.chips)item.selected=item===chip;
         load(state,chip.token,true);
     });
+    // Public watch page data: title, description with its links and
+    // timestamps, chapters, views, date, owner and the playlist panel. Data
+    // for another video (a page still in transition) is never published.
+    const watchModels=new WeakMap();
+    function attributed(value,video){
+        const data=globalThis.MinimalYouTubeSearchData;
+        if(!value||typeof value!=='object')return null;
+        if(typeof value.content==='string'){
+            const text=value.content.slice(0,20000),runs=(Array.isArray(value.commandRuns)?value.commandRuns:[]).filter(run=>Number.isInteger(run.startIndex)&&Number.isInteger(run.length)&&run.length>0).sort((a,b)=>a.startIndex-b.startIndex);
+            const parts=[];let at=0;
+            for(const run of runs){
+                if(run.startIndex<at||run.startIndex+run.length>text.length)continue;
+                if(run.startIndex>at)parts.push({text:text.slice(at,run.startIndex)});
+                const command=run.onTap?.innertubeCommand||run.onTap,watch=command?.watchEndpoint;
+                parts.push({text:text.slice(run.startIndex,run.startIndex+run.length),href:data.endpoint(command)||'',seconds:watch&&watch.videoId===video&&Number.isFinite(watch.startTimeSeconds)?watch.startTimeSeconds:null});
+                at=run.startIndex+run.length;
+            }
+            if(at<text.length)parts.push({text:text.slice(at)});
+            return parts;
+        }
+        if(Array.isArray(value.runs))return value.runs.slice(0,2000).map(run=>{const watch=run.navigationEndpoint?.watchEndpoint;return {text:String(run.text||''),href:run.navigationEndpoint?data.endpoint(run.navigationEndpoint):'',seconds:watch&&watch.videoId===video&&Number.isFinite(watch.startTimeSeconds)?watch.startTimeSeconds:null};});
+        if(typeof value.simpleText==='string')return [{text:value.simpleText}];
+        return null;
+    }
+    function find(root,test,limit=4000){
+        const stack=[root],seen=new Set();let scans=0;
+        while(stack.length&&scans++<limit){
+            const item=stack.pop();if(!item||typeof item!=='object'||seen.has(item))continue;seen.add(item);
+            const found=test(item);if(found)return found;
+            for(const child of Object.values(item))if(child&&typeof child==='object')stack.push(child);
+        }
+        return null;
+    }
+    function watchModel(){
+        const data=globalThis.MinimalYouTubeSearchData;
+        if(location.pathname!=='/watch'||!data)return null;
+        const video=new URL(location.href).searchParams.get('v')||'';
+        const flexy=[...document.querySelectorAll('ytd-watch-flexy')].find(node=>!node.hidden)||document.querySelector('ytd-watch-flexy');
+        const response=flexy?.data?.contents?flexy.data:flexy?.data?.response||flexy?.__data?.data;
+        if(!response||response.currentVideoEndpoint?.watchEndpoint?.videoId!==video)return null;
+        let model=watchModels.get(response);if(model)return model;
+        const results=response.contents?.twoColumnWatchNextResults,contents=results?.results?.results?.contents||[];
+        const primary=contents.find(item=>item.videoPrimaryInfoRenderer)?.videoPrimaryInfoRenderer||{};
+        const secondary=contents.find(item=>item.videoSecondaryInfoRenderer)?.videoSecondaryInfoRenderer||{};
+        const panels=response.engagementPanels||[];
+        const body=find(panels,item=>item.expandableVideoDescriptionBodyRenderer)?.expandableVideoDescriptionBodyRenderer;
+        const header=find(panels,item=>item.videoDescriptionHeaderRenderer)?.videoDescriptionHeaderRenderer||{};
+        const description=attributed(body?.attributedDescriptionBodyText,video)||attributed(secondary.attributedDescription,video)||attributed(secondary.description,video)||[];
+        const chapters=[];
+        const markers=find(panels,item=>item.macroMarkersListRenderer&&(item.macroMarkersListRenderer.contents||[]).some(entry=>entry.macroMarkersListItemRenderer)&&item);
+        for(const entry of markers?.macroMarkersListRenderer?.contents||[]){
+            const item=entry.macroMarkersListItemRenderer;if(!item)continue;
+            const at=item.onTap?.watchEndpoint?.startTimeSeconds;
+            const title=data.label(item.title).trim();
+            if(Number.isFinite(at)&&title&&!chapters.some(chapter=>chapter.seconds===at))chapters.push({title:title.slice(0,300),time:data.label(item.timeDescription).trim().slice(0,20),seconds:at});
+        }
+        if(!chapters.length){
+            const bar=find(response.playerOverlays,item=>item.multiMarkersPlayerBarRenderer)?.multiMarkersPlayerBarRenderer;
+            for(const map of bar?.markersMap||[])for(const entry of map.value?.chapters||[]){
+                const item=entry.chapterRenderer,at=Math.floor((item?.timeRangeStartMillis||0)/1000),title=data.label(item?.title).trim();
+                if(item&&title&&!chapters.some(chapter=>chapter.seconds===at))chapters.push({title:title.slice(0,300),time:'',seconds:at});
+            }
+        }
+        chapters.sort((a,b)=>a.seconds-b.seconds);
+        const viewText=data.label(primary.viewCount?.videoViewCountRenderer?.originalViewCount)||data.label(primary.viewCount?.videoViewCountRenderer?.viewCount)||data.label(header.views);
+        const live=Boolean(primary.viewCount?.videoViewCountRenderer?.isLive);
+        const views=!live&&/^\D*([\d][\d\s,.\u00a0\u202f]*)\D*$/.test(viewText)?viewText.replace(/\D/g,''):'';
+        const ownerRenderer=secondary.owner?.videoOwnerRenderer||{},ownerRun=ownerRenderer.title?.runs?.find(run=>run.navigationEndpoint);
+        const playlist=results?.playlist?.playlist;
+        let panel=null;
+        if(playlist&&Array.isArray(playlist.contents)){
+            const items=[];
+            for(const entry of playlist.contents.slice(0,500)){
+                const item=entry.playlistPanelVideoRenderer;if(!item||!/^[-\w]{3,64}$/.test(String(item.videoId||'')))continue;
+                items.push({id:item.videoId,title:data.label(item.title).trim().slice(0,500)||'Unavailable video',channel:data.label(item.shortBylineText||item.longBylineText).trim().slice(0,300),
+                    duration:data.label(item.lengthText).trim().slice(0,20),index:data.label(item.indexText).trim().slice(0,12),image:data.image(item.thumbnail),
+                    href:data.endpoint(item.navigationEndpoint)||data.url('/watch?v='+item.videoId+'&list='+encodeURIComponent(playlist.playlistId||'')),selected:Boolean(item.selected)||item.videoId===video});
+            }
+            panel={id:String(playlist.playlistId||''),title:data.label(playlist.title).trim().slice(0,500),owner:data.label(playlist.ownerName||playlist.longBylineText||playlist.shortBylineText).trim().slice(0,300),
+                total:Number(playlist.totalVideos)||items.length,current:Number.isInteger(playlist.localCurrentIndex)?playlist.localCurrentIndex:Number.isInteger(playlist.currentIndex)?playlist.currentIndex:items.findIndex(item=>item.selected),
+                infinite:Boolean(playlist.isInfinite),items};
+        }
+        model={video,title:data.label(primary.title).trim().slice(0,1000),description,chapters,views,
+            date:data.label(primary.dateText).trim().slice(0,100)||data.label(header.publishDate).trim().slice(0,100),
+            owner:{name:data.label(ownerRenderer.title).trim().slice(0,300),href:data.endpoint(ownerRun?.navigationEndpoint)||'',avatar:data.image(ownerRenderer.thumbnail),subscribers:data.label(ownerRenderer.subscriberCountText).trim().slice(0,100)},
+            playlist:panel};
+        watchModels.set(response,model);
+        return model;
+    }
+    document.addEventListener('minimal-youtube:watch-model',()=>{
+        const root=document.documentElement;let text='';
+        if(root.classList.contains('minimal-youtube'))try{const model=watchModel();text=model?JSON.stringify(model):'';}catch{text='';}
+        if(root.getAttribute('data-myt-watch-model')!==text){if(text)root.setAttribute('data-myt-watch-model',text);else root.removeAttribute('data-myt-watch-model');}
+    });
     // Public channel identity for the owned header: name, avatar, banner and
     // the verified badge. Account controls are not part of it.
     function largest(root,test){
