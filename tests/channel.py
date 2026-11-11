@@ -21,6 +21,14 @@ if __name__ == '__main__':
                 return {width:gb.width,height:gb.height,hostWidth:hb.width,visibility:getComputedStyle(g).visibility,continuationTop:cb.top,hostBottom:hb.bottom};}''')
             assert grid['width']>=grid['hostWidth']>0 and grid['height']<=2 and grid['visibility']=='hidden',grid
             assert grid['continuationTop']>=grid['hostBottom']-1,grid
+            # Cards stamped between script passes are already hidden by route
+            # styles; quick switches never paint YouTube's own grid or tabs.
+            late=page.evaluate('''()=>{const grid=document.querySelector('ytd-rich-grid-renderer > #contents');
+                grid.insertAdjacentHTML('afterbegin','<ytd-rich-item-renderer id="late-card"><a href="/watch?v=late">Late</a></ytd-rich-item-renderer>');
+                const card=document.querySelector('#late-card'),tabs=document.querySelector('yt-tab-group-shape');
+                return {card:getComputedStyle(card).visibility,tabs:getComputedStyle(tabs).display,section:document.documentElement.dataset.mytChannelSection};}''')
+            assert late=={'card':'hidden','tabs':'none','section':'videos'},late
+            page.evaluate("document.querySelector('#late-card').remove()")
             for label in ('Home','About','Shorts'):
                 expect(page.get_by_role('tab').filter(has_text=label)).to_be_hidden()
             expect(page.locator('#myt-channel-nav').get_by_role('link',name='Videos',exact=True)).to_be_visible()

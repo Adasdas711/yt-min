@@ -1274,6 +1274,12 @@
             if(redirectingURL!==url.href){redirectingURL=url.href;console.info('[Minimal YouTube] document load:','channel landing/language redirect',url.href,'->',channelDestination);location.replace(channelDestination);}
             return;
         }
+        // The incoming channel section is known from navigation start, before
+        // YouTube stamps its feed: route styles hide native cards immediately.
+        const channelSection = nextPage === "channel" ? (url.pathname.match(/^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)\/?([^/]*)/)?.[1] || "videos").toLowerCase() : "";
+        const sectionValue = channelSection === "community" ? "posts" : channelSection === "featured" ? "videos" : channelSection;
+        if (sectionValue && root.dataset.mytChannelSection !== sectionValue) root.dataset.mytChannelSection = sectionValue;
+        else if (!sectionValue) delete root.dataset.mytChannelSection;
         const previous = root.dataset.mytPage;
         if(nextPage==='channel'&&previous!=='channel'){
             root.setAttribute('data-myt-channel-boot','');clearTimeout(channelBootTimer);
@@ -1531,6 +1537,7 @@
             transitionActive = false;
             delete root.dataset.mytPage;
             delete root.dataset.mytPreviousPage;
+            delete root.dataset.mytChannelSection;
         }
     }
 

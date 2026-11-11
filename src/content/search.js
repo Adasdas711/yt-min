@@ -269,15 +269,17 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-layout-path
     visibility:visible !important;opacity:1 !important;overflow:visible !important;contain:none !important;
 }
 /* YouTube lays out a rich grid from its own width: without a box it stamps
-   no items when it re-renders after an SPA section change. Keep it as an
-   invisible full-width 2px strip at the end of the results; the
-   continuation sentinel inside it stays at the bottom. */
-html.minimal-youtube[data-myt-search-ui] ytd-search ytd-rich-grid-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) {
+   no items when it re-renders after an SPA section change. Without page
+   data, keep it as an invisible full-width 2px strip at the end of the
+   results; the continuation sentinel inside it stays at the bottom. With
+   page data the cards come from data, so the grid keeps its layout path and
+   its native sort chips stay visible. */
+html.minimal-youtube[data-myt-search-ui]:not([data-myt-page-data]) ytd-search ytd-rich-grid-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) {
     display:block !important;position:absolute !important;inset:auto 0 0 0 !important;width:auto !important;height:2px !important;
     min-height:0 !important;margin:0 !important;padding:0 !important;overflow:hidden !important;
     visibility:hidden !important;pointer-events:none !important;contain:none !important;
 }
-html.minimal-youtube[data-myt-search-ui] ytd-search ytd-rich-grid-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) [data-myt-search-layout-path] {
+html.minimal-youtube[data-myt-search-ui]:not([data-myt-page-data]) ytd-search ytd-rich-grid-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) [data-myt-search-layout-path] {
     display:block !important;position:static !important;width:100% !important;height:2px !important;margin:0 !important;padding:0 !important;overflow:hidden !important;
 }
 html.minimal-youtube[data-myt-search-ui][data-myt-page-data] ytd-search ytd-continuation-item-renderer,
