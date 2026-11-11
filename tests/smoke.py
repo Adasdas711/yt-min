@@ -2542,7 +2542,7 @@ def main():
         banner = page.locator("#myt-channel-header .myt-ch-banner").bounding_box()
         assert banner["x"] == 0 and banner["width"] == 1440, banner
         assert page.locator("#myt-channel-header .myt-ch-banner img").bounding_box()["width"] == 1440
-        assert page.locator("#myt-channel-header .myt-ch-avatar").bounding_box()["width"] == 240, "Avatar is one and a half times the native 160px"
+        assert page.locator("#myt-channel-header .myt-ch-avatar").bounding_box()["width"] == 300, "Owned avatar size"
         expect(page.locator("#myt-channel-header h1")).to_have_text("Channel title")
         centered(page, "#myt-channel-header .myt-ch-profile")
         centered(page, "#tabs")
@@ -2568,7 +2568,7 @@ def main():
         expect(page.locator("#modern-channel-banner")).to_be_hidden()
         modern_banner = page.locator("#myt-channel-header .myt-ch-banner").bounding_box()
         assert modern_banner["x"] == 0 and modern_banner["width"] == 1440, modern_banner
-        assert page.locator("#myt-channel-header .myt-ch-avatar").bounding_box()["width"] == 240
+        assert page.locator("#myt-channel-header .myt-ch-avatar").bounding_box()["width"] == 300
         ok("modern image-banner component also spans the channel width without resizing the avatar")
         page.close()
 
