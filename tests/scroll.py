@@ -70,6 +70,8 @@ def alignment(browser, theater, playlist, fallback):
       for(const offset of [0,21,160,300,900,999999,999999,70,0,-500]){
         viewport.scrollTop=offset;await frame();check();
       }
+      // The pointer is over the native player: its wheel guard is held.
+      video.dispatchEvent(new PointerEvent('pointerover',{bubbles:true,composed:true}));
       for(const end of [false,true]){
         viewport.scrollTop=end?viewport.scrollHeight:0;await frame();
         const before=viewport.scrollTop,documentBefore=document.scrollingElement.scrollTop;

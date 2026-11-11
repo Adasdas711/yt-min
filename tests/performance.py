@@ -112,9 +112,14 @@ def response_check(page):
     page.evaluate('__view.viewport.scrollTop=0;__view.position()')
     # Measure synchronous handler cost; compare alignment at the following paint.
     scroll = page.evaluate('''async () => {
-      const video=document.querySelector('video'),before=video.getBoundingClientRect().y,start=performance.now();
+      const video=document.querySelector('video'),before=video.getBoundingClientRect().y;
+      video.dispatchEvent(new PointerEvent('pointerover',{bubbles:true,composed:true}));
+      const start=performance.now();
       video.dispatchEvent(new WheelEvent('wheel',{deltaY:150,bubbles:true,cancelable:true,composed:true}));
-      const elapsed=performance.now()-start;await new Promise(requestAnimationFrame);return {ms:elapsed,moved:before-video.getBoundingClientRect().y,scroll:__view.viewport.scrollTop};
+      const elapsed=performance.now()-start;
+      // A wheel notch animates to its target like native wheel scrolling.
+      const until=performance.now()+2000;while(performance.now()<until&&__view.viewport.scrollTop<150)await new Promise(requestAnimationFrame);
+      await new Promise(requestAnimationFrame);return {ms:elapsed,moved:before-video.getBoundingClientRect().y,scroll:__view.viewport.scrollTop};
     }''')
     assert scroll['moved'] >= 149 and scroll['scroll'] >= 150, scroll
     page.evaluate('__view.viewport.scrollTop=0;__view.position()')

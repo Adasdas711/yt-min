@@ -85,6 +85,30 @@ def check(browser, width):
     print(f'PASS watch page text, links, chapters, stats and playlist panel from page data: {width}px', flush=True)
 
 
+def wheel_listeners(page):
+    cdp = page.context.new_cdp_session(page)
+    window = cdp.send('Runtime.evaluate', {'expression': 'window'})['result']['objectId']
+    listeners = cdp.send('DOMDebugger.getEventListeners', {'objectId': window})['listeners']
+    return [item for item in listeners if item['type'] == 'wheel' and not item['passive']]
+
+
+def scroll_path(browser):
+    # Scrolling the owned page never waits for the main thread: a blocking
+    # wheel listener exists only while the pointer is over a native layer.
+    page = setup(browser, '/watch?v=details', watch_details_fixture())
+    expect(page.locator('#myt-watch')).to_be_visible()
+    title = page.locator('#watch-title').bounding_box()
+    page.mouse.move(title['x'] + 5, title['y'] + 5)
+    assert not wheel_listeners(page), wheel_listeners(page)
+    page.locator('#player').evaluate("e=>e.dispatchEvent(new PointerEvent('pointerover',{bubbles:true,composed:true}))")
+    assert len(wheel_listeners(page)) == 1
+    page.mouse.move(title['x'] + 5, title['y'] + 5)
+    page.locator('#watch-title').evaluate("e=>e.dispatchEvent(new PointerEvent('pointerover',{bubbles:true,composed:true}))")
+    assert not wheel_listeners(page)
+    page.close()
+    print('PASS the owned watch page scrolls without a blocking wheel listener', flush=True)
+
+
 def other_video(browser):
     # Data for a different video (a page in transition) is never used.
     page = setup(browser, '/watch?v=details', watch_details_fixture())
@@ -101,4 +125,5 @@ if __name__ == '__main__':
         for width in (1440, 390):
             check(browser, width)
         other_video(browser)
+        scroll_path(browser)
         browser.close()

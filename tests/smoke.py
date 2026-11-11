@@ -888,21 +888,37 @@ def check_native_watch(browser, theater=False, width=1440):
     page.mouse.move(box['x']+box['width']/2,box['y']+min(box['height']/2,300))
     page.mouse.wheel(0,280)
     page.wait_for_function("document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.viewport').scrollTop>0")
+    page.wait_for_timeout(500)
     page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
+    page.wait_for_timeout(100)
     page.add_style_tag(content='ytd-player { transition:top .7s ease,left .7s ease; }')
-    for selector in ['video','#watch-title']:
-        page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
-        direct=page.locator(selector).evaluate('''async e=>{
-          const ui=document.querySelector('#myt-watch').firstElementChild.shadowRoot,viewport=ui.querySelector('.viewport');
-          const event=new WheelEvent('wheel',{deltaY:120,bubbles:true,cancelable:true,composed:true});
-          e.dispatchEvent(event);await new Promise(requestAnimationFrame);
-          return {cancelled:event.defaultPrevented,scroll:viewport.scrollTop,maxScroll:viewport.scrollHeight-viewport.clientHeight,playerY:document.querySelector('#ytd-player').getBoundingClientRect().y,slotY:ui.querySelector('.media').getBoundingClientRect().y,transition:getComputedStyle(document.querySelector('#ytd-player')).transitionDuration};
-        }''')
-        expected_scroll=min(120,direct['maxScroll'])
-        assert direct['cancelled'] and direct['scroll']==expected_scroll,direct
-        assert abs(direct['playerY']-direct['slotY'])<1 and direct['transition']=='0s',direct
-        page.wait_for_timeout(100)
-        assert page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop')==expected_scroll
+    # Over the native player, a wheel notch is consumed and scrolls the owned
+    # page smoothly to its target; the player tracks its slot meanwhile.
+    page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
+    page.locator('video').evaluate("e=>e.dispatchEvent(new PointerEvent('pointerover',{bubbles:true,composed:true}))")
+    direct=page.locator('video').evaluate('''async e=>{
+      const ui=document.querySelector('#myt-watch').firstElementChild.shadowRoot,viewport=ui.querySelector('.viewport');
+      const event=new WheelEvent('wheel',{deltaY:120,bubbles:true,cancelable:true,composed:true});
+      e.dispatchEvent(event);
+      const start=performance.now();while(performance.now()-start<2000&&viewport.scrollTop<Math.min(120,viewport.scrollHeight-viewport.clientHeight))await new Promise(requestAnimationFrame);
+      await new Promise(requestAnimationFrame);
+      return {cancelled:event.defaultPrevented,scroll:viewport.scrollTop,maxScroll:viewport.scrollHeight-viewport.clientHeight,playerY:document.querySelector('#ytd-player').getBoundingClientRect().y,slotY:ui.querySelector('.media').getBoundingClientRect().y,transition:getComputedStyle(document.querySelector('#ytd-player')).transitionDuration};
+    }''')
+    expected_scroll=min(120,direct['maxScroll'])
+    assert direct['cancelled'] and direct['scroll']==expected_scroll,direct
+    assert abs(direct['playerY']-direct['slotY'])<1 and direct['transition']=='0s',direct
+    page.wait_for_timeout(100)
+    assert page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop')==expected_scroll
+    # Over the owned page, the browser scrolls natively: no blocking listener
+    # cancels the gesture, and YouTube's hidden page never moves.
+    page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
+    title=page.locator('#watch-title').bounding_box()
+    page.mouse.move(title['x']+5,title['y']+5)
+    owned=page.locator('#watch-title').evaluate('''e=>{const event=new WheelEvent('wheel',{deltaY:120,bubbles:true,cancelable:true,composed:true});e.dispatchEvent(event);return event.defaultPrevented;}''')
+    assert owned is False
+    page.mouse.wheel(0,120)
+    page.wait_for_function("document.querySelector('#myt-watch').firstElementChild.shadowRoot.querySelector('.viewport').scrollTop>0")
+    assert page.evaluate('document.scrollingElement.scrollTop')==0
     page.locator('#myt-watch .viewport').evaluate('e=>e.scrollTop=0')
     page.locator('#movie_player').evaluate("e=>{const menu=document.createElement('div');menu.id='test-player-menu';menu.className='ytp-settings-menu';menu.style.cssText='position:absolute;right:20px;top:20px;width:120px;height:100px;overflow:auto;background:white';const content=document.createElement('div');content.style.height='400px';content.textContent='Native menu';menu.append(content);e.append(menu);}")
     page.locator('#test-player-menu').hover()
