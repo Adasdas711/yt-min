@@ -38,6 +38,8 @@ def search_page(browser):
           {shelfRenderer:{title:{simpleText:'People also watched'},content:{verticalListRenderer:{items:[item('dataVideo02','Data two')]}}}},
           {shelfRenderer:{title:{simpleText:'Shorts'},content:{verticalListRenderer:{items:[item('shortVideo1','Short in shelf')]}}}},
           {reelShelfRenderer:{items:[]}},
+          {backstagePostThreadRenderer:{post:{backstagePostRenderer:{postId:'UgSearchPost',contentText:{runs:[{text:'A post in search'}]},authorText:{runs:[{text:'Poster'}]}}}}},
+          {shelfRenderer:{title:{simpleText:'Latest posts'},content:{verticalListRenderer:{items:[{postRenderer:{postId:'UgShelfPost',contentText:{runs:[{text:'Shelf post'}]}}}]}}}},
           {videoRenderer:{videoId:'shortVideo2',title:{runs:[{text:'Reel'}]},navigationEndpoint:{reelWatchEndpoint:{videoId:'shortVideo2'}}}},
           item('dataVideo03','Data three')]}},
         more('page-two')]}}}}};
@@ -46,6 +48,9 @@ def search_page(browser):
     # Data order and groups; Shorts never appear; the native video is not a source.
     expect(titles).to_have_text(['Data one', 'Data two', 'Data three', 'Data five', 'Data six'])
     expect(page.locator('#myt-search .group h2')).to_have_count(1)
+    # Posts never appear in search, alone or in a posts shelf.
+    expect(page.locator('#myt-search .post')).to_have_count(0)
+    expect(page.locator('#myt-search')).not_to_contain_text('post')
     assert requests and requests[0]['continuation'] == 'page-two', requests
     # Native channel cards keep their own node and subscribe control.
     expect(page.locator('#myt-search [data-myt-search-channel-card]')).to_have_count(1)

@@ -125,7 +125,9 @@
                 parse(items,out,channel?group:title||group,channel);continue;
             }
             const postValue=entry.backstagePostThreadRenderer?.post||entry.backstagePostRenderer&&entry||entry.postRenderer&&entry||entry.sharedPostRenderer&&entry;
-            if(postValue){const value=post(postValue);if(value)out.items.push(value);continue;}
+            // Posts belong to a channel's Posts feed only; search never shows them.
+            if(postValue){const value=channel?post(postValue):null;if(value)out.items.push(value);continue;}
+            if(!channel&&(entry.postRenderer||entry.sharedPostRenderer||entry.backstagePostRenderer))continue;
             if(entry.richSectionRenderer||entry.reelShelfRenderer||isShort(entry))continue;
             const record=data.record(entry);
             if(!record||!['video','playlist','channel'].includes(record.kind))continue;
