@@ -41,7 +41,11 @@
     ].join(",");
     const tabSelector = "yt-tab-shape, tp-yt-paper-tab, [role='tab'], yt-chip-cloud-chip-renderer";
     const channelRoute = /^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)(?:\/|$)/;
-    const channelShorts = /^(\/(?:@[^/]+|(?:channel|c|user)\/[^/]+))\/shorts\/?$/;
+    // Channel sections the extension shows; other channel tabs (Shorts,
+    // Releases, Podcasts, Store, Courses, Membership...) lead to home.
+    const channelSectionPath = /^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)\/([^/?#]+)/;
+    const channelSections = new Set(["featured", "videos", "streams", "playlists", "posts", "community", "search", "about", "live"]);
+    const homeFeeds = /^\/feed\/(?:subscriptions|history|you|library|playlists|channels)\/?$/;
     const defaultLanguage = "en";
     const messages = {
     "ru": {
@@ -930,13 +934,21 @@
         }
     }
 
+    // Pages the extension does not show lead elsewhere: Shorts, account
+    // feeds (subscriptions, history, library) and other channel tabs go home;
+    // hashtags open as a search.
     function shortsDestination(value) {
         let url;
         try { url = new URL(value, pageLocation()); } catch { return null; }
         if (url.protocol !== "https:" || !(url.hostname === "youtube.com" || url.hostname.endsWith(".youtube.com"))) return null;
-        if (/^\/shorts(?:\/|$)/.test(url.pathname)) return "/";
-        const channel = url.pathname.match(channelShorts);
-        return channel ? `${channel[1]}/videos` : null;
+        if (/^\/shorts(?:\/|$)/.test(url.pathname) || homeFeeds.test(url.pathname)) return "/";
+        const hashtag = url.pathname.match(/^\/hashtag\/([^/?#]+)\/?$/);
+        if (hashtag) {
+            let tag = hashtag[1];try { tag = decodeURIComponent(tag); } catch {}
+            return "/results?search_query=" + encodeURIComponent("#" + tag.replace(/^#/, ""));
+        }
+        const section = url.pathname.match(channelSectionPath)?.[1]?.toLowerCase();
+        return section && !channelSections.has(section) ? "/" : null;
     }
 
     function hide(element) {
@@ -1329,6 +1341,16 @@
         const urlChanged = currentURL !== url.href;
         const nextPage = url.pathname === "/" ? "home" : url.pathname === "/watch" ? "watch" :
             url.pathname === "/results" ? "search" : url.pathname === "/playlist" ? "playlist" : channelRoute.test(url.pathname) ? "channel" : "other";
+        const destination = settingsReady ? shortsDestination(url.href) : null;
+        if (destination !== null) {
+            root.dataset.mytPage = "shorts";
+            if (redirectingURL !== url.href) {
+                redirectingURL = url.href;
+                console.info('[Minimal YouTube] document load:','page redirect', url.href, '->', destination);
+                location.replace(destination);
+            }
+            return;
+        }
         const channelDestination=nextPage==='channel'&&settingsReady&&!pendingNavigation?globalThis.MinimalYouTubeChannel?.destination(url,root.lang):null;
         if(channelDestination){
             root.dataset.mytPage='channel';
@@ -1358,16 +1380,6 @@
         const releaseHome = home?.isConnected && url.pathname !== "/" && !keepHome;
         if (!force && !urlChanged && !releaseHome && (url.pathname !== "/" || home?.isConnected || !document.body)) return;
         currentURL = url.href;
-        const destination = shortsDestination(currentURL);
-        if (destination !== null && settingsReady) {
-            root.dataset.mytPage = "shorts";
-            if (redirectingURL !== currentURL) {
-                redirectingURL = currentURL;
-                console.info('[Minimal YouTube] document load:','Shorts redirect', destination);
-                location.replace(destination);
-            }
-            return;
-        }
         redirectingURL = "";
         const path = url.pathname;
         root.dataset.mytPage = nextPage;

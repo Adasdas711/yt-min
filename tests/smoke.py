@@ -2479,7 +2479,7 @@ def main():
         ok("cancelled navigation keeps the home overlay and original route intact")
         page.close()
 
-        page = setup(browser, "/feed/subscriptions", '<ytd-app><ytd-page-manager class="ytd-app"><ytd-browse><div id="primary" style="width: 700px; margin-left: 37px">Subscriptions</div></ytd-browse></ytd-page-manager></ytd-app>')
+        page = setup(browser, "/feed/trending", '<ytd-app><ytd-page-manager class="ytd-app"><ytd-browse><div id="primary" style="width: 700px; margin-left: 37px">Subscriptions</div></ytd-browse></ytd-page-manager></ytd-app>')
         bounds = page.locator("#primary").bounding_box()
         assert bounds["width"] == 700 and bounds["x"] == 37, bounds
         ok("nonchannel browse primary dimensions are not globally overridden")
@@ -2489,9 +2489,22 @@ def main():
         page.wait_for_url("https://www.youtube.com/")
         ok("direct Shorts playback redirects to home")
         page.close()
-        page = setup(browser, "/@creator/shorts")
-        page.wait_for_url("https://www.youtube.com/@creator/videos")
-        ok("channel Shorts URL redirects to Videos tab")
+        for path, target, label in [
+            ("/@creator/shorts", "https://www.youtube.com/", "channel Shorts tab"),
+            ("/@creator/releases", "https://www.youtube.com/", "rare channel tab"),
+            ("/feed/subscriptions", "https://www.youtube.com/", "subscriptions feed"),
+            ("/feed/history", "https://www.youtube.com/", "history feed"),
+            ("/feed/you", "https://www.youtube.com/", "You page"),
+            ("/hashtag/%D0%BC%D0%B0%D0%B9%D0%BD", "https://www.youtube.com/results?search_query=%23%D0%BC%D0%B0%D0%B9%D0%BD", "hashtag page"),
+        ]:
+            page = setup(browser, path)
+            page.wait_for_url(target)
+            ok(f"{label} redirects to {target.removeprefix('https://www.youtube.com')}")
+            page.close()
+        # Kept channel sections are not redirected.
+        page = setup(browser, "/@creator/streams")
+        page.wait_for_timeout(300)
+        assert page.url == "https://www.youtube.com/@creator/streams", page.url
         page.close()
 
         page = setup(browser, body='<ytd-app id="keep"><ytd-page-manager></ytd-page-manager></ytd-app>')
@@ -2598,7 +2611,7 @@ def main():
         page.evaluate("async () => { for (let n=0;n<5;n++) await new Promise(requestAnimationFrame); }")
         assert page.locator("#main-scroll").evaluate("element => element.scrollTop") == 0
         page.evaluate("__setEnabled(true)")
-        navigate_spa(page, "/feed/subscriptions")
+        navigate_spa(page, "/feed/trending")
         page.mouse.wheel(0, 300)
         page.evaluate("async () => { for (let n=0;n<5;n++) await new Promise(requestAnimationFrame); }")
         page.wait_for_function("document.querySelector('#main-scroll').scrollTop >= 250")
@@ -2645,7 +2658,7 @@ def main():
             check_gutter_document_scroll(browser, path, renderer)
             ok(f'{renderer} forwards both blocked gutters to the document scrollport without double scrolling, and stays inactive when disabled')
 
-        for path in ["/watch?v=header", "/results?search_query=header", "/@creator/videos", "/feed/subscriptions"]:
+        for path in ["/watch?v=header", "/results?search_query=header", "/@creator/videos", "/feed/trending"]:
             page = setup(browser, path, '<ytd-app>' + MASTHEAD + '<ytd-page-manager class="ytd-app"><ytd-browse>Native content</ytd-browse></ytd-page-manager></ytd-app>', watch_ui=False)
             centered_header(page)
             page.locator('#myt-masthead .myt-masthead-link').focus()
