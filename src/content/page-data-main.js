@@ -95,6 +95,30 @@
         }
         return null;
     }
+    // Search filters as YouTube's own filter panel offers them: groups of
+    // links, with the applied ones marked. Old and new layouts share them.
+    function filters(root){
+        const data=globalThis.MinimalYouTubeSearchData,groups=[],seen=new Set(),stack=[root],visited=new Set();let scans=0;
+        while(stack.length&&scans++<6000&&groups.length<8){
+            const item=stack.pop();if(!item||typeof item!=='object'||visited.has(item))continue;visited.add(item);
+            const group=item.searchFilterGroupRenderer;
+            if(group){
+                const title=data.label(group.title).trim();
+                const options=[];
+                for(const entry of group.filters||[]){
+                    const filter=entry.searchFilterRenderer;if(!filter)continue;
+                    const label=data.label(filter.label).trim(),href=data.endpoint(filter.navigationEndpoint);
+                    const selected=/SELECTED/.test(filter.status||'')&&!/UNSELECTED/.test(filter.status||'');
+                    if(label&&(href||selected))options.push({label:label.slice(0,60),href,selected});
+                }
+                if(title&&options.length&&!seen.has(title)){seen.add(title);groups.push({title:title.slice(0,60),options:options.slice(0,12)});}
+                continue;
+            }
+            const values=Array.isArray(item)?item:Object.values(item);
+            for(let i=values.length-1;i>=0;i--)if(values[i]&&typeof values[i]==='object')stack.push(values[i]);
+        }
+        return groups;
+    }
     function chips(content){
         const data=globalThis.MinimalYouTubeSearchData;
         const bar=content?.richGridRenderer?.header?.feedFilterChipBarRenderer||content?.sectionListRenderer?.header?.feedFilterChipBarRenderer;
@@ -144,7 +168,7 @@
             const search=document.querySelector('#myt-search')?.closest('ytd-search')||[...document.querySelectorAll('ytd-search')].find(visible);
             const data=search?.data;
             const list=(data?.contents||data?.response?.contents)?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents;
-            return Array.isArray(list)?{type:'search',list}:null;
+            return Array.isArray(list)?{type:'search',list,content:data}:null;
         }
         if(path==='/playlist'){
             const list=new URL(location.href).searchParams.get('list')||'';
@@ -172,15 +196,15 @@
         if(!found)return null;
         let value=models.get(found.list);
         if(!value){
-            value={key:routeKey(),type:found.type,items:[],continuation:'',loading:false,failed:false,chips:[]};
-            try{parse(found.list,value,'',found.type!=='search');value.chips=found.type==='channel'?chips(found.content):[];}catch{return null;}
+            value={key:routeKey(),type:found.type,items:[],continuation:'',loading:false,failed:false,chips:[],filters:[]};
+            try{parse(found.list,value,'',found.type!=='search');value.chips=found.type==='channel'?chips(found.content):[];value.filters=found.type==='search'?filters(found.content):[];}catch{return null;}
             models.set(found.list,value);
         }
         return value;
     }
     function publish(){
         const root=document.documentElement;
-        const text=current?JSON.stringify({key:current.key,type:current.type,items:current.items,more:Boolean(current.continuation)&&!current.failed,loading:current.loading,chips:current.chips.map(({label,selected})=>({label,selected}))}):'';
+        const text=current?JSON.stringify({key:current.key,type:current.type,items:current.items,more:Boolean(current.continuation)&&!current.failed,loading:current.loading,chips:current.chips.map(({label,selected})=>({label,selected})),filters:current.filters||[]}):'';
         if(text===published)return;
         published=text;
         if(text)root.setAttribute('data-myt-page-model',text);else root.removeAttribute('data-myt-page-model');

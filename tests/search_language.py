@@ -17,7 +17,8 @@ def check(browser,language,width,modern):
       document.querySelector('ytd-search').addEventListener('click',event=>{if(event.target.closest('#native-filters-toggle'))window.__nativeEventPath=true;});
     }''')
     root=page.locator('#myt-search');button=page.locator('#native-filters-toggle');panel=page.locator('#native-filters')
-    expect(root.locator('.filters-toggle,.filter-panel')).to_have_count(0)
+    # Without page data, the owned filters stay hidden and YouTube's own work.
+    expect(root.locator('.filters')).to_be_hidden()
     expect(button).to_have_text('Filters');expect(button).to_have_attribute('aria-label','Filters')
     dimensions=page.evaluate('''()=>{const search=document.querySelector('ytd-search'),s=getComputedStyle(search),host=document.querySelector('#myt-search').getBoundingClientRect(),toolbar=document.querySelector('#native-toolbar').getBoundingClientRect();return{old:(search.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight))*.9,host:host.width,toolbar:toolbar.width,x:host.x,toolbarX:toolbar.x};}''')
     assert abs(dimensions['host']-dimensions['old']*.9)<.05,dimensions
