@@ -1691,6 +1691,20 @@ html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-sticky-header] {
     background: var(--yt-spec-base-background, var(--myt-bg));
 }
 
+/* Owned cards replace YouTube's channel cards and tabs. Hide the native ones
+   by route, before scripts mark newly stamped nodes, so quick section
+   switches never paint YouTube's own grid or tabs. Posts keep their feed. */
+html.minimal-youtube[data-myt-page="channel"]:not([data-myt-channel-section="posts"]) ytd-browse :is(
+    ytd-rich-item-renderer, ytd-rich-section-renderer, ytd-grid-video-renderer, ytd-grid-playlist-renderer,
+    ytd-video-renderer, ytd-playlist-renderer, yt-lockup-view-model, ytd-shelf-renderer, ytd-reel-shelf-renderer,
+    ytd-message-renderer, yt-message-view-model, ytd-backstage-post-thread-renderer, ytd-continuation-item-renderer
+) {
+    visibility: hidden !important;
+}
+html.minimal-youtube[data-myt-page="channel"] ytd-browse:has(#myt-channel-nav) :is(yt-tab-group-shape, tp-yt-paper-tabs) {
+    display: none !important;
+}
+
 /* Keep source metadata/controllers for updates without painting duplicate UI. */
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-source] {
     display: none !important;

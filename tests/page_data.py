@@ -70,12 +70,18 @@ def channel_page(browser):
         route.fulfill(content_type='application/json', body=page.evaluate('()=>(()=>{' + ITEM + "return JSON.stringify({onResponseReceivedActions:[{appendContinuationItemsAction:{continuationItems:[{richItemRenderer:{content:item('chanVideo03','Channel three')}}]}}]});})()"))
     page.route('https://www.youtube.com/youtubei/v1/browse**', api)
     expect(page.locator('#myt-search .media')).to_have_count(18)
+    # Live YouTube keeps the sort chips inside the rich grid's header.
+    page.evaluate("""document.querySelector('ytd-rich-grid-renderer').insertAdjacentHTML('afterbegin','<div id="header"><ytd-feed-filter-chip-bar-renderer><button id="sort-latest">Latest</button></ytd-feed-filter-chip-bar-renderer></div>')""")
     page.evaluate(CONFIG + ITEM + """
       const tab=(name,selected,content)=>({tabRenderer:{title:name,selected,endpoint:{commandMetadata:{webCommandMetadata:{url:'/@creator/'+name.toLowerCase()}}},content}});
       document.querySelector('ytd-browse').data={contents:{twoColumnBrowseResultsRenderer:{tabs:[
         tab('Videos',true,{richGridRenderer:{contents:[{richItemRenderer:{content:item('chanVideo01','Channel one')}},{richItemRenderer:{content:item('chanVideo02','Channel two')}},more('channel-two')]}})]}}};
       document.dispatchEvent(new Event('yt-page-data-updated'));""")
     expect(page.locator('#myt-search .media-title')).to_have_text(['Channel one', 'Channel two', 'Channel three'])
+    expect(page.locator('#sort-latest')).to_be_visible()
+    page.locator('#sort-latest').scroll_into_view_if_needed()
+    hit = page.locator('#sort-latest').evaluate('e=>{const r=e.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {height:r.height,hit:e===hit||e.contains(hit)}}')
+    assert hit['height'] > 10 and hit['hit'], hit
     assert requests and requests[0]['continuation'] == 'channel-two', requests
     # The design is unchanged: the same owned cards, header and navigation.
     expect(page.locator('#myt-channel-nav')).to_be_visible()
