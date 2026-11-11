@@ -401,6 +401,8 @@
             const avatarImage=native(':is(yt-decorated-avatar-view-model,yt-avatar-shape,#avatar) img,img#avatar,img[id*="avatar"]')[0];
             const bannerImage=native(':is(yt-image-banner-view-model,ytd-banner-header-renderer,#banner,#page-header-banner,#channel-header-banner,.page-header-banner) img')[0];
             const name=(data.title||title?.textContent||'').replace(/\s+/g,' ').trim();
+            // Nothing identifies a channel yet: keep the native header as is.
+            if(!name){this.restoreSubscribe();own.remove();return;}
             const verified=data.verified??native('[aria-label*="verified" i],[aria-label*="подтвержд" i],.badge-style-type-verified,ytd-badge-supported-renderer [class*="verified" i]').length>0;
             const image=value=>{if(typeof value!=='string'||!value.trim())return '';if(/^data:image\//i.test(value))return value;try{const url=new URL(value,location.href);return /^https?:$/.test(url.protocol)?url.href:'';}catch{return '';}};
             const avatar=image(data.avatar||avatarImage?.currentSrc||avatarImage?.src||''),banner=image(data.banner||bannerImage?.currentSrc||bannerImage?.src||'');
