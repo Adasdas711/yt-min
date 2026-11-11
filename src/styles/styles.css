@@ -640,6 +640,137 @@ html.minimal-youtube ytd-masthead :is(yt-searchbox, .ytSearchboxComponentHost) :
     outline-offset: 2px;
 }
 
+/* Owned site header inside YouTube's masthead container: the same centered
+   logo and search field, without YouTube's own logo or searchbox. */
+html.minimal-youtube ytd-masthead[data-myt-own-masthead] > #container > :not(#myt-masthead) {
+    display: none !important;
+}
+
+html.minimal-youtube #myt-masthead {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    height: 56px;
+}
+
+html.minimal-youtube #myt-masthead .myt-masthead-link {
+    display: flex;
+    align-items: center;
+    flex: none;
+    color: var(--myt-ink);
+    font-size: 0;
+    text-decoration: none;
+    outline: none;
+}
+
+html.minimal-youtube #myt-masthead .myt-masthead-brand {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    gap: 10px;
+    font-family: "Roboto", "Arial", sans-serif;
+    line-height: 1;
+}
+
+html.minimal-youtube #myt-masthead .myt-masthead-brand .myt-home__wordmark {
+    font-size: 24px;
+}
+
+html.minimal-youtube #myt-masthead .myt-masthead-search {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    flex: 0 1 640px;
+    width: 100%;
+    min-width: 0;
+    max-width: 640px;
+    height: 44px;
+    margin: 0;
+    padding: 0 16px;
+    border: 1px solid var(--myt-border);
+    border-radius: 14px;
+    background: var(--myt-surface);
+    box-shadow: none;
+}
+
+html.minimal-youtube #myt-masthead .myt-masthead-search:focus-within {
+    border-color: var(--myt-muted);
+    outline: 2px solid color-mix(in srgb, var(--myt-muted) 16%, transparent);
+    outline-offset: 2px;
+}
+
+html.minimal-youtube #myt-masthead .myt-masthead-query {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    box-shadow: none;
+    color: var(--myt-ink);
+    font: 400 15px/1.4 "Roboto", "Arial", sans-serif;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+html.minimal-youtube #myt-masthead .myt-masthead-query::placeholder {
+    color: var(--myt-muted);
+}
+
+html.minimal-youtube #myt-masthead .myt-masthead-query::-webkit-search-decoration,
+html.minimal-youtube #myt-masthead .myt-masthead-query::-webkit-search-cancel-button,
+html.minimal-youtube #myt-masthead .myt-masthead-query::-webkit-search-results-button,
+html.minimal-youtube #myt-masthead .myt-masthead-query::-webkit-search-results-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+    display: none;
+}
+
+html.minimal-youtube #myt-masthead .myt-masthead-clear {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    margin: 0 -6px 0 4px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--myt-muted);
+    font: 400 22px/1 "Roboto", "Arial", sans-serif;
+    cursor: pointer;
+}
+
+html.minimal-youtube #myt-masthead .myt-masthead-clear:hover {
+    color: var(--myt-ink);
+}
+
+html.minimal-youtube #myt-masthead .myt-masthead-clear[hidden] {
+    display: none;
+}
+
+@media (max-width: 600px) {
+    html.minimal-youtube #myt-masthead {
+        gap: 12px;
+    }
+
+    html.minimal-youtube #myt-masthead .myt-masthead-brand .myt-home__mark {
+        width: 32px;
+        height: 24px;
+    }
+
+    html.minimal-youtube #myt-masthead .myt-masthead-brand .myt-home__wordmark {
+        font-size: 20px;
+    }
+}
+
 /* A quieter text column below the full-size native player. */
 html.minimal-youtube:is([data-myt-page="watch"], [data-myt-previous-page="watch"]) ytd-watch-metadata,
 html.minimal-youtube:is([data-myt-page="watch"], [data-myt-previous-page="watch"]) ytd-video-primary-info-renderer,
@@ -1659,6 +1790,36 @@ html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(yt-page-header-view
     overflow-wrap: anywhere;
 }
 html.minimal-youtube [data-myt-channel-tab-hidden] { display: none !important; }
+/* The subscribe control sits on the title row, right of the channel name.
+   The row is found by its children (name and actions), not by class names
+   YouTube renames; every other header line spans the full width below. */
+html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#page-header, #header, yt-page-header-view-model, yt-page-header-renderer, ytd-page-header-renderer, ytd-c4-tabbed-header-renderer) :has(> :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]))):has(> :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) {
+    display: grid !important;
+    /* Name and button size the first two columns; full-width lines span a
+       flexible third one, so they never widen the name or button column. */
+    grid-template-columns: minmax(0, max-content) auto minmax(0, 1fr);
+    column-gap: 24px;
+    align-items: center;
+}
+html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#page-header, #header, yt-page-header-view-model, yt-page-header-renderer, ytd-page-header-renderer, ytd-c4-tabbed-header-renderer) :has(> :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]))):has(> :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) > * {
+    grid-column: 1 / -1;
+}
+html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#page-header, #header, yt-page-header-view-model, yt-page-header-renderer, ytd-page-header-renderer, ytd-c4-tabbed-header-renderer) :has(> :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]))):has(> :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) > :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+}
+html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#page-header, #header, yt-page-header-view-model, yt-page-header-renderer, ytd-page-header-renderer, ytd-c4-tabbed-header-renderer) :has(> :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]))):has(> :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) > :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]) {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: start;
+    align-self: center;
+    margin: 0 !important;
+}
+/* The channel avatar is one and a half times its native size. */
+html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#page-header, #header, yt-page-header-view-model, yt-page-header-renderer, ytd-page-header-renderer, ytd-c4-tabbed-header-renderer) :is(yt-decorated-avatar-view-model, yt-avatar-shape, #avatar, img[id*="avatar"]):not(:is(yt-decorated-avatar-view-model, yt-avatar-shape, #avatar, img[id*="avatar"]) *) {
+    zoom: 1.5;
+}
 html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(yt-tab-group-shape, tp-yt-paper-tabs) {
     display: flex !important;
     justify-content: center !important;

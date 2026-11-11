@@ -125,7 +125,7 @@ def changed_wrappers(browser,width,untyped=False):
     sentinel=page.locator('#changed-continuation')
     sentinel.evaluate('(e,html)=>e.insertAdjacentHTML("beforebegin",html)',video(403))
     expect(host.locator('.media-title')).to_have_text(['Regular video 401','Regular video 402','Regular video 403'])
-    assert sentinel.evaluate('e=>e.getBoundingClientRect().top>=document.querySelector("#myt-search").getBoundingClientRect().bottom-1')
+    assert sentinel.evaluate('e=>e.getBoundingClientRect().top>=document.querySelector("#myt-search").getBoundingClientRect().bottom-1'),sentinel.evaluate('e=>[e.getBoundingClientRect().top,document.querySelector("#myt-search").getBoundingClientRect().bottom,innerWidth]')
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     page.wait_for_timeout(100);assert_stable(page)
     Path('/tmp/yt-min-qa').mkdir(exist_ok=True)

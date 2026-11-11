@@ -134,9 +134,9 @@ def centered(page, selector, tolerance=3):
 
 
 def centered_header(page):
-    brand = page.locator("ytd-masthead .myt-masthead-brand")
+    brand = page.locator("#myt-masthead .myt-masthead-brand")
     logo = brand.bounding_box() if brand.count() else page.locator("#logo-icon svg").bounding_box()
-    search = page.locator("#search-form, .ytSearchboxComponentSearchForm").bounding_box()
+    search = page.locator("#myt-masthead .myt-masthead-search").bounding_box()
     assert logo and search, (logo, search)
     left = min(logo["x"], search["x"])
     right = max(logo["x"] + logo["width"], search["x"] + search["width"])
@@ -254,39 +254,32 @@ def check_home_isolation(browser, theme):
 def check_search_icon_variants(browser, variant, width, path):
     if variant == 'legacy':
         header = MASTHEAD.replace('name="search_query"', 'type="search" name="search_query"')
-        form = '#search-form'
-        marker = 'id="search-icon"'
     else:
         start = MASTHEAD.index('<ytd-searchbox>')
         end = MASTHEAD.index('</ytd-searchbox>') + len('</ytd-searchbox>')
         header = MASTHEAD[:start] + '''<yt-searchbox><form class="ytSearchboxComponentSearchForm" action="/results">
           <div class="ytSearchboxComponentInputBox"><input id="search" type="search" name="search_query"></div>
           </form></yt-searchbox>''' + MASTHEAD[end:]
-        form = '.ytSearchboxComponentSearchForm'
-        marker = 'class="ytSearchboxComponentSearchIcon"'
     page = setup(browser, path, '<ytd-app>' + header + '</ytd-app>', width=width)
-    # YouTube can mount a leading icon as a sibling of its input box when focused.
-    page.locator('#search').fill('mr beast')
-    page.locator('#search').focus()
-    page.locator(form).evaluate("""(element, marker) => {
-      element.insertAdjacentHTML('afterbegin', `<button type="button" ${marker} data-leading-icon
-        style="position:absolute;left:16px;top:8px;width:24px;height:24px">
-        <svg width="24" height="24"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg></button>`);
-      element.insertAdjacentHTML('beforeend', '<button type="button" id="native-clear">Clear</button>');
-      element.querySelector('#native-clear').addEventListener('click', () => { element.querySelector('input').value = ''; });
-    }""", marker)
-    expect(page.locator('[data-leading-icon]')).to_be_hidden()
-    expect(page.locator('#native-clear')).to_be_visible()
-    assert page.locator('#search').evaluate("element => getComputedStyle(element).appearance") == 'none'
-    assert page.locator('#search').evaluate("element => getComputedStyle(element, '::-webkit-search-decoration').appearance") == 'none'
+    # The owned header replaces YouTube's searchbox in every native variant.
+    own = page.locator('#myt-masthead .myt-masthead-query')
+    expect(own).to_be_visible()
+    expect(page.locator('#search')).to_be_hidden()
+    assert own.evaluate("element => getComputedStyle(element).appearance") == 'none'
+    assert own.evaluate("element => getComputedStyle(element, '::-webkit-search-decoration').appearance") == 'none'
+    own.fill('mr beast')
+    clear = page.locator('#myt-masthead .myt-masthead-clear')
+    expect(clear).to_be_visible()
+    clear.click()
+    expect(own).to_have_value('')
+    expect(clear).to_be_hidden()
     page.evaluate('__setEnabled(false)')
-    expect(page.locator('[data-leading-icon]')).to_be_visible()
+    expect(page.locator('#myt-masthead')).to_have_count(0)
+    expect(page.locator('#search')).to_be_visible()
     page.evaluate('__setEnabled(true)')
-    expect(page.locator('[data-leading-icon]')).to_be_hidden()
-    page.locator('#native-clear').click()
-    expect(page.locator('#search')).to_have_value('')
-    page.locator('#search').fill('mr beast & C++')
-    page.locator('#search').press('Enter')
+    expect(own).to_be_visible()
+    own.fill('mr beast & C++')
+    own.press('Enter')
     page.wait_for_url('**/results?**')
     assert parse_qs(urlparse(page.url).query)['search_query'] == ['mr beast & C++']
     page.close()
@@ -509,18 +502,19 @@ def check_settings_failures(browser):
 def check_header_alignment_and_anonymous_icons(browser, width):
     legacy = MASTHEAD[MASTHEAD.index('<ytd-searchbox>'):MASTHEAD.index('</ytd-searchbox>')+len('</ytd-searchbox>')]
     modern = '''<yt-searchbox style="height:40px;margin-top:5px"><div class="ytSearchboxComponentHost" style="height:40px"><form class="ytSearchboxComponentSearchForm" style="position:relative;height:40px;margin-top:4px" action="/results">
-      <div class="ytSearchboxComponentInputBox"><div class="ytSearchboxComponentInputContainer" style="height:100%;flex:1"><input id="search" type="search" name="search_query" style="margin-top:3px"></div></div>
-      <button type="button" id="keyboard" style="width:32px;height:32px"><svg width="16" height="16"><rect width="16" height="10"/></svg></button>
-      <button type="button" id="clear" style="width:32px;height:32px">×</button>
+      <div class="ytSearchboxComponentInputBox"><input id="search" type="search" name="search_query"></div>
       </form></div></yt-searchbox>'''
     header = MASTHEAD.replace(legacy,modern).replace('<div id="center">','<div id="center" style="height:40px;align-items:flex-start">')
     page = setup(browser,'/results?search_query=alignment','<ytd-app>'+header+'</ytd-app>',width=width)
-    page.locator('#search').fill('mr beast')
+    own = page.locator('#myt-masthead .myt-masthead-query')
+    # The field shows the current query; native offsets cannot move it.
+    expect(own).to_have_value('alignment')
+    own.fill('mr beast')
     centered_header(page)
-    field = page.locator('.ytSearchboxComponentSearchForm').bounding_box()
-    text = page.locator('#search').bounding_box()
+    field = page.locator('#myt-masthead .myt-masthead-search').bounding_box()
+    text = own.bounding_box()
     assert abs(field['y'] + field['height']/2 - text['y'] - text['height']/2) < 1, (field,text)
-    page.locator('#logo').focus()
+    assert abs(field['height'] - 44) < 1, field
     png=page.screenshot(animations='disabled')
     ink=page.evaluate("""async data => {
       const image=await createImageBitmap(await (await fetch('data:image/png;base64,'+data.png)).blob());
@@ -535,20 +529,18 @@ def check_header_alignment_and_anonymous_icons(browser, width):
       return {min:Math.min(...ys),max:Math.max(...ys)};
     }""",{'png':base64.b64encode(png).decode(),'field':field,'text':text})
     assert abs((ink['min']+ink['max'])/2-field['y']-field['height']/2)<3, (field,ink)
-    page.locator('#search').focus()
+    # YouTube's own searchbox and any icon it mounts stay hidden.
     page.locator('.ytSearchboxComponentSearchForm').evaluate("""form => {
       form.insertAdjacentHTML('afterbegin','<span data-anonymous-icon style="position:absolute;left:14px;top:10px"><svg width="24" height="24"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg></span>');
     }""")
-    expect(page.locator('[data-anonymous-icon] svg')).to_be_hidden()
-    expect(page.locator('#keyboard svg')).to_be_visible()
-    expect(page.locator('#clear')).to_be_visible()
-    page.locator('#search').press('Control+a')
     expect(page.locator('[data-anonymous-icon] svg')).to_be_hidden()
     page.evaluate('__setEnabled(false)')
     expect(page.locator('[data-anonymous-icon] svg')).to_be_visible()
     page.evaluate('__setEnabled(true)')
     expect(page.locator('[data-anonymous-icon] svg')).to_be_hidden()
-    page.locator('#search').press('Enter')
+    expect(own).to_have_value('alignment')
+    own.fill('mr beast')
+    own.press('Enter')
     page.wait_for_url('**/results?**')
     assert parse_qs(urlparse(page.url).query)['search_query']==['mr beast']
     page.close()
@@ -2547,7 +2539,7 @@ def main():
         banner = page.locator("#banner").bounding_box()
         assert banner["x"] == 0 and banner["width"] == 1440, banner
         assert page.locator("#banner-image").bounding_box()["width"] == 1440
-        assert page.locator("#profile-avatar").bounding_box()["width"] == 160, "Avatar must keep its own size"
+        assert page.locator("#profile-avatar").bounding_box()["width"] == 240, "Avatar is one and a half times its native size"
         centered(page, "#channel-header-container")
         centered(page, "#tabs")
         assert page.locator("#channel-header-container").bounding_box()["width"] <= 1280
@@ -2558,8 +2550,10 @@ def main():
         columns = page.locator("#channel-grid").evaluate("element => parseInt(getComputedStyle(element).getPropertyValue('--ytd-rich-grid-items-per-row'))")
         assert columns == 3, columns
         centered_header(page)
-        for selector in ["#logo", "#search"]:
+        for selector in ["#myt-masthead .myt-masthead-link", "#myt-masthead .myt-masthead-query"]:
             expect(page.locator(selector)).to_be_visible()
+        for selector in ["#logo", "#search"]:
+            expect(page.locator(selector)).to_be_hidden()
         for selector in ["#create", "#avatar-btn", "#voice-search-button"]:
             expect(page.locator(selector)).to_be_hidden()
         ok("channel banner fills the viewport while profile/avatar, rounded tabs and spaced cards keep centered dimensions")
@@ -2569,7 +2563,7 @@ def main():
         page = setup(browser, "/@creator/videos", modern_channel)
         modern_banner = page.locator("#modern-channel-banner").bounding_box()
         assert modern_banner["x"] == 0 and modern_banner["width"] == 1440, modern_banner
-        assert page.locator("#profile-avatar").bounding_box()["width"] == 160
+        assert page.locator("#profile-avatar").bounding_box()["width"] == 240
         ok("modern image-banner component also spans the channel width without resizing the avatar")
         page.close()
 
@@ -2649,16 +2643,16 @@ def main():
         for path in ["/watch?v=header", "/results?search_query=header", "/@creator/videos", "/feed/subscriptions"]:
             page = setup(browser, path, '<ytd-app>' + MASTHEAD + '<ytd-page-manager class="ytd-app"><ytd-browse>Native content</ytd-browse></ytd-page-manager></ytd-app>', watch_ui=False)
             centered_header(page)
-            page.locator('#logo').focus()
-            assert page.locator('#logo').evaluate('element => getComputedStyle(element).outlineStyle') == 'none'
+            page.locator('#myt-masthead .myt-masthead-link').focus()
+            assert page.locator('#myt-masthead .myt-masthead-link').evaluate('element => getComputedStyle(element).outlineStyle') == 'none'
             expect(page.locator("#create")).to_be_hidden()
             expect(page.locator("#avatar-btn")).to_be_hidden()
-            page.locator("#search").fill("кот & C++")
-            expect(page.locator("#search-icon-legacy")).to_be_hidden()
-            page.locator("#search").press("Enter")
+            page.locator('#myt-masthead .myt-masthead-query').fill("кот & C++")
+            expect(page.locator("#search")).to_be_hidden()
+            page.locator('#myt-masthead .myt-masthead-query').press("Enter")
             page.wait_for_url("**/results?**")
             assert parse_qs(urlparse(page.url).query)["search_query"] == ["кот & C++"], page.url
-            ok(f"logo and functional native search stay centered together on {path.split('?')[0]}")
+            ok(f"logo and functional owned search stay centered together on {path.split('?')[0]}")
             page.close()
 
         legacy_searchbox = MASTHEAD[MASTHEAD.index('<ytd-searchbox>'):MASTHEAD.index('</ytd-searchbox>') + len('</ytd-searchbox>')]
@@ -2666,12 +2660,12 @@ def main():
         modern_header = MASTHEAD.replace(legacy_searchbox, modern_searchbox)
         page = setup(browser, "/results?search_query=modern", '<ytd-app>' + modern_header + '<ytd-page-manager class="ytd-app"><ytd-search>Modern results</ytd-search></ytd-page-manager></ytd-app>')
         centered_header(page)
-        page.locator("#search").fill("modern & search")
+        page.locator('#myt-masthead .myt-masthead-query').fill("modern & search")
         expect(page.locator(".ytSearchboxComponentSearchButton")).to_be_hidden()
-        page.locator("#search").press("Enter")
+        page.locator('#myt-masthead .myt-masthead-query').press("Enter")
         page.wait_for_url("**/results?**")
         assert parse_qs(urlparse(page.url).query)["search_query"] == ["modern & search"]
-        ok("modern native searchbox keeps its visible logo/form group centered and submits normally")
+        ok("owned header replaces the modern native searchbox, stays centered and submits normally")
         page.close()
 
         for variant, header in [('legacy', MASTHEAD), ('modern', modern_header)]:
@@ -2682,21 +2676,24 @@ def main():
                 holder = '#search-input' if variant == 'legacy' else '.ytSearchboxComponentInputBox'
                 page.locator(holder).evaluate("(element, fixture) => { element.style.position='relative'; element.insertAdjacentHTML('afterbegin', fixture); }", f'<span id="{icon_id}" class="{icon_class}" data-fixture-leading style="position:absolute;left:0;top:0;width:24px;height:24px"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="10" cy="10" r="7"/></svg></span>')
                 expect(page.locator('[data-fixture-leading]')).to_be_hidden()
-                expect(page.locator('.myt-masthead-brand')).to_have_count(1)
+                expect(page.locator('#myt-masthead .myt-masthead-brand')).to_have_count(1)
                 expect(page.locator('#logo-icon')).to_be_hidden()
-                assert page.locator('.myt-masthead-brand .myt-home__mark').inner_html() == home_mark
-                assert page.locator('.myt-masthead-brand .myt-home__wordmark').text_content() == home_wordmark
+                assert page.locator('#myt-masthead .myt-masthead-brand .myt-home__mark').inner_html() == home_mark
+                assert page.locator('#myt-masthead .myt-masthead-brand .myt-home__wordmark').text_content() == home_wordmark
                 centered_header(page)
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Header must fit narrow screens'
-                page.locator('#search').fill('Савельев Сергей & C++')
-                expect(page.locator('#search')).to_have_value('Савельев Сергей & C++')
+                page.locator('#myt-masthead .myt-masthead-query').fill('Савельев Сергей & C++')
+                expect(page.locator('#myt-masthead .myt-masthead-query')).to_have_value('Савельев Сергей & C++')
                 submit = page.locator('#search-icon-legacy' if variant == 'legacy' else '.ytSearchboxComponentSearchButton')
                 expect(submit).to_be_hidden()
                 page.evaluate('__setEnabled(false)')
                 expect(submit).to_be_visible()
                 page.evaluate('__setEnabled(true)')
                 expect(submit).to_be_hidden()
-                page.locator('#search').press('Enter')
+                # A recreated header shows the page's query; type the new one again.
+                expect(page.locator('#myt-masthead .myt-masthead-query')).to_have_value('icon')
+                page.locator('#myt-masthead .myt-masthead-query').fill('Савельев Сергей & C++')
+                page.locator('#myt-masthead .myt-masthead-query').press('Enter')
                 page.wait_for_url('**/results?**')
                 assert parse_qs(urlparse(page.url).query)['search_query'] == ['Савельев Сергей & C++']
                 ok(f'{variant} search at {width}px removes all search magnifiers, restores native buttons on disable and submits with Enter')
@@ -2709,18 +2706,18 @@ def main():
 
         page = setup(browser, '/results?search_query=brand', '<ytd-app>' + MASTHEAD + '<ytd-page-manager class="ytd-app"><ytd-search>Results</ytd-search></ytd-page-manager></ytd-app>')
         page.locator('#logo').evaluate("element => element.innerHTML = '<span id=logo-icon><svg viewBox=\"0 0 90 20\"><rect width=90 height=20/></svg></span>'")
-        expect(page.locator('.myt-masthead-brand')).to_have_count(1)
+        expect(page.locator('#logo .myt-masthead-brand')).to_have_count(1)
         expect(page.locator('#logo-icon')).to_be_hidden()
         page.locator('#logo').evaluate("element => element.append(element.querySelector('.myt-masthead-brand').cloneNode(true))")
-        expect(page.locator('.myt-masthead-brand')).to_have_count(1)
+        expect(page.locator('#logo .myt-masthead-brand')).to_have_count(1)
         assert_stable(page)
         page.evaluate('__setEnabled(false)')
         expect(page.locator('.myt-masthead-brand')).to_have_count(0)
         expect(page.locator('#logo-icon')).to_be_visible()
         expect(page.locator('#logo')).to_have_attribute('href', '/')
         page.evaluate('__setEnabled(true)')
-        expect(page.locator('.myt-masthead-brand')).to_have_count(1)
-        page.locator('#logo').click()
+        expect(page.locator('#logo .myt-masthead-brand')).to_have_count(1)
+        page.locator('#myt-masthead .myt-masthead-link').click()
         page.wait_for_url('https://www.youtube.com/')
         ok('homepage-style masthead brand repairs native rerenders without duplicates, restores native logo on disable and keeps its home link')
         page.close()
@@ -2836,8 +2833,8 @@ def main():
         expect(page.locator("#video-votes")).to_be_hidden()
         expect(page.locator("#share")).to_be_visible()
         expect(page.locator("#save")).to_be_visible()
-        expect(page.locator("#logo")).to_be_visible()
-        expect(page.locator("#search")).to_be_visible()
+        expect(page.locator("#myt-masthead .myt-masthead-link")).to_be_visible()
+        expect(page.locator("#myt-masthead .myt-masthead-query")).to_be_visible()
         expect(page.locator("#create")).to_be_hidden()
         expect(page.locator("#avatar-btn")).to_be_hidden()
         expect(page.locator("#voice-search-button")).to_be_hidden()
