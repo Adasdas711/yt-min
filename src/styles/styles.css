@@ -1751,6 +1751,16 @@ html.minimal-youtube [data-myt-playlist-list] > #contents {
     flex-direction: column !important; grid-template-columns: minmax(0,1fr) !important; gap: 0 !important;
     width: 100% !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important;
 }
+/* Page data mode: owned rows replace the native list's content. */
+html.minimal-youtube [data-myt-playlist-list][data-myt-playlist-data] > :not(#myt-playlist-rows) { display: none !important; }
+html.minimal-youtube #myt-playlist-rows { display: block; width: 100%; min-width: 0; }
+html.minimal-youtube #myt-playlist-rows > .myt-playlist-items > [data-myt-owned-playlist-card] { margin: 0 0 12px; }
+html.minimal-youtube #myt-playlist-rows > .myt-playlist-items > [aria-busy="true"] { opacity: .5; pointer-events: none; }
+html.minimal-youtube #myt-playlist-rows > .myt-playlist-more { height: 1px; }
+html.minimal-youtube #myt-playlist-rows > .myt-playlist-empty { margin: 48px 0; text-align: center; color: var(--myt-muted); font: 600 18px/1.4 Arial, sans-serif; }
+html.minimal-youtube #myt-playlist-rows > .myt-playlist-empty[hidden] { display: none; }
+html.minimal-youtube #myt-playlist-rows > .myt-playlist-status { margin: 0; color: var(--myt-muted); font: 14px/1.5 Arial, sans-serif; }
+html.minimal-youtube #myt-playlist-rows > .myt-playlist-status:empty { display: none; }
 html.minimal-youtube [data-myt-playlist-row] {
     display: block !important; box-sizing: border-box; position: relative !important; inset: auto !important;
     width: 100% !important; min-width: 0 !important; max-width: none !important;

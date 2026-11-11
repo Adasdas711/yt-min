@@ -655,6 +655,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             this.host.remove();this.cards.clear();this.channels.clear();this.sources.clear();
         }
     }
+    Search.publishedLabel=publishedLabel;
     Search.playlistSelector=playlistSelector;Search.filterScopeSelector=filterScopeSelector;
     globalThis.MinimalYouTubeSearch=Search;
 })();

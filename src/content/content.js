@@ -772,7 +772,7 @@
     });
 
     function channelBrowse() {
-        return [...document.querySelectorAll('ytd-browse')].find(el=>!el.closest('[hidden],[aria-hidden="true"]')&&getComputedStyle(el).display!=='none'&&(el.getAttribute('page-subtype')==='channels'||el.querySelector('yt-page-header-view-model,yt-page-header-renderer,ytd-page-header-renderer,ytd-c4-tabbed-header-renderer,#myt-channel-nav')));
+        return [...document.querySelectorAll('ytd-browse')].find(el=>!el.closest('[hidden],[aria-hidden="true"]')&&getComputedStyle(el).display!=='none'&&(el.getAttribute('page-subtype')==='channels'||!el.getAttribute('page-subtype')&&el.querySelector('yt-page-header-view-model,yt-page-header-renderer,ytd-page-header-renderer,ytd-c4-tabbed-header-renderer,#myt-channel-nav')));
     }
 
     function syncChannel() {
@@ -1278,7 +1278,9 @@
                 const owned = node.closest('[data-myt-playlist-source-summary]');
                 for (let parent = node; parent && parent !== document.body; parent = parent.parentElement) {
                     const style = getComputedStyle(parent);
-                    if (style.display === "none" || (!owned && style.visibility === "hidden")) return false;
+                    // The channel paint guard hides pages only while a channel
+                    // loads; the outgoing playlist keeps its layout meanwhile.
+                    if (style.display === "none" || (!owned && style.visibility === "hidden" && !root.hasAttribute("data-myt-channel-boot"))) return false;
                 }
                 return true;
             };
