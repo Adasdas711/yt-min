@@ -1795,7 +1795,9 @@ html.minimal-youtube [data-myt-channel-tab-hidden] { display: none !important; }
    YouTube renames; every other header line spans the full width below. */
 html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#page-header, #header, yt-page-header-view-model, yt-page-header-renderer, ytd-page-header-renderer, ytd-c4-tabbed-header-renderer) :has(> :is(h1, ytd-channel-name, :has(h1), :has(ytd-channel-name)):not(:is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"]))):has(> :is(yt-flexible-actions-view-model, ytd-subscribe-button-renderer, yt-subscribe-button-view-model, #buttons, [class*="flexible-actions"], [class*="FlexibleActions"])) {
     display: grid !important;
-    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+    /* Name and button size the first two columns; full-width lines span a
+       flexible third one, so they never widen the name or button column. */
+    grid-template-columns: minmax(0, max-content) auto minmax(0, 1fr);
     column-gap: 24px;
     align-items: center;
 }

@@ -678,7 +678,7 @@
         own.innerHTML = `<a class="myt-masthead-link" href="/" aria-label="YouTube"><span class="myt-masthead-brand">${brandMarkup}</span></a>` +
             '<form class="myt-masthead-search" role="search" action="/results" method="get" accept-charset="UTF-8">' +
             '<input class="myt-masthead-query" name="search_query" type="search" placeholder="Search" aria-label="Search" autocomplete="off" spellcheck="false">' +
-            '<button class="myt-masthead-clear" type="button" aria-label="Clear" hidden>×</button></form>';
+            '<button class="myt-masthead-clear" type="button" aria-label="Clear" tabindex="-1" hidden>×</button></form>';
         const form = own.querySelector("form"), input = own.querySelector("input"), clear = own.querySelector("button");
         input.addEventListener("input", () => { clear.hidden = !input.value; });
         input.addEventListener("keydown", event => {
