@@ -216,7 +216,19 @@
       :host([data-channel]) .media.playlist{display:flex;flex-direction:column;gap:14px;padding-bottom:18px}:host([data-channel]) .media.playlist .media-title{font-size:18px}
       /* Keep 20px gaps fixed while reducing channel column widths by 15%. */
       :host([data-channel]) :is(.row,.results-heading){width:calc(85% + (var(--myt-columns,1) - 1)*3px);margin-inline:auto}
-      .empty{padding:32px 0;color:var(--myt-muted)}.more{height:1px}@media(max-width:700px){.channels{grid-template-columns:1fr}.media-title{font-size:18px}.media.video .media-title{font-size:16px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}:host([data-channel]) .row{width:calc(85% + (var(--myt-columns,1) - 1)*2.4px)}}
+      .empty{padding:32px 0;color:var(--myt-muted)}.more{height:1px}
+      .chips{display:flex;flex-wrap:wrap;gap:12px;margin:0 auto 24px}.chips[hidden]{display:none}:host([data-channel]) .chips{width:calc(85% + (var(--myt-columns,1) - 1)*3px)}
+      .chip{height:32px;margin:0;padding:0 12px;border:0;border-radius:8px;background:var(--myt-soft);color:var(--myt-ink);font:500 14px/32px Roboto,Arial,sans-serif;cursor:pointer}
+      .chip:hover{filter:brightness(1.15)}.chip[aria-pressed="true"]{background:var(--myt-ink);color:var(--myt-bg)}.chip:focus-visible{outline:2px solid var(--myt-muted);outline-offset:2px}
+      .post{display:block;box-sizing:border-box;width:min(720px,100%);margin:0 auto 20px;padding:20px;border:1px solid var(--myt-border);border-radius:18px;background:var(--myt-surface);color:var(--myt-ink);font:400 15px/1.55 Roboto,Arial,sans-serif}
+      .post-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}.post-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:none;background:var(--myt-soft)}
+      .post-author{display:block;font-weight:600}.post-time{color:var(--myt-muted);font-size:13px;text-decoration:none}.post-time:hover{text-decoration:underline}
+      .post-text{margin:0 0 12px;white-space:pre-wrap;overflow-wrap:anywhere}.post-text:empty{display:none}
+      .post-images{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:12px}.post-images img{display:block;width:100%;max-height:560px;object-fit:cover;border-radius:12px;background:var(--myt-soft)}
+      .post-media{display:grid;grid-template-columns:minmax(0,200px) minmax(0,1fr);gap:14px;align-items:center;margin-bottom:12px;color:inherit;text-decoration:none}.post-media img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:10px;background:var(--myt-soft)}.post-media span{font-weight:600;overflow-wrap:anywhere}
+      .post-poll{display:grid;gap:8px;margin:0 0 8px;padding:0;list-style:none}.post-poll li{padding:10px 14px;border:1px solid var(--myt-border);border-radius:10px}
+      .post-meta{display:flex;flex-wrap:wrap;gap:16px;color:var(--myt-muted);font-size:13px}.post-meta:empty{display:none}
+      @media(max-width:600px){.post{padding:16px}.post-media{grid-template-columns:1fr}}@media(max-width:700px){.channels{grid-template-columns:1fr}.media-title{font-size:18px}.media.video .media-title{font-size:16px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}:host([data-channel]) .row{width:calc(85% + (var(--myt-columns,1) - 1)*2.4px)}}
     `;
     class MediaCard{
         constructor(source,kind){
@@ -244,6 +256,32 @@
         }
         destroy(){this.host.remove();}
     }
+    // A channel post in the owned design: public text, images, attachments and
+    // counts. Likes, poll votes and comments are not account actions here.
+    class PostCard{
+        constructor(){this.host=node('article','post');this.host.dataset.kind='post';}
+        update(data){
+            const signature=JSON.stringify(data);if(this.signature===signature)return;this.signature=signature;
+            this.host.dataset.href=data.href||'';
+            const head=node('div','post-head'),who=node('div','post-who');
+            const avatar=safeURL(data.avatar);if(avatar){const image=node('img','post-avatar');image.alt='';image.decoding='async';image.loading='lazy';image.src=avatar.href;head.append(image);}
+            who.append(node('span','post-author',data.author||''));
+            const time=node(data.href?'a':'span','post-time',data.published||'');if(data.href&&safeURL(data.href))time.href=safeURL(data.href).href;who.append(time);head.append(who);
+            const parts=[head,node('p','post-text',data.text||'')];
+            const images=(data.images||[]).map(safeURL).filter(Boolean);
+            if(images.length){const grid=node('div','post-images');for(const url of images){const image=node('img');image.alt='';image.decoding='async';image.loading='lazy';image.src=url.href;grid.append(image);}parts.push(grid);}
+            const media=data.media&&safeURL(data.media.href);
+            if(media){const link=node('a','post-media');link.href=media.href;const cover=safeURL(data.media.image);if(cover){const image=node('img');image.alt='';image.decoding='async';image.loading='lazy';image.src=cover.href;link.append(image);}link.append(node('span','',data.media.title||''));parts.push(link);}
+            if(data.poll?.choices?.length){const list=node('ul','post-poll');for(const choice of data.poll.choices)list.append(node('li','',choice));parts.push(list);}
+            const meta=node('div','post-meta');
+            if(data.poll?.votes)meta.append(node('span','',data.poll.votes));
+            if(data.likes)meta.append(node('span','',data.likes+' likes'));
+            if(data.comments)meta.append(node('span','',/\d/.test(data.comments)?data.comments+' comments':data.comments));
+            parts.push(meta);this.host.replaceChildren(...parts);
+        }
+        destroy(){this.host.remove();}
+    }
+    const chipLabels=new Map([['новые','Latest'],['популярные','Popular'],['старые','Oldest'],['latest','Latest'],['popular','Popular'],['oldest','Oldest'],['neueste','Latest'],['beliebt','Popular'],['älteste','Oldest']]);
     // Install native-page isolation with the renderer itself. Updating the
     // renderer cannot leave an older CSS asset painting a second search UI.
     const nativeStyles=`/* Search owns result cards. Native filter controls and pagination keep
@@ -282,6 +320,7 @@ html.minimal-youtube[data-myt-search-ui]:not([data-myt-page-data]) ytd-search yt
 html.minimal-youtube[data-myt-search-ui]:not([data-myt-page-data]) ytd-search ytd-rich-grid-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) [data-myt-search-layout-path] {
     display:block !important;position:static !important;width:100% !important;height:2px !important;margin:0 !important;padding:0 !important;overflow:hidden !important;
 }
+html.minimal-youtube[data-myt-search-ui][data-myt-own-chips] ytd-search :is(ytd-feed-filter-chip-bar-renderer, yt-chip-cloud-renderer) { display:none !important; }
 html.minimal-youtube[data-myt-search-ui][data-myt-page-data] ytd-search ytd-continuation-item-renderer,
 html.minimal-youtube[data-myt-search-ui][data-myt-page-data] ytd-search ytd-continuation-item-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) { display:none !important; }
 html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) {
@@ -300,7 +339,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             this.nativeStyle=node('style');this.nativeStyle.id='myt-search-native-style';this.nativeStyle.textContent=channel?nativeStyles.replaceAll('ytd-search','[data-myt-channel-results]'):nativeStyles;document.documentElement.append(this.nativeStyle);
             this.cards=new Map();this.channels=new Map();this.groups=new Map();this.sources=new Map();this.virtualSources=new Map();this.sequence=0;this.nativeNodes=new Set();this.filterText=new Map();this.filterAttributes=new Map();
             this.host=node('div');this.host.id='myt-search';this.host.lang='en';if(channel)this.host.dataset.channel='';this.shadow=this.host.attachShadow({mode:'open'});
-            this.shadow.innerHTML='<style>'+styles+'</style><h2 class="results-heading" lang="ru" hidden>Результаты поиска</h2><div class="channels" aria-label="Channels"></div><div class="stream"></div><p class="empty" hidden>No results found.</p><div class="more" aria-hidden="true"></div>';
+            this.shadow.innerHTML='<style>'+styles+'</style><h2 class="results-heading" lang="ru" hidden>Результаты поиска</h2><div class="channels" aria-label="Channels"></div><div class="chips" role="group" aria-label="Sort" hidden></div><div class="stream"></div><p class="empty" hidden>No results found.</p><div class="more" aria-hidden="true"></div>';
             this.q=selector=>this.shadow.querySelector(selector);
             this.resize=new ResizeObserver(()=>this.layout());this.resize.observe(this.host);
             // Page data loads further results itself; this sentinel replaces
@@ -454,6 +493,10 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
                     let card=this.channels.get(source);if(!card){card=new ChannelCard(source,()=>this.queue(),this.q('.channels'));this.channels.set(source,card);}card.update(channelCache,record||null);continue;
                 }
                 this.channels.get(source)?.destroy();this.channels.delete(source);
+                if(kind==='post'){
+                    let card=this.cards.get(source);if(card&&!(card instanceof PostCard)){card.destroy();card=null;}
+                    if(!card){card=new PostCard();this.cards.set(source,card);}card.update(record);stream.push(card);continue;
+                }
                 const value=this.read(source,kind,record);if(!value)continue;
                 let card=this.cards.get(source);if(card&&card.host.dataset.kind!==kind){card.destroy();card=null;}if(!card){card=new MediaCard(source,kind);this.cards.set(source,card);}card.record=record;card.update(value);
                 const dataGroup=dataRecords.get(source)?.group||'';
@@ -478,14 +521,29 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             this.q('.results-heading').hidden=!query||blank;this.q('.stream').hidden=blank;
             const busy=this.channel&&document.querySelector('#myt-channel-nav')?.getAttribute('aria-busy')==='true';
             const confirmedEmpty=this.channel&&(model?!model.items.length&&!model.more&&!model.loading:[...search.querySelectorAll('ytd-message-renderer,yt-message-view-model,ytd-background-promo-renderer')].some(node=>nativeAvailable(node,search)));
-            this.q('.empty').textContent=this.channel&&!query?(/\/playlists\/?$/.test(url.pathname)?'No playlists yet.':'No videos yet.'):'No results found.';
+            this.q('.empty').textContent=this.channel&&!query?(/\/playlists\/?$/.test(url.pathname)?'No playlists yet.':/\/(?:posts|community)\/?$/.test(url.pathname)?'No posts yet.':'No videos yet.'):'No results found.';
+            this.renderChips(model);
             this.q('.channels').hidden=!this.channels.size||blank;this.q('.empty').hidden=Boolean(blank||this.channels.size||stream.length||busy||this.channel&&!query&&!confirmedEmpty);
             this.prepareNative(search);this.translateFilters();this.layout();this.requestMore();
         }
         pageModel(){
             document.dispatchEvent(new Event('minimal-youtube:page-model'));
             let model=null;try{model=JSON.parse(document.documentElement.getAttribute('data-myt-page-model')||'null');}catch{}
-            return model&&Array.isArray(model.items)&&model.type===(this.channel?'channel':'search')?model:null;
+            return model&&Array.isArray(model.items)&&(this.channel?['channel','posts'].includes(model.type):model.type==='search')?model:null;
+        }
+        renderChips(model){
+            const bar=this.q('.chips'),chips=this.channel&&Array.isArray(model?.chips)?model.chips:[];
+            const signature=JSON.stringify(chips);
+            if(bar.dataset.value!==signature){
+                bar.dataset.value=signature;
+                bar.replaceChildren(...chips.map((chip,index)=>{
+                    const button=node('button','chip',chipLabels.get(String(chip.label).toLocaleLowerCase())||chip.label);button.type='button';
+                    button.setAttribute('aria-pressed',String(Boolean(chip.selected)));
+                    button.addEventListener('click',()=>{document.documentElement.setAttribute('data-myt-page-model-chip',String(index));document.dispatchEvent(new Event('minimal-youtube:page-model-chip'));});
+                    return button;
+                }));
+            }
+            bar.hidden=!chips.length;document.documentElement.toggleAttribute('data-myt-own-chips',chips.length>0);
         }
         dataGroup(label){
             this.dataGroups ||=new Map();
@@ -539,7 +597,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             container.dataset.layout=signature;let row=null,used=0,content=[];
             const flush=()=>{if(!row)return;row.style.gridTemplateColumns='repeat('+columns+',minmax(0,1fr))';if(this.channel)row.style.setProperty('--myt-columns',String(columns));content.push(row);row=null;used=0;};
             for(const item of items){
-                if(item.items){flush();content.push(item.host);continue;}
+                if(item.items||item.host.dataset.kind==='post'){flush();content.push(item.host);continue;}
                 const units=Math.min(columns,!this.channel&&item.host.dataset.kind==='playlist'?2:1);
                 if(row&&used+units>columns)flush();
                 if(!row)row=node('div','row');item.host.style.gridColumn='span '+units;row.append(item.host);used+=units;
@@ -557,7 +615,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             cancelAnimationFrame(this.cardFrame);this.pendingCards?.clear();
             cancelAnimationFrame(this.frame);this.observer.disconnect();this.resize.disconnect();this.search?.removeEventListener('load',this.changed,true);
             document.removeEventListener('yt-page-data-updated',this.changed);document.removeEventListener('yt-rendererstamper-finished',this.changed);
-            document.removeEventListener('minimal-youtube:page-model-updated',this.modelChanged);this.moreObserver.disconnect();document.documentElement.removeAttribute('data-myt-page-data');
+            document.removeEventListener('minimal-youtube:page-model-updated',this.modelChanged);this.moreObserver.disconnect();document.documentElement.removeAttribute('data-myt-page-data');document.documentElement.removeAttribute('data-myt-own-chips');
             for(const card of [...this.cards.values(),...this.channels.values()])card.destroy();
             for(const source of this.sources.keys()){source.removeAttribute('data-myt-search-source-key');source.removeAttribute('data-myt-search-source-kind');}
             this.restoreNative();

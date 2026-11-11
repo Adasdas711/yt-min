@@ -34,7 +34,7 @@ if __name__ == '__main__':
             expect(page.locator('#myt-channel-nav').get_by_role('link',name='Videos',exact=True)).to_be_visible()
             page.locator('#subscribe').click()
             expect(page.locator('#subscribe')).to_have_text('Subscribed')
-            assert page.locator('h1').evaluate("e=>getComputedStyle(e).fontStyle")=='italic'
+            assert page.locator('#myt-channel-header h1').evaluate("e=>getComputedStyle(e).fontStyle")=='italic'
             assert 'Mono' in page.locator('#myt-channel-description .summary').evaluate("e=>getComputedStyle(e).fontFamily")
             result=page.locator('#myt-search').evaluate('''host=>{const q=s=>host.shadowRoot.querySelector(s),a=q('.video').getBoundingClientRect(),b=q('.playlist').getBoundingClientRect();return {video:a.width,playlist:b.width,display:getComputedStyle(q('.playlist')).display,width:host.getBoundingClientRect().width}}''')
             assert abs(result['video']-result['playlist'])<2,result

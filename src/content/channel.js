@@ -376,6 +376,65 @@
         }
         url(section,query){const url=new URL(this.base+'/'+section,location.origin);url.searchParams.set('hl','en');url.searchParams.set('persist_hl','1');if(query)url.searchParams.set('query',query);return url.href;}
         hide(node){if(node&&!this.hidden.has(node)){node.setAttribute('data-myt-channel-source','');this.hidden.add(node);}}
+        // The owned channel header: banner, avatar, name, verified badge,
+        // stats and description in the extension's design. YouTube's own
+        // subscribe control is the only native part; it moves into the
+        // header's action slot with its own handlers and returns on disable.
+        headerPart(selector){
+            if(!this.header){
+                this.header=document.createElement('div');this.header.id='myt-channel-header';this.header.lang='en';
+                this.header.innerHTML='<div class="myt-ch-banner" hidden><img alt="" decoding="async"></div><div class="myt-ch-profile"><img class="myt-ch-avatar" alt="" decoding="async" hidden><div class="myt-ch-info"><div class="myt-ch-title-row"><h1 class="myt-ch-title"><span class="myt-ch-name"></span><svg class="myt-ch-verified" viewBox="0 0 24 24" role="img" aria-label="Verified" hidden><circle cx="12" cy="12" r="11" fill="currentColor"/><path d="m7 12.4 3.2 3.2L17.2 8.6" fill="none" stroke="var(--myt-bg,#101012)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></h1><div class="myt-ch-actions"></div></div></div></div>';
+            }
+            return selector?this.header.querySelector(selector):this.header;
+        }
+        ownHeader(header){
+            const root=header&&this.browse?.querySelector(':scope > #header,:scope > #page-header')||header;
+            if(!root){this.restoreSubscribe();this.header?.remove();return;}
+            const own=this.headerPart();
+            if(own.parentElement!==root||root.firstElementChild!==own)root.prepend(own);
+            const native=selector=>[...root.querySelectorAll(selector)].filter(node=>!own.contains(node));
+            // Public identity from the page data; the native header is the fallback.
+            document.dispatchEvent(new Event('minimal-youtube:channel-identity'));
+            let data={};try{data=JSON.parse(document.documentElement.getAttribute('data-myt-channel-identity')||'{}');}catch{}
+            if(data.base!==this.base.toLowerCase())data={};
+            const title=native('h1,ytd-channel-name #text,#channel-name #text')[0];
+            const avatarImage=native(':is(yt-decorated-avatar-view-model,yt-avatar-shape,#avatar) img,img#avatar,img[id*="avatar"]')[0];
+            const bannerImage=native(':is(yt-image-banner-view-model,ytd-banner-header-renderer,#banner,#page-header-banner,#channel-header-banner,.page-header-banner) img')[0];
+            const name=(data.title||title?.textContent||'').replace(/\s+/g,' ').trim();
+            // Nothing identifies a channel yet: keep the native header as is.
+            if(!name){this.restoreSubscribe();own.remove();return;}
+            const verified=data.verified??native('[aria-label*="verified" i],[aria-label*="подтвержд" i],.badge-style-type-verified,ytd-badge-supported-renderer [class*="verified" i]').length>0;
+            const image=value=>{if(typeof value!=='string'||!value.trim())return '';if(/^data:image\//i.test(value))return value;try{const url=new URL(value,location.href);return /^https?:$/.test(url.protocol)?url.href:'';}catch{return '';}};
+            const avatar=image(data.avatar||avatarImage?.currentSrc||avatarImage?.src||''),banner=image(data.banner||bannerImage?.currentSrc||bannerImage?.src||'');
+            const nameNode=this.headerPart('.myt-ch-name');if(nameNode.textContent!==name){nameNode.textContent=name;globalThis.MinimalYouTubeWatch?.loadTitleFonts?.(name);}
+            this.headerPart('.myt-ch-verified').toggleAttribute('hidden',!verified);
+            const avatarNode=this.headerPart('.myt-ch-avatar');if(avatar&&avatarNode.getAttribute('src')!==avatar)avatarNode.src=avatar;avatarNode.hidden=!avatar;avatarNode.alt=name;
+            const bannerNode=this.headerPart('.myt-ch-banner');if(banner&&bannerNode.firstElementChild.getAttribute('src')!==banner)bannerNode.firstElementChild.src=banner;bannerNode.hidden=!banner;
+            // Move YouTube's current subscribe control into the action slot.
+            const subscribeSelector='ytd-subscribe-button-renderer,yt-subscribe-button-view-model,#subscribe-button,#subscribe';
+            const subscribe=native(subscribeSelector).find(node=>!node.parentElement.closest(subscribeSelector));
+            const slot=this.headerPart('.myt-ch-actions');
+            if(subscribe&&subscribe!==this.subscribe?.node){
+                this.restoreSubscribe();
+                this.subscribe={node:subscribe,parent:subscribe.parentElement,next:subscribe.nextSibling};
+                slot.append(subscribe);
+            }
+            // Hide the native profile (its name, avatar, metadata, description,
+            // links and other actions) and banners; tabs stay separate.
+            for(const node of native(':is(yt-image-banner-view-model,ytd-banner-header-renderer,#banner,#page-header-banner,#channel-header-banner,.page-header-banner)'))if(!node.parentElement.closest('yt-image-banner-view-model,ytd-banner-header-renderer,#banner,#page-header-banner,#channel-header-banner,.page-header-banner'))this.hide(node);
+            const avatarNative=native(':is(yt-decorated-avatar-view-model,yt-avatar-shape,#avatar,img[id*="avatar"])')[0];
+            let profile=title||avatarNative;
+            while(profile&&profile!==root&&!(profile.contains(title||profile)&&profile.contains(avatarNative||profile)))profile=profile.parentElement;
+            const keep='#myt-channel-header,#myt-channel-nav,#tabs,#tabs-container,yt-tab-group-shape,tp-yt-paper-tabs';
+            if(profile&&profile!==root&&!profile.matches(keep)&&!profile.querySelector(keep))this.hide(profile);
+            else for(const node of [title?.closest('ytd-channel-name,h1')||title,avatarNative,...native('#buttons,yt-flexible-actions-view-model,[class*="flexible-actions"],[class*="FlexibleActions"]')])if(node&&!node.querySelector(keep))this.hide(node);
+        }
+        restoreSubscribe(){
+            const state=this.subscribe;this.subscribe=null;
+            if(!state||!state.node.isConnected&&!this.header?.contains(state.node))return;
+            if(state.parent.isConnected){try{state.parent.insertBefore(state.node,state.next&&state.next.parentNode===state.parent?state.next:null);}catch{state.node.remove();}}
+            else state.node.remove();
+        }
         sync(browse){
             const match=location.pathname.match(basePattern);if(!match)return;
             if(this.browse!==browse){this.browse?.removeAttribute('data-myt-channel-ready');this.browse?.removeAttribute('data-myt-channel-section');this.browse=browse;}
@@ -386,6 +445,7 @@
             const header=browse.querySelector(':scope > #header,:scope > #page-header,ytd-c4-tabbed-header-renderer,yt-page-header-view-model,yt-page-header-renderer');
             if(header){this.identity(header);this.links(header);}
             this.preview(header);
+            this.ownHeader(header);
             this.navigation(browse,match[2]?.replace(/\/$/,'')||'videos');
             this.about();
             if(this.descriptionDialog.open&&this.nativeAboutOpen()){this.restoreDescriptionFocus=false;this.descriptionDialog.close();}
@@ -454,7 +514,7 @@
                 // fixed heights cannot affect the independent shadow component.
                 let slot=source;
                 while(slot.parentElement&&slot.parentElement!==header&&!slot.parentElement.querySelector(guard))slot=slot.parentElement;
-                if(value||canOpen){if(this.descriptionHost.nextElementSibling!==slot)slot.before(this.descriptionHost);}
+                if(value||canOpen){const anchor=this.stats.parentElement===this.headerPart('.myt-ch-info')?this.stats:this.headerPart('.myt-ch-title-row');if(this.descriptionHost.previousElementSibling!==anchor)anchor.after(this.descriptionHost);}
                 else this.descriptionHost.remove();
                 mark(slot,'source');
                 for(let parent=this.descriptionHost.parentElement;parent&&header.contains(parent);parent=parent.parentElement){mark(parent,'parent');if(parent===header)break;}
@@ -470,7 +530,7 @@
             const videos=values.map(value=>count(value,'videos')).find(Boolean)||'';
             const first=candidates.find(node=>node.matches('yt-content-metadata-view-model,#channel-tagline'))||candidates[0];
             if(first&&(handle||subscribers||videos)){
-                if(this.stats.previousElementSibling!==first)first.after(this.stats);
+                const row=this.headerPart('.myt-ch-title-row');if(this.stats.previousElementSibling!==row)row.after(this.stats);
                 const signature=JSON.stringify([handle,subscribers,videos]);
                 if(this.stats.dataset.value!==signature){
                     this.stats.dataset.value=signature;const row=this.stats.shadowRoot.querySelector('.row');row.replaceChildren();
@@ -677,6 +737,7 @@
             this.releaseDescriptionScroll();
             window.removeEventListener('wheel',this.descriptionWheel,true);window.removeEventListener('touchstart',this.descriptionTouchStart,true);window.removeEventListener('touchmove',this.descriptionTouchMove,true);
             window.removeEventListener('click',this.click,true);window.removeEventListener('auxclick',this.click,true);window.removeEventListener('keydown',this.keydown,true);this.nav.remove();this.stats.remove();this.descriptionHost.remove();
+            this.restoreSubscribe();this.header?.remove();
             for(const node of this.hidden)node.removeAttribute('data-myt-channel-source');this.hidden.clear();
             for(const [node,names]of this.previewNodes)for(const name of names)node.removeAttribute(name);this.previewNodes.clear();
             for(const [node,names]of this.aboutNodes)for(const name of names)node.removeAttribute(name);this.aboutNodes.clear();
