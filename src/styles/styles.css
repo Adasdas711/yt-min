@@ -1860,6 +1860,28 @@ html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-info {
     min-width: 0;
     padding-top: 20px;
 }
+/* The text column keeps the same distance from both window edges: its right
+   margin mirrors the avatar and gap on its left. */
+@media (min-width: 901px) {
+    html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-info {
+        margin-right: calc(var(--myt-ch-avatar) + 40px);
+    }
+}
+/* YouTube positions its channel app header with a script on every scroll
+   (position: fixed plus a transform), which lags behind the page. Make it
+   ordinary page content that the browser scrolls, and drop the space
+   YouTube reserves for it. The tabs stay pinned by the sticky header. */
+html.minimal-youtube[data-myt-page="channel"] ytd-tabbed-page-header tp-yt-app-header:has(#myt-channel-header) {
+    position: relative !important;
+    top: auto !important;
+    right: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    transform: none !important;
+}
+html.minimal-youtube[data-myt-page="channel"] ytd-tabbed-page-header tp-yt-app-header-layout:has(#myt-channel-header) > #wrapper > #contentContainer {
+    padding-top: 0 !important;
+}
 html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-title-row {
     display: grid;
     grid-template-columns: minmax(0, max-content) auto minmax(0, 1fr);
