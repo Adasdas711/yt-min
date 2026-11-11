@@ -388,7 +388,10 @@
             return selector?this.header.querySelector(selector):this.header;
         }
         ownHeader(header){
-            const root=header&&this.browse?.querySelector(':scope > #header,:scope > #page-header')||header;
+            // Live YouTube keeps the profile and tabs in a fixed app header
+            // (ytd-tabbed-page-header). The owned header takes the native
+            // profile's place there, so that layout and its tabs stay intact.
+            const root=header&&(this.browse?.querySelector('ytd-tabbed-page-header #page-header')||this.browse?.querySelector(':scope > #header,:scope > #page-header'))||header;
             if(!root){this.restoreSubscribe();this.header?.remove();return;}
             const own=this.headerPart();
             if(own.parentElement!==root||root.firstElementChild!==own)root.prepend(own);
@@ -421,7 +424,9 @@
             }
             // Hide the native profile (its name, avatar, metadata, description,
             // links and other actions) and banners; tabs stay separate.
-            for(const node of native(':is(yt-image-banner-view-model,ytd-banner-header-renderer,#banner,#page-header-banner,#channel-header-banner,.page-header-banner)'))if(!node.parentElement.closest('yt-image-banner-view-model,ytd-banner-header-renderer,#banner,#page-header-banner,#channel-header-banner,.page-header-banner'))this.hide(node);
+            // Native banners can sit beside the profile slot (#page-header-banner).
+            const banners=':is(yt-image-banner-view-model,ytd-banner-header-renderer,#banner,#page-header-banner,#channel-header-banner,.page-header-banner)';
+            for(const node of (this.browse||root).querySelectorAll(banners))if(!own.contains(node)&&!node.parentElement.closest(banners)&&!node.closest('#contents,[data-myt-channel-results]'))this.hide(node);
             const avatarNative=native(':is(yt-decorated-avatar-view-model,yt-avatar-shape,#avatar,img[id*="avatar"])')[0];
             let profile=title||avatarNative;
             while(profile&&profile!==root&&!(profile.contains(title||profile)&&profile.contains(avatarNative||profile)))profile=profile.parentElement;
