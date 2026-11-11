@@ -75,14 +75,14 @@ def channel_page(browser):
     page.evaluate(CONFIG + ITEM + """
       const tab=(name,selected,content)=>({tabRenderer:{title:name,selected,endpoint:{commandMetadata:{webCommandMetadata:{url:'/@creator/'+name.toLowerCase()}}},content}});
       document.querySelector('ytd-browse').data={contents:{twoColumnBrowseResultsRenderer:{tabs:[
-        tab('Videos',true,{richGridRenderer:{contents:[{richItemRenderer:{content:item('chanVideo01','Channel one')}},{richItemRenderer:{content:item('chanVideo02','Channel two','','1 year ago')}},more('channel-two')]}})]}}};
+        tab('Videos',true,{richGridRenderer:{contents:[{richItemRenderer:{content:item('chanVideo01','Channel one')}},{richItemRenderer:{content:item('chanVideo02','Channel two','','\u202aStreamed \u20681\u2069 year ago\u202c')}},more('channel-two')]}})]}}};
       document.dispatchEvent(new Event('yt-page-data-updated'));""")
     expect(page.locator('#myt-search .media-title')).to_have_text(['Channel one', 'Channel two', 'Channel three'])
     # Every video shows its upload date below the title.
     # Older than four months: month and year, counted back from today.
     import datetime
     year_ago = datetime.date.today().replace(year=datetime.date.today().year - 1).strftime('%B %Y')
-    expect(page.locator('#myt-search .media-date')).to_have_text(['3 days ago', year_ago, '3 days ago'])
+    expect(page.locator('#myt-search .media-date')).to_have_text(['3 days ago', 'Streamed ' + year_ago, '3 days ago'])
     # A channel's own cards carry no owner line.
     expect(page.locator('#myt-search .media-channel')).to_have_count(3)
     assert page.locator('#myt-search .media-channel').evaluate_all('nodes=>nodes.every(n=>!n.getClientRects().length)')

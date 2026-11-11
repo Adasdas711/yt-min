@@ -234,21 +234,25 @@
     // Upload dates older than four months read as month and year. YouTube
     // gives only a relative age, so the month is counted back from today.
     const ageUnits={second:1/86400,minute:1/1440,hour:1/24,day:1,week:7,month:30.44,year:365.25,sec:1/86400,min:1/1440,hr:1/24,wk:7,mo:30.44,yr:365.25,
-        'секунд':1/86400,'минут':1/1440,'час':1/24,'дн':1,'день':1,'недел':7,'месяц':30.44,'год':365.25,'лет':365.25};
+        'секунд':1/86400,'минут':1/1440,'час':1/24,'дн':1,'день':1,'недел':7,'месяц':30.44,'мес':30.44,'год':365.25,'лет':365.25};
     function publishedLabel(value){
-        // YouTube may wrap numbers in invisible direction marks and append
-        // notes such as "(edited)"; both stay out of the way of the match.
-        const text=String(value||'').replace(/[\u00ad\u200b-\u200f\u2060-\u2069\ufeff]/g,'').replace(/[\s\u00a0\u202f]+/g,' ').trim();
-        const match=text.match(/^(.*?)(\d+)\s*(second|minute|hour|day|week|month|year|секунд|минут|час|день|дн|недел|месяц|год|лет|sec|min|hr|wk|mo|yr)\S*\s+(?:ago|назад)(.*)$/iu);
-        if(!match)return text;
-        const days=Number(match[2])*ageUnits[match[3].toLowerCase()],suffix=match[4].trim();
+        // YouTube may wrap words and numbers in invisible format characters
+        // (direction marks, isolates, zero-width spaces) and add words
+        // around the age ("Streamed", "(edited)"). Only the age is replaced.
+        const text=String(value||'').replace(/\p{Cf}/gu,'').replace(/[\s\u00a0\u202f]+/g,' ').trim();
+        const match=text.match(/(\d+)\s*(second|minute|hour|day|week|month|year|секунд|минут|час|день|дн|недел|месяц|мес|год|лет|sec|min|hr|wk|mo|yr)[^\s\d]*\s+(?:ago|назад)/iu);
+        if(!match){
+            if(/\bago\b|назад/iu.test(text)&&!publishedLabel.reported){publishedLabel.reported=true;console.info('[Minimal YouTube] unrecognized date',JSON.stringify(text),[...String(value)].map(c=>c.codePointAt(0).toString(16)).join(' '));}
+            return text;
+        }
+        const count=Number(match[1]),unit=match[2].toLowerCase(),days=count*ageUnits[unit];
         if(!(days>=4*30.44))return text;
         const date=new Date();
-        if(/^(month|месяц|mo$)/i.test(match[3]))date.setMonth(date.getMonth()-Number(match[2]));
-        else if(/^(year|год|лет|yr$)/i.test(match[3]))date.setFullYear(date.getFullYear()-Number(match[2]));
+        if(/^(month|месяц|мес|mo)$/.test(unit))date.setMonth(date.getMonth()-count);
+        else if(/^(year|год|лет|yr)$/.test(unit))date.setFullYear(date.getFullYear()-count);
         else date.setTime(date.getTime()-days*86400000);
-        const prefix=match[1].trim();
-        return (prefix?prefix+' ':'')+date.toLocaleDateString('en-US',{month:'long',year:'numeric'})+(suffix?' '+suffix:'');
+        const label=date.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+        return (text.slice(0,match.index)+label+text.slice(match.index+match[0].length)).replace(/\s+/g,' ').trim();
     }
     const datedText=value=>(globalThis.MinimalYouTubeSearchData?.publishedPattern||/\bago\b|назад/iu).test(value);
     // A content type label is not an owner.
