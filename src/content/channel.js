@@ -661,15 +661,27 @@
             for(const [node,names]of this.aboutNodes)for(const name of names)if(!this.nextAboutNodes.get(node)?.has(name))node.removeAttribute(name);
             this.aboutNodes=this.nextAboutNodes;this.nextAboutNodes=null;this.aboutLinkSignatures=null;
         }
+        // YouTube's tabbed channel header keeps its tabs in an absolutely
+        // positioned scroller inside a script-driven app header. Place the
+        // navigation right below that header as a direct child of the page,
+        // where it spans the full width and CSS alone pins it under the
+        // masthead, without scroll handlers.
+        placeBelowHeader(browse,anchor){
+            const tabbed=anchor.closest('ytd-tabbed-page-header');
+            const wrapper=tabbed&&[...browse.children].find(child=>child!==this.nav&&child.contains(tabbed));
+            if(!wrapper)return false;
+            if(this.nav.previousElementSibling!==wrapper||this.nav.parentElement!==browse)wrapper.after(this.nav);
+            return true;
+        }
         navigation(browse,current){
             const tabs=[...browse.querySelectorAll(tabsSelector)].filter(node=>!node.parentElement.closest(tabsSelector));
             if(!tabs.length){
-                if(this.navigationPending){const slot=browse.querySelector('#tabs,#tabs-container');if(slot&&!slot.contains(this.nav))slot.prepend(this.nav);this.renderNavigationState();}
+                if(this.navigationPending){const slot=browse.querySelector('#tabs,#tabs-container');if(slot&&!this.placeBelowHeader(browse,slot)&&!slot.contains(this.nav))slot.prepend(this.nav);this.renderNavigationState();}
                 else this.nav.remove();
                 return;
             }
             const group=tabs[0].closest('yt-tab-group-shape,tp-yt-paper-tabs')||tabs[0];
-            if(this.nav.nextElementSibling!==group)group.before(this.nav);
+            if(!this.placeBelowHeader(browse,group)&&this.nav.nextElementSibling!==group)group.before(this.nav);
             const available=new Map();
             for(const tab of tabs){
                 const label=tab.textContent.trim()||tab.getAttribute('aria-label')||tab.querySelector('[aria-label]')?.getAttribute('aria-label')||'';

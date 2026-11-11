@@ -779,7 +779,14 @@
         if(globalThis.MinimalYouTubeChannel){channelView ||= new globalThis.MinimalYouTubeChannel();channelView.sync(browse);}
         // Some YouTube layouts nest tabs inside the profile header. Stick that
         // wrapper with a negative offset so only its navigation remains visible.
+        const pinnedNav=browse.querySelector(':scope > #myt-channel-nav');
         for(const wrapper of browse.querySelectorAll(':scope > #header,:scope > #page-header')){
+            // The navigation below the header pins itself; the header scrolls.
+            if(pinnedNav){
+                if(wrapper.hasAttribute('data-myt-channel-sticky-header'))wrapper.removeAttribute('data-myt-channel-sticky-header');
+                if(wrapper.style.getPropertyValue('--myt-channel-header-offset'))wrapper.style.removeProperty('--myt-channel-header-offset');
+                continue;
+            }
             const tabs=wrapper.querySelector('#tabs,#tabs-container')||wrapper.querySelector('#myt-channel-nav');
             if(!tabs)continue;
             if(!wrapper.hasAttribute('data-myt-channel-sticky-header'))wrapper.setAttribute('data-myt-channel-sticky-header','');

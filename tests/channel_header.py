@@ -42,7 +42,7 @@ def tabbed_fixture():
     avatar="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2780%27 height=%2780%27%3E%3Ccircle cx=%2740%27 cy=%2740%27 r=%2740%27 fill=%27%23e44%27/%3E%3C/svg%3E"
     tabs=''.join(f'<yt-tab-shape role="tab"><a href="/@JoeSpeen/{path}">{label}</a></yt-tab-shape>' for path,label in [('featured','Home'),('videos','Videos'),('streams','Live'),('playlists','Playlists'),('posts','Posts')])
     return f'''<style>ytd-browse,ytd-tabbed-page-header,tp-yt-app-header-layout,tp-yt-app-header,tp-yt-app-toolbar,tp-yt-paper-tabs,yt-page-header-renderer,yt-page-header-view-model{{display:block}}
-      tp-yt-app-header{{background:#0f0f0f}}#tabsContent{{display:flex}}
+      tp-yt-app-header{{background:#0f0f0f}}#tabsContainer{{position:relative;overflow:hidden;height:48px}}#tabsContent{{display:flex;position:absolute;left:0;top:0}}
       ytd-tabbed-page-header #page-header{{max-width:1284px;margin:0 auto;padding:0 24px}}</style><ytd-app>{MASTHEAD}<ytd-page-manager><ytd-browse page-subtype="channels">
       <div id="header"><ytd-tabbed-page-header><tp-yt-app-header-layout><div id="wrapper"><tp-yt-app-header id="header" style="position:fixed;top:56px;left:0;right:0;z-index:2;transform:translateY(0)"><div id="contentContainer">
         <div id="page-header-container"><div id="page-header-banner"><img alt="" src="{avatar}" style="width:100%;height:120px"></div>
@@ -86,16 +86,24 @@ def tabbed_header(browser,width):
     # The navigation still stays pinned below the masthead.
     nav=page.locator('#myt-channel-nav')
     expect(nav.get_by_role('link',name='Videos',exact=True)).to_be_in_viewport()
-    assert 50<=nav.bounding_box()['y']<=140,nav.bounding_box()
+    assert abs(nav.bounding_box()['y']-56)<1,nav.bounding_box()
+    # Pinned by CSS alone: it holds its place on every scroll position.
+    assert page.evaluate('''async()=>{const nav=document.querySelector('#myt-channel-nav');let max=0;
+      for(let y=1000;y<=2600;y+=37){scrollTo(0,y);max=Math.max(max,Math.abs(nav.getBoundingClientRect().top-56));}
+      return max<1&&getComputedStyle(nav).position==='sticky'&&!document.querySelector('[data-myt-channel-sticky-header]');}''')
+    # The navigation row is centered in the window.
+    links=page.evaluate('''()=>{const nav=document.querySelector('#myt-channel-nav').shadowRoot,items=[...nav.querySelectorAll('nav a,.channel-search > button')].filter(e=>e.getClientRects().length).map(e=>e.getBoundingClientRect());
+      return {left:Math.min(...items.map(r=>r.left)),right:Math.max(...items.map(r=>r.right))};}''')
+    assert abs((links['left']+links['right'])/2-width/2)<=2,(links,width)
     page.evaluate('window.scrollTo(0,0)')
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-    # The owned navigation inside tp-yt-paper-tabs stays visible below it.
+    # The owned navigation sits right below the header, the native toolbar is gone.
     nav=page.locator('#myt-channel-nav')
     expect(nav.get_by_role('link',name='Videos',exact=True)).to_be_visible()
     assert nav.bounding_box()['y']>=own.bounding_box()['y']+own.bounding_box()['height']-1
     expect(own.locator('.myt-ch-actions #subscribe')).to_be_visible()
     page.close()
-    print(f'PASS live tabbed header: owned header in the native profile slot, navigation inside paper tabs visible: {width}px',flush=True)
+    print(f'PASS live tabbed header: owned header in the native profile slot, centered navigation pinned by CSS: {width}px',flush=True)
 
 
 def click_more(page):
