@@ -6,7 +6,7 @@ in search keep their native nodes for YouTube's live subscribe controls.
 """
 import json
 from playwright.sync_api import sync_playwright, expect
-from smoke import MASTHEAD, setup
+from smoke import MASTHEAD, setup, ROOT
 from search import video, channel
 from channel import fixture as channel_fixture
 
@@ -21,9 +21,10 @@ const more=token=>({continuationItemRenderer:{continuationEndpoint:{continuation
 
 
 def search_page(browser):
-    body = ('<ytd-app>' + MASTHEAD + '<ytd-page-manager><ytd-search><ytd-section-list-renderer><div id="contents"><ytd-item-section-renderer><div id="contents">'
+    body = ('<ytd-app>' + MASTHEAD + '<ytd-page-manager><ytd-search><ytd-search-sub-menu-renderer id="native-toolbar"><div id="filter-menu"><div id="container"><ytd-toggle-button-renderer><button id="native-filter-button" aria-label="Filters">Filters</button></ytd-toggle-button-renderer></div></div><iron-collapse id="collapse-content">Native filter groups</iron-collapse></ytd-search-sub-menu-renderer><ytd-section-list-renderer><div id="contents"><ytd-item-section-renderer><div id="contents">'
             + video(1) + channel(1) + '<ytd-continuation-item-renderer id="native-continuation"></ytd-continuation-item-renderer></div></ytd-item-section-renderer></div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>')
     page = setup(browser, '/results?search_query=cats', body)
+    page.add_script_tag(path=str(ROOT / 'src/content/navigation.js'))
     requests = []
 
     def api(route):
@@ -41,8 +42,16 @@ def search_page(browser):
           {backstagePostThreadRenderer:{post:{backstagePostRenderer:{postId:'UgSearchPost',contentText:{runs:[{text:'A post in search'}]},authorText:{runs:[{text:'Poster'}]}}}}},
           {shelfRenderer:{title:{simpleText:'Latest posts'},content:{verticalListRenderer:{items:[{postRenderer:{postId:'UgShelfPost',contentText:{runs:[{text:'Shelf post'}]}}}]}}}},
           {videoRenderer:{videoId:'shortVideo2',title:{runs:[{text:'Reel'}]},navigationEndpoint:{reelWatchEndpoint:{videoId:'shortVideo2'}}}},
+          {channelRenderer:{channelId:'UCdatachannel00000000000',title:{simpleText:'Data Channel'},navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/@datachannel'}},browseEndpoint:{browseId:'UCdatachannel00000000000',canonicalBaseUrl:'/@datachannel'}},
+            thumbnail:{thumbnails:[{url:'https://yt3.ggpht.com/datachannel=s176',width:176}]},subscriberCountText:{simpleText:'1.2M subscribers'}}},
           item('dataVideo03','Data three')]}},
-        more('page-two')]}}}}};
+        more('page-two')],
+        subMenu:{searchSubMenuRenderer:{groups:[
+          {searchFilterGroupRenderer:{title:{simpleText:'Upload date'},filters:[
+            {searchFilterRenderer:{label:{simpleText:'Today'},status:'FILTER_STATUS_UNSELECTED',navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/results?search_query=cats&sp=EgIIAg%253D%253D'}}}}},
+            {searchFilterRenderer:{label:{simpleText:'This week'},status:'FILTER_STATUS_SELECTED',navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/results?search_query=cats'}}}}}]}},
+          {searchFilterGroupRenderer:{title:{simpleText:'Type'},filters:[
+            {searchFilterRenderer:{label:{simpleText:'Video'},status:'FILTER_STATUS_UNSELECTED',navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/results?search_query=cats&sp=EgIQAQ%253D%253D'}}}}}]}}]}}}}}}};
       document.dispatchEvent(new Event('yt-page-data-updated'));""")
     titles = page.locator('#myt-search .media-title')
     # Data order and groups; Shorts never appear; the native video is not a source.
@@ -53,7 +62,26 @@ def search_page(browser):
     expect(page.locator('#myt-search')).not_to_contain_text('post')
     assert requests and requests[0]['continuation'] == 'page-two', requests
     # Native channel cards keep their own node and subscribe control.
-    expect(page.locator('#myt-search [data-myt-search-channel-card]')).to_have_count(1)
+    expect(page.locator('#myt-search [data-myt-search-channel-card]')).to_have_count(2)
+    # A channel without a native card gets one from the data; its photo opens the channel.
+    card = page.locator('#myt-search [data-myt-search-channel-card]').filter(has_text='Data Channel')
+    expect(card.locator('.channel-link')).to_have_attribute('href', 'https://www.youtube.com/@datachannel')
+    expect(card.locator('.subscriber-value')).to_have_text('1.2 M')
+    card.locator('.avatar').click()
+    assert '/@datachannel' in (page.evaluate("document.documentElement.getAttribute('data-myt-navigate-request')") or ''), page.evaluate("document.documentElement.getAttribute('data-myt-navigate-request')")
+    # Owned filters replace YouTube's filter button and panel.
+    filters = page.locator('#myt-search .filters')
+    expect(page.locator('#native-filter-button')).to_be_hidden()
+    expect(page.locator('#collapse-content')).to_be_hidden()
+    expect(filters.locator('.filters-panel')).to_be_hidden()
+    filters.get_by_role('button', name='Filters').click()
+    expect(filters.locator('.filter-group h3')).to_have_text(['Upload date', 'Type'])
+    expect(filters.locator('[aria-current="true"]')).to_have_text('This week')
+    today = filters.get_by_role('link', name='Today')
+    expect(today).to_have_attribute('href', 'https://www.youtube.com/results?search_query=cats&sp=EgIIAg%253D%253D')
+    today.click()
+    expect(filters.locator('.filters-panel')).to_be_hidden()
+    assert 'sp=EgIIAg' in page.evaluate("document.documentElement.getAttribute('data-myt-navigate-request')")
     # YouTube's own continuation is off while page data loads further results.
     expect(page.locator('#native-continuation')).to_have_css('display', 'none')
     assert titles.first.get_attribute('href') == 'https://www.youtube.com/watch?v=dataVideo01'
