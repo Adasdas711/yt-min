@@ -1987,6 +1987,23 @@ html.minimal-youtube[data-myt-page="channel"][data-myt-channel-description-open]
     overscroll-behavior: none !important;
 }
 
+/* Below YouTube's tabbed channel header the navigation is a direct child of
+   the page: full width, centered and pinned under the masthead by CSS. */
+html.minimal-youtube[data-myt-page="channel"] ytd-browse > #myt-channel-nav {
+    box-sizing: border-box !important;
+    position: sticky !important;
+    top: var(--ytd-masthead-height, 56px) !important;
+    z-index: 100 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 6px 24px !important;
+    background: var(--yt-spec-base-background, var(--myt-bg)) !important;
+}
+html.minimal-youtube[data-myt-page="channel"] ytd-browse:has(> #myt-channel-nav) ytd-tabbed-page-header tp-yt-app-toolbar {
+    display: none !important;
+}
+
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-sticky-header] {
     position: sticky !important;
     top: calc(var(--ytd-masthead-height, 56px) - var(--myt-channel-header-offset, 0px)) !important;
