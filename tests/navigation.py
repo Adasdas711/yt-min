@@ -142,7 +142,7 @@ def native_links(browser):
             '<a id="handled" href="/watch?v=bbbbbbbbbbb">Handled</a>'
             '<a id="account" href="/account">Account</a>'
             '</ytd-browse></ytd-page-manager></ytd-app>')
-    page = prepare(browser, '/feed/library', body)
+    page = prepare(browser, '/feed/trending', body)
     start = len(page.documents)
     # YouTube handles this one itself: the router must not run twice.
     page.evaluate("document.querySelector('#handled').addEventListener('click', e => e.preventDefault())")
