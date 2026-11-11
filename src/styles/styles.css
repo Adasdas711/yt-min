@@ -2015,6 +2015,13 @@ html.minimal-youtube[data-myt-page="channel"] :is(body, ytd-app, #masthead-conta
     background: var(--myt-bg) !important;
     background-image: none !important;
 }
+/* YouTube's containers between the page and the owned results paint their
+   own shade (an empty search showed it as bands). They stay transparent. */
+html.minimal-youtube[data-myt-page="channel"] ytd-app > #content,
+html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(ytd-two-column-browse-results-renderer, #primary, #secondary, ytd-section-list-renderer, ytd-item-section-renderer, ytd-rich-grid-renderer, [data-myt-channel-results], #myt-search) {
+    background: transparent !important;
+    background-image: none !important;
+}
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-header-slot],
 html.minimal-youtube[data-myt-page="channel"] tp-yt-app-header[data-myt-channel-header-slot] :is(#background, #backgroundFrontLayer, #backgroundRearLayer) {
     background: transparent !important;

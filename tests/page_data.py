@@ -148,7 +148,7 @@ def channel_posts(browser):
     page = setup(browser, '/@creator/posts', channel_fixture())
     page.evaluate(CONFIG + """
       const post=(id,text,extra)=>({backstagePostThreadRenderer:{post:{backstagePostRenderer:{postId:id,authorText:{runs:[{text:'Data Creator'}]},
-        authorThumbnail:{thumbnails:[{url:'https://yt3.ggpht.com/author=s88',width:88}]},publishedTimeText:{runs:[{text:'2 days ago'}]},
+        authorThumbnail:{thumbnails:[{url:'https://yt3.ggpht.com/author=s88',width:88}]},publishedTimeText:{runs:[{text:'\u20681\u2069 year ago (edited)'}]},
         contentText:{runs:[{text:text}]},voteCount:{simpleText:'1.2K'},...extra}}}});
       const tab=(name,selected,content)=>({tabRenderer:{title:name,selected,endpoint:{commandMetadata:{webCommandMetadata:{url:'/@creator/'+name.toLowerCase()}}},content}});
       document.querySelector('ytd-browse').data={contents:{twoColumnBrowseResultsRenderer:{tabs:[tab('Posts',true,{sectionListRenderer:{contents:[{itemSectionRenderer:{contents:[
@@ -160,6 +160,10 @@ def channel_posts(browser):
     expect(posts).to_have_count(2)
     expect(posts.first.locator('.post-text')).to_have_text('First post\nwith two lines')
     assert 'monospace' in posts.first.locator('.post-text').evaluate('e=>getComputedStyle(e).fontFamily')
+    # Post dates older than four months read as month and year as well.
+    import datetime
+    year_ago = datetime.date.today().replace(year=datetime.date.today().year - 1).strftime('%B %Y')
+    expect(posts.first.locator('.post-time')).to_have_text(year_ago + ' (edited)')
     expect(posts.first.locator('.post-images img')).to_have_attribute('src', 'https://yt3.ggpht.com/post-image=s1080')
     expect(posts.first.locator('.post-time')).to_have_attribute('href', 'https://www.youtube.com/post/UgPost1')
     expect(posts.nth(1).locator('.post-poll li')).to_have_text(['Option A', 'Option B'])
