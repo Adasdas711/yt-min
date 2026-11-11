@@ -2530,8 +2530,8 @@ def main():
 
         channel_profile = '<ytd-app>' + MASTHEAD + '''
           <ytd-page-manager class="ytd-app"><ytd-browse page-subtype="channels">
-          <div id="header"><div id="banner" style="height:180px;background:#345"><img id="banner-image" alt="Channel banner" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='16' height='16' fill='%23345'/%3E%3C/svg%3E" style="display:block;width:100%;height:180px"></div>
-          <ytd-c4-tabbed-header-renderer><div id="channel-header-container"><div id="profile"><img id="profile-avatar" alt="Profile" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='16' height='16' fill='%23345'/%3E%3C/svg%3E" style="display:block;width:160px;height:160px;border-radius:50%"><h1>Channel title</h1></div></div></ytd-c4-tabbed-header-renderer></div>
+          <div id="header"><div id="banner" style="height:180px;background:#345"><img id="banner-image" alt="Channel banner" src="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2716%27 height=%2716%27%3E%3Crect width=%2716%27 height=%2716%27 fill=%27%23345%27/%3E%3C/svg%3E" style="display:block;width:100%;height:180px"></div>
+          <ytd-c4-tabbed-header-renderer><div id="channel-header-container"><div id="profile"><img id="profile-avatar" alt="Profile" src="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2716%27 height=%2716%27%3E%3Crect width=%2716%27 height=%2716%27 fill=%27%23345%27/%3E%3C/svg%3E" style="display:block;width:160px;height:160px;border-radius:50%"><h1>Channel title</h1></div></div></ytd-c4-tabbed-header-renderer></div>
           <div id="tabs"><tp-yt-paper-tabs><tp-yt-paper-tab>Home</tp-yt-paper-tab><tp-yt-paper-tab>Videos</tp-yt-paper-tab></tp-yt-paper-tabs></div>
           <div id="contents"><ytd-rich-grid-renderer id="channel-grid"><ytd-rich-item-renderer><ytd-thumbnail id="channel-thumbnail" style="height:180px;background:#345">Thumbnail</ytd-thumbnail></ytd-rich-item-renderer></ytd-rich-grid-renderer></div>
           </ytd-browse></ytd-page-manager></ytd-app>'''
@@ -2563,7 +2563,7 @@ def main():
         ok("channel banner fills the viewport while profile/avatar, rounded tabs and spaced cards keep centered dimensions")
         page.close()
 
-        modern_channel = channel_profile.replace('<div id="banner" style="height:180px;background:#345"><img id="banner-image" alt="Channel banner" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='16' height='16' fill='%23345'/%3E%3C/svg%3E" style="display:block;width:100%;height:180px"></div>', '<yt-image-banner-view-model id="modern-channel-banner" style="height:180px;background:#345"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='16' height='16' fill='%23345'/%3E%3C/svg%3E"></yt-image-banner-view-model>')
+        modern_channel = channel_profile.replace('<div id="banner" style="height:180px;background:#345"><img id="banner-image" alt="Channel banner" src="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2716%27 height=%2716%27%3E%3Crect width=%2716%27 height=%2716%27 fill=%27%23345%27/%3E%3C/svg%3E" style="display:block;width:100%;height:180px"></div>', '<yt-image-banner-view-model id="modern-channel-banner" style="height:180px;background:#345"><img alt="" src="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2716%27 height=%2716%27%3E%3Crect width=%2716%27 height=%2716%27 fill=%27%23345%27/%3E%3C/svg%3E"></yt-image-banner-view-model>')
         page = setup(browser, "/@creator/videos", modern_channel)
         expect(page.locator("#modern-channel-banner")).to_be_hidden()
         modern_banner = page.locator("#myt-channel-header .myt-ch-banner").bounding_box()
