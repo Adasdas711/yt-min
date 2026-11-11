@@ -16,6 +16,7 @@
     function routeKey(){
         const url=new URL(location.href);
         if(url.pathname==='/results')return JSON.stringify(['search',url.searchParams.get('search_query')||'',url.searchParams.get('sp')||'']);
+        if(url.pathname==='/playlist')return JSON.stringify(['playlist',url.searchParams.get('list')||'']);
         return JSON.stringify(['channel',url.pathname.replace(/\/$/,'').replace(/\/community$/,'/posts').toLowerCase(),/\/search$/.test(url.pathname.replace(/\/$/,''))?url.searchParams.get('query')||'':'']);
     }
     function token(value){
@@ -54,6 +55,46 @@
             likes:data.label(renderer.voteCount).trim().slice(0,40),
             comments:data.label(renderer.actionButtons?.commentActionButtonsRenderer?.replyButton?.buttonRenderer?.text).trim().slice(0,40),group:''};
     }
+    // A playlist video in public fields, with the playlist edits YouTube's
+    // own menu offers for it (remove, move, save). The edit commands stay
+    // here; the renderer only names them.
+    const actions=new Map();let actionSequence=0;
+    function playlistItem(value){
+        const data=globalThis.MinimalYouTubeSearchData;
+        const id=String(value.videoId||'');if(!/^[-\w]{11}$/.test(id))return null;
+        const list=new URL(location.href).searchParams.get('list')||'';
+        const fallback=data.url('/watch?v='+encodeURIComponent(id)+(list?'&list='+encodeURIComponent(list):''));
+        const owner=value.shortBylineText||value.ownerText;
+        const info=data.label(value.videoInfo).replace(/\s+/g,' ').trim();
+        const published=info.split(/\s*[•·]\s*/).find(text=>data.publishedPattern.test(text))||'';
+        let duration=data.label(value.lengthText).trim();
+        if(!duration)for(const overlay of value.thumbnailOverlays||[]){const text=data.label(overlay.thumbnailOverlayTimeStatusRenderer?.text).trim();if(text){duration=text;break;}}
+        const options=[];
+        for(const item of value.menu?.menuRenderer?.items||[]){
+            const service=item.menuServiceItemRenderer,endpoint=service?.serviceEndpoint,edit=endpoint?.playlistEditEndpoint;
+            const api=endpoint?.commandMetadata?.webCommandMetadata?.apiUrl;
+            if(!edit||typeof api!=='string'||!/^\/youtubei\/v1\//.test(api))continue;
+            const change=(edit.actions||[])[0]||{},label=data.label(service.text).trim();if(!label)continue;
+            const kind=/REMOVE/.test(change.action||'')?'remove':/MOVE/.test(change.action||'')?'move':/ADD/.test(change.action||'')?'add':'edit';
+            const key='a'+(++actionSequence);
+            actions.set(key,{api,payload:edit,kind,change,setVideoId:String(value.setVideoId||''),videoId:id,playlistId:String(edit.playlistId||'')});
+            while(actions.size>3000)actions.delete(actions.keys().next().value);
+            options.push({id:key,label:label.slice(0,80),kind});
+        }
+        return {kind:'video',id,href:data.endpoint(value.navigationEndpoint)||fallback,title:(data.label(value.title).trim()||'Unavailable video').slice(0,1000),
+            image:data.image(value.thumbnail),channel:{name:data.label(owner).slice(0,500),href:data.endpoint(owner?.runs?.find(run=>run.navigationEndpoint)?.navigationEndpoint)},
+            index:data.label(value.index).trim().slice(0,12),duration:duration.slice(0,20),stats:info.slice(0,200),published:published.slice(0,100),
+            setVideoId:String(value.setVideoId||'').slice(0,100),playable:value.isPlayable!==false,actions:options,group:''};
+    }
+    function playlistList(root){
+        const stack=[root],seen=new Set();let scans=0;
+        while(stack.length&&scans++<2000){
+            const item=stack.pop();if(!item||typeof item!=='object'||seen.has(item))continue;seen.add(item);
+            if(item.playlistVideoListRenderer)return item.playlistVideoListRenderer;
+            for(const child of Object.values(item))if(child&&typeof child==='object')stack.push(child);
+        }
+        return null;
+    }
     function chips(content){
         const data=globalThis.MinimalYouTubeSearchData;
         const bar=content?.richGridRenderer?.header?.feedFilterChipBarRenderer||content?.sectionListRenderer?.header?.feedFilterChipBarRenderer;
@@ -72,6 +113,7 @@
         for(const entry of Array.isArray(list)?list:[]){
             if(!entry||typeof entry!=='object'||out.items.length>=600)continue;
             if(entry.continuationItemRenderer){const value=token(entry.continuationItemRenderer);if(value)out.continuation=value;continue;}
+            if(entry.playlistVideoRenderer){const value=playlistItem(entry.playlistVideoRenderer);if(value)out.items.push(value);continue;}
             if(entry.itemSectionRenderer){parse(entry.itemSectionRenderer.contents,out,group,channel);continue;}
             if(entry.richItemRenderer){parse([entry.richItemRenderer.content],out,group,channel);continue;}
             if(entry.gridRenderer){parse(entry.gridRenderer.items,out,group,channel);continue;}
@@ -101,6 +143,15 @@
             const data=search?.data;
             const list=(data?.contents||data?.response?.contents)?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents;
             return Array.isArray(list)?{type:'search',list}:null;
+        }
+        if(path==='/playlist'){
+            const list=new URL(location.href).searchParams.get('list')||'';
+            const browse=[...document.querySelectorAll('ytd-browse')].find(node=>visible(node)&&node.getAttribute('page-subtype')==='playlist')||[...document.querySelectorAll('ytd-browse')].find(visible);
+            const tabs=(browse?.data?.contents||browse?.data?.response?.contents)?.twoColumnBrowseResultsRenderer?.tabs;
+            const renderer=Array.isArray(tabs)?playlistList(tabs):null;
+            // Data for another playlist is a page still in transition.
+            if(!renderer||!Array.isArray(renderer.contents)||renderer.playlistId&&renderer.playlistId!==list)return null;
+            return {type:'playlist',list:renderer.contents,content:renderer};
         }
         if(!channelPath.test(path)||/\/featured$/.test(path)||/^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)$/.test(path))return null;
         const browse=[...document.querySelectorAll('ytd-browse')].find(visible)||document.querySelector('ytd-browse');
@@ -161,6 +212,58 @@
         finally{clearTimeout(timeout);state.loading=false;}
         if(current===state)publish();
     }
+    // Playlist edits run as YouTube's own web client sends them: the page's
+    // client context and the signed-in session's authorization header.
+    async function authorization(){
+        const cookies=Object.fromEntries(document.cookie.split(/;\s*/).map(part=>{const index=part.indexOf('=');return [part.slice(0,index),part.slice(index+1)];}));
+        const sid=cookies.SAPISID||cookies['__Secure-3PAPISID'];if(!sid)return '';
+        const time=Math.floor(Date.now()/1000),digest=await crypto.subtle.digest('SHA-1',new TextEncoder().encode(time+' '+sid+' '+location.origin));
+        return 'SAPISIDHASH '+time+'_'+[...new Uint8Array(digest)].map(byte=>byte.toString(16).padStart(2,'0')).join('');
+    }
+    function report(id,ok,message=''){
+        document.documentElement.setAttribute('data-myt-page-model-action-result',JSON.stringify({id,ok,message}));
+        document.dispatchEvent(new Event('minimal-youtube:page-model-action-result'));
+    }
+    async function runAction(state,id){
+        const action=actions.get(id);
+        const context=config('INNERTUBE_CONTEXT')||{},client=context.client||{},version=client.clientVersion||config('INNERTUBE_CONTEXT_CLIENT_VERSION');
+        if(!action||typeof version!=='string'||!version){report(id,false);return;}
+        const url=new URL(action.api,location.origin);url.searchParams.set('prettyPrint','false');
+        const key=config('INNERTUBE_API_KEY');if(typeof key==='string'&&key)url.searchParams.set('key',key);
+        const headers={'Content-Type':'application/json','X-Origin':location.origin,'X-Youtube-Client-Name':String(config('INNERTUBE_CONTEXT_CLIENT_NAME')||1),'X-Youtube-Client-Version':version,'X-Goog-AuthUser':String(config('SESSION_INDEX')??0)};
+        const visitor=config('VISITOR_DATA');if(typeof visitor==='string'&&visitor)headers['X-Goog-Visitor-Id']=visitor;
+        const page=config('DELEGATED_SESSION_ID');if(typeof page==='string'&&page)headers['X-Goog-PageId']=page;
+        try{const auth=await authorization();if(auth)headers.Authorization=auth;}catch{}
+        const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
+        try{
+            const response=await fetch(url.href,{method:'POST',credentials:'include',signal:controller.signal,headers,
+                body:JSON.stringify({...action.payload,context:{...context,client:{...client,clientName:client.clientName||'WEB',clientVersion:version}}})});
+            const result=await response.json().catch(()=>({}));
+            if(!response.ok||result.status&&result.status!=='STATUS_SUCCEEDED')throw new Error('Edit failed');
+            // Mirror the edit in this page's list. Saves to other playlists
+            // leave it as it is.
+            const current=new URL(location.href).searchParams.get('list')||'';
+            if(action.playlistId===current||!action.playlistId){
+                const index=state.items.findIndex(item=>item.setVideoId&&item.setVideoId===action.setVideoId||!action.setVideoId&&item.id===action.videoId);
+                if(index>=0&&action.kind==='remove')state.items.splice(index,1);
+                else if(index>=0&&action.kind==='move'){
+                    const [item]=state.items.splice(index,1),change=action.change;
+                    let target=change.movedSetVideoIdSuccessor?state.items.findIndex(other=>other.setVideoId===change.movedSetVideoIdSuccessor):change.movedSetVideoIdPredecessor?state.items.findIndex(other=>other.setVideoId===change.movedSetVideoIdPredecessor)+1:/AFTER/.test(change.action||'')?0:state.items.length;
+                    if(target<0)target=/AFTER/.test(change.action||'')?0:state.items.length;
+                    state.items.splice(target,0,item);
+                }
+                state.items.forEach((item,position)=>{if(/^\d+$/.test(item.index))item.index=String(position+1);});
+            }
+            report(id,true);
+        }catch{report(id,false);}
+        finally{clearTimeout(timeout);}
+        if(current===state)publish();
+    }
+    document.addEventListener('minimal-youtube:page-model-action',()=>{
+        const state=current,id=document.documentElement.getAttribute('data-myt-page-model-action')||'';
+        if(!state||state.type!=='playlist'||state.key!==routeKey()||!actions.has(id))return;
+        runAction(state,id);
+    });
     document.addEventListener('minimal-youtube:page-model-more',()=>{
         const state=current;
         if(!state||state.loading||!state.continuation||state.failed||state.key!==routeKey())return;

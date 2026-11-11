@@ -174,6 +174,79 @@ def channel_posts(browser):
     print('PASS Posts is an owned read-only feed from page data', flush=True)
 
 
+PLAYLIST_ITEM = """const pitem=(id,title,set,index)=>({playlistVideoRenderer:{videoId:id,setVideoId:set,index:{simpleText:String(index)},title:{runs:[{text:title}]},
+    thumbnail:{thumbnails:[{url:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg',width:480}]},lengthText:{simpleText:'12:34'},
+    shortBylineText:{runs:[{text:'Some creator',navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/@somecreator'}},browseEndpoint:{browseId:'UCsome',canonicalBaseUrl:'/@somecreator'}}}]},
+    videoInfo:{runs:[{text:'1.2M views'},{text:' • '},{text:'2 years ago'}]},
+    navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/watch?v='+id+'&list=PLfixture&index='+index}},watchEndpoint:{videoId:id,playlistId:'PLfixture'}},
+    menu:{menuRenderer:{items:[
+      {menuServiceItemRenderer:{text:{runs:[{text:'Remove from Fixture'}]},serviceEndpoint:{commandMetadata:{webCommandMetadata:{sendPost:true,apiUrl:'/youtubei/v1/browse/edit_playlist'}},playlistEditEndpoint:{playlistId:'PLfixture',actions:[{setVideoId:set,action:'ACTION_REMOVE_VIDEO'}],params:'CAFAAQ%3D%3D'}}}},
+      {menuServiceItemRenderer:{text:{runs:[{text:'Move to top'}]},serviceEndpoint:{commandMetadata:{webCommandMetadata:{sendPost:true,apiUrl:'/youtubei/v1/browse/edit_playlist'}},playlistEditEndpoint:{playlistId:'PLfixture',actions:[{setVideoId:set,action:'ACTION_MOVE_VIDEO_AFTER'}]}}}},
+      {menuServiceItemRenderer:{text:{runs:[{text:'Save to playlist'}]},serviceEndpoint:{addToPlaylistServiceEndpoint:{videoId:id}}}}]}}}});"""
+
+
+def playlist_page(browser):
+    from playlist import body as playlist_body
+    page = setup(browser, '/playlist?list=PLfixture', playlist_body(count=3))
+    edits, more = [], []
+
+    def edit(route):
+        edits.append({'body': route.request.post_data_json, 'auth': route.request.headers.get('authorization', '')})
+        route.fulfill(content_type='application/json', body='{"status":"STATUS_SUCCEEDED"}')
+
+    def browse(route):
+        more.append(route.request.post_data_json)
+        route.fulfill(content_type='application/json', body=page.evaluate('()=>(()=>{' + PLAYLIST_ITEM + "return JSON.stringify({onResponseReceivedActions:[{appendContinuationItemsAction:{continuationItems:[pitem('dataVideo04','Data four','set4',4)]}}]})})()"))
+    page.route('https://www.youtube.com/youtubei/v1/browse/edit_playlist**', edit)
+    page.route('https://www.youtube.com/youtubei/v1/browse?**', browse)
+    page.evaluate("document.cookie='SAPISID=fixturesid; path=/; secure'")
+    page.evaluate(CONFIG + PLAYLIST_ITEM + """
+      document.querySelector('ytd-browse').data={contents:{twoColumnBrowseResultsRenderer:{tabs:[{tabRenderer:{selected:true,content:{sectionListRenderer:{contents:[{itemSectionRenderer:{contents:[{playlistVideoListRenderer:{playlistId:'PLfixture',
+        contents:[pitem('dataVideo01','Data one','set1',1),pitem('dataVideo02','Data two','set2',2),pitem('dataVideo03','Data three','set3',3),{continuationItemRenderer:{continuationEndpoint:{continuationCommand:{token:'playlist-more'}}}}]}}]}}]}}}}]}}};
+      document.dispatchEvent(new Event('yt-page-data-updated'));""")
+    rows = page.locator('#myt-playlist-rows [data-myt-owned-playlist-card=video]')
+    # Rows come from the playlist's page data; the native rows are hidden.
+    # Row geometry matches the native-backed rows: a compact grid.
+    assert rows.first.bounding_box()['height'] < 220, rows.first.bounding_box()
+    page.locator('#myt-playlist-rows .myt-playlist-more').scroll_into_view_if_needed()
+    expect(rows.locator('.title')).to_have_text(['Data one', 'Data two', 'Data three', 'Data four'])
+    assert more and more[0]['continuation'] == 'playlist-more', more
+    expect(page.locator('ytd-playlist-video-renderer').first).to_be_hidden()
+    expect(rows.first.locator('.duration')).to_have_text('12:34')
+    import datetime
+    two_years = datetime.date.today().replace(year=datetime.date.today().year - 2).strftime('%B %Y')
+    expect(rows.first.locator('.metadata')).to_have_text('1.2M views · ' + two_years)
+    expect(rows.first.locator('a.title')).to_have_attribute('href', 'https://www.youtube.com/watch?v=dataVideo01&list=PLfixture&index=1')
+    # The video menu offers YouTube's playlist edits; dialogs it cannot run are left out.
+    rows.nth(1).get_by_role('button', name='Video actions').click()
+    menu = page.locator('#myt-playlist-menu')
+    expect(menu.get_by_role('menuitem')).to_have_text(['Remove from Fixture', 'Move to top', 'Copy link'])
+    menu.get_by_role('menuitem', name='Remove from Fixture').click()
+    expect(menu).to_be_hidden()
+    expect(rows.locator('.title')).to_have_text(['Data one', 'Data three', 'Data four'])
+    assert edits[-1]['body']['actions'] == [{'setVideoId': 'set2', 'action': 'ACTION_REMOVE_VIDEO'}] and edits[-1]['body']['playlistId'] == 'PLfixture', edits
+    assert edits[-1]['body']['context']['client']['clientVersion'] == '2.20260101', edits
+    assert edits[-1]['auth'].startswith('SAPISIDHASH '), edits
+    expect(rows.locator('.index')).to_have_text(['1', '2', '3'])
+    rows.nth(2).get_by_role('button', name='Video actions').click()
+    menu.get_by_role('menuitem', name='Move to top').click()
+    expect(rows.locator('.title')).to_have_text(['Data four', 'Data one', 'Data three'])
+    # A failed edit leaves the list and says so.
+    page.unroute('https://www.youtube.com/youtubei/v1/browse/edit_playlist**')
+    page.route('https://www.youtube.com/youtubei/v1/browse/edit_playlist**', lambda route: route.fulfill(status=401, body='{}'))
+    rows.first.get_by_role('button', name='Video actions').click()
+    menu.get_by_role('menuitem', name='Remove from Fixture').click()
+    expect(page.locator('#myt-playlist-rows .myt-playlist-status')).to_have_text('Could not update the playlist. Try again.')
+    expect(rows.locator('.title')).to_have_text(['Data four', 'Data one', 'Data three'])
+    # The header keeps YouTube's own controls.
+    expect(page.locator('[data-myt-playlist-summary]').get_by_role('button', name='Shuffle', exact=True)).to_be_visible()
+    page.evaluate('__setEnabled(false)')
+    expect(page.locator('#myt-playlist-rows')).to_have_count(0)
+    expect(page.locator('ytd-playlist-video-renderer').first).to_be_visible()
+    page.close()
+    print('PASS playlist rows, continuation and edits come from page data in the owned design', flush=True)
+
+
 if __name__ == '__main__':
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
@@ -181,4 +254,5 @@ if __name__ == '__main__':
         channel_page(browser)
         channel_header_and_chips(browser)
         channel_posts(browser)
+        playlist_page(browser)
         browser.close()
