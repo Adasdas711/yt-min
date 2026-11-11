@@ -35,6 +35,43 @@ def fixture(legacy=False,contents=None):
       </ytd-browse></ytd-page-manager></ytd-app>'''
 
 
+def tabbed_fixture():
+    # Live YouTube (measured): the profile and the tabs live in a fixed
+    # tp-yt-app-header inside ytd-tabbed-page-header; the tabs are inside
+    # tp-yt-paper-tabs #tabsContent.
+    avatar="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2780%27 height=%2780%27%3E%3Ccircle cx=%2740%27 cy=%2740%27 r=%2740%27 fill=%27%23e44%27/%3E%3C/svg%3E"
+    tabs=''.join(f'<yt-tab-shape role="tab"><a href="/@JoeSpeen/{path}">{label}</a></yt-tab-shape>' for path,label in [('featured','Home'),('videos','Videos'),('streams','Live'),('playlists','Playlists'),('posts','Posts')])
+    return f'''<style>ytd-browse,ytd-tabbed-page-header,tp-yt-app-header-layout,tp-yt-app-header,tp-yt-app-toolbar,tp-yt-paper-tabs,yt-page-header-renderer,yt-page-header-view-model{{display:block}}
+      tp-yt-app-header{{background:#0f0f0f}}#tabsContent{{display:flex}}</style><ytd-app>{MASTHEAD}<ytd-page-manager><ytd-browse page-subtype="channels">
+      <div id="header"><ytd-tabbed-page-header><tp-yt-app-header-layout><div id="wrapper"><tp-yt-app-header id="header"><div id="contentContainer">
+        <div id="page-header-container"><div id="page-header-banner"><img alt="" src="{avatar}" style="width:100%;height:120px"></div>
+          <div id="page-header"><yt-page-header-renderer><yt-page-header-view-model><yt-image-banner-view-model><img alt="" src="{avatar}" style="width:100%;height:150px"></yt-image-banner-view-model>
+            <div class="yt-page-header-view-model__page-header-headline"><yt-decorated-avatar-view-model><img alt="" src="{avatar}" style="width:160px;height:160px"></yt-decorated-avatar-view-model>
+            <div class="yt-page-header-view-model__page-header-headline-info"><h1>Joe Speen</h1><yt-content-metadata-view-model>@JoeSpeen · 2.24M subscribers · 2.4K videos</yt-content-metadata-view-model>
+            <yt-flexible-actions-view-model><yt-subscribe-button-view-model><button id="subscribe">Subscribe</button></yt-subscribe-button-view-model></yt-flexible-actions-view-model></div></div>
+          </yt-page-header-view-model></yt-page-header-renderer></div></div>
+        <tp-yt-app-toolbar><div id="tabs-container"><tp-yt-paper-tabs><div id="tabsContainer"><div id="tabsContent">{tabs}</div></div></tp-yt-paper-tabs></div></tp-yt-app-toolbar>
+      </div></tp-yt-app-header></div></tp-yt-app-header-layout></ytd-tabbed-page-header></div>
+      <div id="contents"><ytd-rich-grid-renderer><div id="contents">{video(1)}</div></ytd-rich-grid-renderer></div></ytd-browse></ytd-page-manager></ytd-app>'''
+
+
+def tabbed_header(browser,width):
+    page=setup(browser,'/@JoeSpeen/videos',tabbed_fixture(),width=width)
+    own=page.locator('#myt-channel-header')
+    expect(own.locator('h1')).to_have_text('Joe Speen')
+    # The owned header takes the native profile's place inside YouTube's
+    # header, so no empty native header band remains above it.
+    assert page.evaluate("document.querySelector('#myt-channel-header').closest('tp-yt-app-header')!==null")
+    assert abs(own.bounding_box()['y']-56)<1,own.bounding_box()
+    # The owned navigation inside tp-yt-paper-tabs stays visible below it.
+    nav=page.locator('#myt-channel-nav')
+    expect(nav.get_by_role('link',name='Videos',exact=True)).to_be_visible()
+    assert nav.bounding_box()['y']>=own.bounding_box()['y']+own.bounding_box()['height']-1
+    expect(own.locator('.myt-ch-actions #subscribe')).to_be_visible()
+    page.close()
+    print(f'PASS live tabbed header: owned header in the native profile slot, navigation inside paper tabs visible: {width}px',flush=True)
+
+
 def click_more(page):
     page.locator('#myt-channel-description .more').click()
     dialog=page.locator('#myt-channel-description .full')
@@ -331,4 +368,6 @@ if __name__=='__main__':
         nested_preview(browser)
         more_text_spacing(browser)
         description_updates(browser)
+        for width in (1440,390):
+            tabbed_header(browser,width)
         browser.close()

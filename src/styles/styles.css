@@ -1962,7 +1962,9 @@ html.minimal-youtube[data-myt-page="channel"]:not([data-myt-channel-section="pos
 ) {
     visibility: hidden !important;
 }
-html.minimal-youtube[data-myt-page="channel"] ytd-browse:has(#myt-channel-nav) :is(yt-tab-group-shape, tp-yt-paper-tabs) {
+/* The owned navigation can live inside the native group (tp-yt-paper-tabs
+   #tabsContent on live YouTube): never hide the group that contains it. */
+html.minimal-youtube[data-myt-page="channel"] ytd-browse:has(#myt-channel-nav) :is(yt-tab-group-shape, tp-yt-paper-tabs):not(:has(#myt-channel-nav)) {
     display: none !important;
 }
 
