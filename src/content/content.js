@@ -789,8 +789,14 @@
         }
         const title=browse.querySelector('yt-page-header-view-model h1,yt-page-header-renderer h1,ytd-page-header-renderer h1,ytd-c4-tabbed-header-renderer h1,ytd-channel-name #text,#channel-name #text');
         if(title)globalThis.MinimalYouTubeWatch?.loadTitleFonts?.(title.textContent);
-        // Posts retain their native interactions and layout.
+        // Posts use the owned read-only feed when their page data is public;
+        // otherwise they retain their native interactions and layout.
+        let postsData=false;
         if(/\/(community|posts)\/?$/.test(location.pathname)){
+            document.dispatchEvent(new Event('minimal-youtube:page-model'));
+            try{postsData=JSON.parse(root.getAttribute('data-myt-page-model')||'null')?.type==='posts';}catch{postsData=false;}
+        }
+        if(/\/(community|posts)\/?$/.test(location.pathname)&&!postsData){
             if(channelView?.nav.isConnected){browse.setAttribute('data-myt-channel-ready','');root.removeAttribute('data-myt-channel-boot');}
             return null;
         }
@@ -1456,7 +1462,9 @@
             if (record.type === "attributes" && record.attributeName === "title" && !target.closest(filterScope)) return false;
             if (target.closest("title")) { cleanTitle(); return false; }
             if (stableHome) return record.target === root && record.attributeName === "dark";
-            if (target.closest("#myt-watch, #myt-home, #myt-search, #myt-channel-nav, #myt-channel-stats, #myt-channel-description, #myt-playlist-summary, [data-myt-search-channel-card]")) return false;
+            if (target.closest("#myt-watch, #myt-home, #myt-search, #myt-masthead, #myt-channel-nav, #myt-channel-stats, #myt-channel-description, #myt-playlist-summary, [data-myt-search-channel-card]")) return false;
+            // The owned channel header; YouTube's own subscribe control inside it still counts.
+            if (target.closest("#myt-channel-header") && !target.closest(".myt-ch-actions")) return false;
             if(record.type==='childList'){
                 const changes=[...record.addedNodes,...record.removedNodes];
                 if(changes.length&&changes.every(node=>node instanceof Element&&node.matches('#myt-watch,#myt-home,#myt-playlist-summary,[data-myt-search-playlist-card],[data-myt-search-channel-card],.myt-masthead-brand'))&&(!changes.some(node=>node.matches('.myt-masthead-brand'))||target.querySelectorAll(':scope > .myt-masthead-brand').length<=1))return false;

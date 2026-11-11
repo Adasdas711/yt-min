@@ -31,6 +31,40 @@
         return Object.keys(entry).some(key=>/^shorts|^reel/i.test(key))||/SHORTS/.test(entry.lockupViewModel?.contentType||'')||
             Boolean(entry.videoRenderer?.navigationEndpoint?.reelWatchEndpoint);
     }
+    // Public, read-only fields of a channel post. Likes, votes and comments
+    // stay counts; account actions are not offered.
+    function post(value){
+        const data=globalThis.MinimalYouTubeSearchData;
+        const renderer=value.backstagePostRenderer||value.postRenderer||value.sharedPostRenderer;
+        if(!renderer||typeof renderer!=='object')return null;
+        const id=typeof renderer.postId==='string'?renderer.postId:'';
+        const attachment=renderer.backstageAttachment||{};
+        const images=[];
+        for(const image of [attachment.backstageImageRenderer,...(attachment.postMultiImageRenderer?.images||[]).map(item=>item.backstageImageRenderer)]){
+            const url=image&&data.image(image.image);if(url&&images.length<10)images.push(url);
+        }
+        const media=attachment.videoRenderer?data.record({videoRenderer:attachment.videoRenderer}):attachment.playlistRenderer?data.record({playlistRenderer:attachment.playlistRenderer}):null;
+        const poll=attachment.pollRenderer?{choices:(attachment.pollRenderer.choices||[]).map(choice=>data.label(choice.text).trim()).filter(Boolean).slice(0,10),votes:data.label(attachment.pollRenderer.totalVotes).trim()}:null;
+        const text=data.label(renderer.contentText).slice(0,5000);
+        if(!text&&!images.length&&!media&&!poll)return null;
+        return {kind:'post',id,href:id?'https://www.youtube.com/post/'+encodeURIComponent(id):'',
+            author:data.label(renderer.authorText).trim().slice(0,300),avatar:data.image(renderer.authorThumbnail),
+            published:data.label(renderer.publishedTimeText).trim().slice(0,100),text,images,
+            media:media&&(media.kind==='video'||media.kind==='playlist')?{kind:media.kind,href:media.href,title:media.title,image:media.image}:null,poll,
+            likes:data.label(renderer.voteCount).trim().slice(0,40),
+            comments:data.label(renderer.actionButtons?.commentActionButtonsRenderer?.replyButton?.buttonRenderer?.text).trim().slice(0,40),group:''};
+    }
+    function chips(content){
+        const data=globalThis.MinimalYouTubeSearchData;
+        const bar=content?.richGridRenderer?.header?.feedFilterChipBarRenderer||content?.sectionListRenderer?.header?.feedFilterChipBarRenderer;
+        const result=[];
+        for(const item of bar?.contents||[]){
+            const chip=item.chipCloudChipRenderer||item.chipViewModel;if(!chip)continue;
+            const label=data.label(chip.text||chip.title).trim(),value=token(chip.navigationEndpoint||chip.tapCommand||chip);
+            if(label&&value)result.push({label:label.slice(0,60),selected:Boolean(chip.isSelected||chip.selected),token:value});
+        }
+        return result.slice(0,8);
+    }
     // Only top-level item renderers become cards. Nested endpoints inside a
     // card (owner links, playlist ids of a video) never add extra records.
     function parse(list,out,group,channel){
@@ -48,6 +82,8 @@
                 const items=(content.verticalListRenderer||content.horizontalListRenderer||content.expandedShelfContentsRenderer||content.gridRenderer||{}).items;
                 parse(items,out,channel?group:title||group,channel);continue;
             }
+            const postValue=entry.backstagePostThreadRenderer?.post||entry.backstagePostRenderer&&entry||entry.postRenderer&&entry||entry.sharedPostRenderer&&entry;
+            if(postValue){const value=post(postValue);if(value)out.items.push(value);continue;}
             if(entry.richSectionRenderer||entry.reelShelfRenderer||isShort(entry))continue;
             const record=data.record(entry);
             if(!record||!['video','playlist','channel'].includes(record.kind))continue;
@@ -66,7 +102,7 @@
             const list=(data?.contents||data?.response?.contents)?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents;
             return Array.isArray(list)?{type:'search',list}:null;
         }
-        if(!channelPath.test(path)||/\/(?:community|posts|featured)$/.test(path)||/^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)$/.test(path))return null;
+        if(!channelPath.test(path)||/\/featured$/.test(path)||/^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)$/.test(path))return null;
         const browse=[...document.querySelectorAll('ytd-browse')].find(visible)||document.querySelector('ytd-browse');
         const tabs=(browse?.data?.contents||browse?.data?.response?.contents)?.twoColumnBrowseResultsRenderer?.tabs;
         if(!Array.isArray(tabs))return null;
@@ -76,31 +112,29 @@
         if(!url||url.split('?')[0].replace(/\/$/,'').replace(/\/community$/,'/posts').toLowerCase()!==path.replace(/\/community$/,'/posts').toLowerCase())return null;
         const content=selected.content;
         const list=content?.richGridRenderer?.contents||content?.sectionListRenderer?.contents;
-        return Array.isArray(list)?{type:'channel',list}:null;
+        return Array.isArray(list)?{type:/\/(?:community|posts)$/.test(path)?'posts':'channel',list,content}:null;
     }
     function model(){
         let found=null;try{found=source();}catch{found=null;}
         if(!found)return null;
         let value=models.get(found.list);
         if(!value){
-            value={key:routeKey(),type:found.type,items:[],continuation:'',loading:false,failed:false};
-            try{parse(found.list,value,'',found.type==='channel');}catch{return null;}
+            value={key:routeKey(),type:found.type,items:[],continuation:'',loading:false,failed:false,chips:[]};
+            try{parse(found.list,value,'',found.type!=='search');value.chips=found.type==='channel'?chips(found.content):[];}catch{return null;}
             models.set(found.list,value);
         }
         return value;
     }
     function publish(){
         const root=document.documentElement;
-        const text=current?JSON.stringify({key:current.key,type:current.type,items:current.items,more:Boolean(current.continuation)&&!current.failed,loading:current.loading}):'';
+        const text=current?JSON.stringify({key:current.key,type:current.type,items:current.items,more:Boolean(current.continuation)&&!current.failed,loading:current.loading,chips:current.chips.map(({label,selected})=>({label,selected}))}):'';
         if(text===published)return;
         published=text;
         if(text)root.setAttribute('data-myt-page-model',text);else root.removeAttribute('data-myt-page-model');
         document.dispatchEvent(new Event('minimal-youtube:page-model-updated'));
     }
     document.addEventListener('minimal-youtube:page-model',()=>{current=model();publish();});
-    document.addEventListener('minimal-youtube:page-model-more',async()=>{
-        const state=current;
-        if(!state||state.loading||!state.continuation||state.failed||state.key!==routeKey())return;
+    async function load(state,continuation,replace){
         const context=config('INNERTUBE_CONTEXT')||{},client=context.client||{},version=client.clientVersion||config('INNERTUBE_CONTEXT_CLIENT_VERSION');
         if(typeof version!=='string'||!version){state.failed=true;publish();return;}
         state.loading=true;publish();
@@ -109,19 +143,65 @@
         const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
         try{
             const response=await fetch(url.href,{method:'POST',credentials:'same-origin',signal:controller.signal,headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({continuation:state.continuation,context:{...context,client:{...client,clientName:client.clientName||'WEB',clientVersion:version}}})});
+                body:JSON.stringify({continuation,context:{...context,client:{...client,clientName:client.clientName||'WEB',clientVersion:version}}})});
             if(!response.ok)throw new Error('Continuation failed');
             const data=await response.json();
             const next={items:[],continuation:''};
-            for(const command of [...(data.onResponseReceivedCommands||[]),...(data.onResponseReceivedActions||[])]){
+            for(const command of [...(data.onResponseReceivedCommands||[]),...(data.onResponseReceivedActions||[]),...(data.onResponseReceivedEndpoints||[])]){
                 const action=command.appendContinuationItemsAction||command.reloadContinuationItemsCommand;
-                if(Array.isArray(action?.continuationItems))parse(action.continuationItems,next,'',state.type==='channel');
+                // A reload names its slot; only the feed's items replace it.
+                if(replace&&command.reloadContinuationItemsCommand&&/header/i.test(command.reloadContinuationItemsCommand.slot||''))continue;
+                if(Array.isArray(action?.continuationItems))parse(action.continuationItems,next,'',state.type!=='search');
             }
+            if(replace)state.items=[];
             const known=new Set(state.items.map(item=>item.href+'|'+item.group));
             for(const item of next.items)if(!known.has(item.href+'|'+item.group)&&state.items.length<600)state.items.push(item);
-            state.continuation=next.continuation;
-        }catch{state.failed=true;}
+            state.continuation=next.continuation;state.failed=false;
+        }catch{if(!replace)state.failed=true;}
         finally{clearTimeout(timeout);state.loading=false;}
         if(current===state)publish();
+    }
+    document.addEventListener('minimal-youtube:page-model-more',()=>{
+        const state=current;
+        if(!state||state.loading||!state.continuation||state.failed||state.key!==routeKey())return;
+        load(state,state.continuation,false);
+    });
+    // Sort chips reload the section's feed with their own continuation.
+    document.addEventListener('minimal-youtube:page-model-chip',()=>{
+        const state=current,index=Number(document.documentElement.getAttribute('data-myt-page-model-chip'));
+        const chip=state?.chips?.[index];
+        if(!chip||chip.selected||state.loading||state.key!==routeKey())return;
+        for(const item of state.chips)item.selected=item===chip;
+        load(state,chip.token,true);
+    });
+    // Public channel identity for the owned header: name, avatar, banner and
+    // the verified badge. Account controls are not part of it.
+    function largest(root,test){
+        const stack=[root],seen=new Set();let scans=0;
+        while(stack.length&&scans++<3000){
+            const item=stack.pop();if(!item||typeof item!=='object'||seen.has(item))continue;seen.add(item);
+            for(const [key,child]of Object.entries(item)){if(test(key)&&child&&typeof child==='object')return globalThis.MinimalYouTubeSearchData.image(child);if(child&&typeof child==='object')stack.push(child);}
+        }
+        return '';
+    }
+    document.addEventListener('minimal-youtube:channel-identity',()=>{
+        const root=document.documentElement,data=globalThis.MinimalYouTubeSearchData;
+        if(!root.classList.contains('minimal-youtube')||!data)return;
+        let value=null;
+        try{
+            const browse=[...document.querySelectorAll('ytd-browse')].find(visible)||document.querySelector('ytd-browse');
+            const response=browse?.data?.response||browse?.data,meta=response?.metadata?.channelMetadataRenderer,header=response?.header;
+            const base=(location.pathname.match(/^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)/)?.[0]||'').toLowerCase();
+            const urls=[meta?.vanityChannelUrl,meta?.channelUrl,...(Array.isArray(meta?.ownerUrls)?meta.ownerUrls:[])].map(url=>{try{return new URL(url,location.origin).pathname.toLowerCase();}catch{return '';}});
+            // Identity for another channel is a page still in transition.
+            if(meta&&(urls.includes(base)||base==='/channel/'+String(meta.externalId||'').toLowerCase())){
+                const text=JSON.stringify(header||{});
+                value={base,title:String(meta.title||'').slice(0,300),avatar:data.image(meta.avatar)||largest(header,key=>/avatar/i.test(key)),
+                    banner:largest(header,key=>/banner/i.test(key)&&!/tv|mobile/i.test(key)),
+                    verified:/CHECK_CIRCLE|BADGE_STYLE_TYPE_VERIFIED|"verified"/i.test(text)};
+            }
+        }catch{value=null;}
+        const text=value?JSON.stringify(value):'';
+        if(root.getAttribute('data-myt-channel-identity')!==text){if(text)root.setAttribute('data-myt-channel-identity',text);else root.removeAttribute('data-myt-channel-identity');}
     });
 })();

@@ -1778,7 +1778,7 @@ html.minimal-youtube [data-myt-playlist-action-anchor]::backdrop { background: t
 }
 
 /* Channel identity keeps native avatar, subscription and description actions. */
-html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(yt-page-header-view-model h1, yt-page-header-renderer h1, ytd-page-header-renderer h1, ytd-c4-tabbed-header-renderer h1, ytd-channel-name #text, #channel-name #text) {
+html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#myt-channel-header .myt-ch-title, yt-page-header-view-model h1, yt-page-header-renderer h1, ytd-page-header-renderer h1, ytd-c4-tabbed-header-renderer h1, ytd-channel-name #text, #channel-name #text) {
     font-family: "MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif !important;
     font-size: clamp(36px, 4vw, 48px) !important;
     font-weight: 900 !important;
@@ -1790,6 +1790,106 @@ html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(yt-page-header-view
     overflow-wrap: anywhere;
 }
 html.minimal-youtube [data-myt-channel-tab-hidden] { display: none !important; }
+/* Owned channel header: viewport-wide banner, centered profile with a large
+   avatar, the name with its verified badge and YouTube's subscribe control on
+   one row, then stats and description. */
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    color: var(--myt-ink);
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-banner {
+    display: block;
+    width: 100%;
+    aspect-ratio: 6.2 / 1;
+    overflow: hidden;
+    background: var(--myt-soft);
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-banner[hidden] {
+    display: none;
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-banner img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-profile {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+    max-width: var(--myt-channel-width);
+    margin: 0 auto;
+    padding: 16px 24px 0;
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-avatar {
+    flex: none;
+    width: 240px;
+    height: 240px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--myt-soft);
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-avatar[hidden] {
+    display: none;
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-info {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-title-row {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) auto minmax(0, 1fr);
+    column-gap: 24px;
+    align-items: center;
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-title {
+    display: flex;
+    align-items: center;
+    gap: .22em;
+    min-width: 0;
+    margin: 0;
+    color: var(--myt-ink);
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-name {
+    min-width: 0;
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-verified {
+    flex: none;
+    width: .62em;
+    height: .62em;
+    color: var(--myt-ink);
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-verified[hidden] {
+    display: none;
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-actions {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-actions:empty {
+    display: none;
+}
+@media (max-width: 600px) {
+    html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-profile {
+        align-items: flex-start;
+        gap: 16px;
+        padding: 12px 16px 0;
+    }
+    html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-avatar {
+        width: 96px;
+        height: 96px;
+    }
+    html.minimal-youtube[data-myt-page="channel"] #myt-channel-header .myt-ch-title-row {
+        column-gap: 12px;
+    }
+}
+
 /* The subscribe control sits on the title row, right of the channel name.
    The row is found by its children (name and actions), not by class names
    YouTube renames; every other header line spans the full width below. */

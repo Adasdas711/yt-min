@@ -25,7 +25,7 @@ def fixture(legacy=False,contents=None):
       </style><ytd-app>'''+MASTHEAD+f'''
       <ytd-page-manager><ytd-browse page-subtype="channels"><div id="page-header"><div id="banner">Banner</div>
       <{profile}><div id="channel-header-container"><h1>Joe Speen — Мой канал</h1>
-      <img id="avatar" width="80" height="80" alt="Joe Speen">{metadata}
+      <img id="avatar" width="80" height="80" alt="Joe Speen" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Ccircle cx='40' cy='40' r='40' fill='%23e44'/%3E%3C/svg%3E">{metadata}
       <yt-description-preview-view-model><yt-attributed-string class="ytDescriptionPreviewViewModelTruncatedText"><span id="author-description" style="font-family:Arial">Пщщ! Я Joe Speen, а это мой канал.</span></yt-attributed-string><button id="description-more" class="ytDescriptionPreviewViewModelMoreButton" onclick="window.__more=(window.__more||0)+1"><span id="more-label">...ещё</span></button></yt-description-preview-view-model>
       <yt-channel-external-link-view-model><a href="https://t.me/joe_speen_youtube">t.me/joe_speen_youtube и ещё 5 ссылок</a></yt-channel-external-link-view-model>
       <ytd-subscribe-button-renderer><button id="subscribe" aria-label="Подписаться" onclick="this.textContent='Вы подписаны';window.__subscriptions=(window.__subscriptions||0)+1">Подписаться</button></ytd-subscribe-button-renderer>
@@ -53,14 +53,19 @@ def header(browser,legacy,width,dark):
     expect(page.locator('yt-channel-external-link-view-model')).to_be_hidden()
     expect(page.locator('#author-description')).to_have_text('Пщщ! Я Joe Speen, а это мой канал.')
     assert 'Mono' in page.locator('#myt-channel-description .summary').evaluate('e=>getComputedStyle(e).fontFamily')
-    expect(page.locator('h1')).to_have_text('Joe Speen — Мой канал')
+    expect(page.locator('#myt-channel-header h1')).to_have_text('Joe Speen — Мой канал')
+    # The owned header shows the name and avatar; the native profile is hidden
+    # and YouTube's subscribe control is the only native part, in its slot.
+    expect(page.locator('#channel-header-container')).to_be_hidden()
+    expect(page.locator('#myt-channel-header .myt-ch-actions #subscribe')).to_be_visible()
     expect(page.locator('#subscribe')).to_have_text('Subscribe')
     expect(page.locator('#description-more')).to_have_text('More')
     # Subscribe sits on the title row, right of the channel name, and the
     # avatar is one and a half times its native size.
-    title=page.locator('h1').bounding_box();button=page.locator('#subscribe').bounding_box()
+    title=page.locator('#myt-channel-header h1').bounding_box();button=page.locator('#subscribe').bounding_box()
     assert button['x']>=title['x']+title['width']-1 and abs(button['y']+button['height']/2-title['y']-title['height']/2)<title['height']/2,(title,button)
-    assert abs(page.locator('#avatar').bounding_box()['width']-120)<1,page.locator('#avatar').bounding_box()
+    avatar=page.locator('#myt-channel-header .myt-ch-avatar').bounding_box()
+    assert abs(avatar['width']-(240 if width>600 else 96))<1,avatar
     click_more(page)
     assert page.evaluate('__more')==1
     expect(page.get_by_role('button',name='Latest',exact=True)).to_be_visible()
