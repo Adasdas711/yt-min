@@ -44,7 +44,7 @@ def tabbed_fixture():
     return f'''<style>ytd-browse,ytd-tabbed-page-header,tp-yt-app-header-layout,tp-yt-app-header,tp-yt-app-toolbar,tp-yt-paper-tabs,yt-page-header-renderer,yt-page-header-view-model{{display:block}}
       tp-yt-app-header{{background:#0f0f0f}}#tabsContent{{display:flex}}
       ytd-tabbed-page-header #page-header{{max-width:1284px;margin:0 auto;padding:0 24px}}</style><ytd-app>{MASTHEAD}<ytd-page-manager><ytd-browse page-subtype="channels">
-      <div id="header"><ytd-tabbed-page-header><tp-yt-app-header-layout><div id="wrapper"><tp-yt-app-header id="header"><div id="contentContainer">
+      <div id="header"><ytd-tabbed-page-header><tp-yt-app-header-layout><div id="wrapper"><tp-yt-app-header id="header" style="position:fixed;top:56px;left:0;right:0;z-index:2;transform:translateY(0)"><div id="contentContainer">
         <div id="page-header-container"><div id="page-header-banner"><img alt="" src="{avatar}" style="width:100%;height:120px"></div>
           <div id="page-header"><yt-page-header-renderer><yt-page-header-view-model><yt-image-banner-view-model><img alt="" src="{avatar}" style="width:100%;height:150px"></yt-image-banner-view-model>
             <div class="yt-page-header-view-model__page-header-headline"><yt-decorated-avatar-view-model><img alt="" src="{avatar}" style="width:160px;height:160px"></yt-decorated-avatar-view-model>
@@ -52,8 +52,8 @@ def tabbed_fixture():
             <yt-flexible-actions-view-model><yt-subscribe-button-view-model><button id="subscribe">Subscribe</button></yt-subscribe-button-view-model></yt-flexible-actions-view-model></div></div>
           </yt-page-header-view-model></yt-page-header-renderer></div></div>
         <tp-yt-app-toolbar><div id="tabs-container"><tp-yt-paper-tabs><div id="tabsContainer"><div id="tabsContent">{tabs}</div></div></tp-yt-paper-tabs></div></tp-yt-app-toolbar>
-      </div></tp-yt-app-header></div></tp-yt-app-header-layout></ytd-tabbed-page-header></div>
-      <div id="contents"><ytd-rich-grid-renderer><div id="contents">{video(1)}</div></ytd-rich-grid-renderer></div></ytd-browse></ytd-page-manager></ytd-app>'''
+      </div></tp-yt-app-header><div id="contentContainer" style="padding-top:420px"></div></div></tp-yt-app-header-layout></ytd-tabbed-page-header></div>
+      <div id="contents" style="min-height:3000px"><ytd-rich-grid-renderer><div id="contents">{video(1)}</div></ytd-rich-grid-renderer></div></ytd-browse></ytd-page-manager></ytd-app>'''
 
 
 def tabbed_header(browser,width):
@@ -73,6 +73,21 @@ def tabbed_header(browser,width):
     assert avatar['y']<banner['y']+banner['height']<avatar['y']+avatar['height']/2,(banner,avatar)
     assert title['x']>=avatar['x']+avatar['width'] and title['y']>=banner['y']+banner['height'],(avatar,title)
     assert abs(description['x']-title['x'])<1,(title,description)
+    if width>900:
+        # The text column keeps the same distance from both window edges.
+        right=page.locator('#myt-channel-description').evaluate('e=>innerWidth-e.getBoundingClientRect().right')
+        assert abs(right-title['x'])<2,(title,right)
+    # YouTube's fixed, script-positioned app header becomes part of the page:
+    # it scrolls with the document (no lag) and its reserved space is gone.
+    assert page.evaluate("getComputedStyle(document.querySelector('tp-yt-app-header')).position")!='fixed'
+    top=own.bounding_box()['y'];page.evaluate('window.scrollTo(0,200)')
+    assert abs(own.bounding_box()['y']-(top-200))<1,own.bounding_box()
+    page.evaluate('window.scrollTo(0,2000)');page.wait_for_timeout(100)
+    # The navigation still stays pinned below the masthead.
+    nav=page.locator('#myt-channel-nav')
+    expect(nav.get_by_role('link',name='Videos',exact=True)).to_be_in_viewport()
+    assert 50<=nav.bounding_box()['y']<=140,nav.bounding_box()
+    page.evaluate('window.scrollTo(0,0)')
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     # The owned navigation inside tp-yt-paper-tabs stays visible below it.
     nav=page.locator('#myt-channel-nav')
