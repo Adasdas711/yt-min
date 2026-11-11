@@ -12,7 +12,7 @@ from channel import fixture as channel_fixture
 
 CONFIG = "window.ytcfg={get:name=>name==='INNERTUBE_CONTEXT'?{client:{clientName:'WEB',clientVersion:'2.20260101'}}:name==='INNERTUBE_API_KEY'?'fixture':undefined};"
 ITEM = """const item=(id,title,owner)=>({videoRenderer:{videoId:id,title:{runs:[{text:title}]},
-    thumbnail:{thumbnails:[{url:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg',width:480}]},
+    thumbnail:{thumbnails:[{url:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg',width:480}]},publishedTimeText:{simpleText:'3 days ago'},
     ownerText:{runs:[{text:owner||'Data creator',navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/@datacreator'}},browseEndpoint:{browseId:'UCdata',canonicalBaseUrl:'/@datacreator'}}}]},
     navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/watch?v='+id}},watchEndpoint:{videoId:id}}}});
 const more=token=>({continuationItemRenderer:{continuationEndpoint:{continuationCommand:{token}}}});"""
@@ -78,6 +78,8 @@ def channel_page(browser):
         tab('Videos',true,{richGridRenderer:{contents:[{richItemRenderer:{content:item('chanVideo01','Channel one')}},{richItemRenderer:{content:item('chanVideo02','Channel two')}},more('channel-two')]}})]}}};
       document.dispatchEvent(new Event('yt-page-data-updated'));""")
     expect(page.locator('#myt-search .media-title')).to_have_text(['Channel one', 'Channel two', 'Channel three'])
+    # Every video shows its upload date below the title.
+    expect(page.locator('#myt-search .media-date')).to_have_text(['3 days ago'] * 3)
     expect(page.locator('#sort-latest')).to_be_visible()
     page.locator('#sort-latest').scroll_into_view_if_needed()
     hit = page.locator('#sort-latest').evaluate('e=>{const r=e.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {height:r.height,hit:e===hit||e.contains(hit)}}')
@@ -98,6 +100,7 @@ def channel_header_and_chips(browser):
         chip_requests.append(route.request.post_data_json)
         route.fulfill(content_type='application/json', body=page.evaluate('()=>(()=>{' + ITEM + "return JSON.stringify({onResponseReceivedActions:[{reloadContinuationItemsCommand:{slot:'RELOAD_CONTINUATION_SLOT_BODY',continuationItems:[{richItemRenderer:{content:item('popular0001','Most popular')}}]}}]});})()"))
     page.route('https://www.youtube.com/youtubei/v1/browse**', api)
+    page.route('https://yt3.ggpht.com/**', lambda route: route.fulfill(content_type='image/svg+xml', body='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"/>'))
     expect(page.locator('#myt-search .media')).to_have_count(18)
     page.evaluate(CONFIG + ITEM + """
       const tab=(name,selected,content)=>({tabRenderer:{title:name,selected,endpoint:{commandMetadata:{webCommandMetadata:{url:'/@creator/'+name.toLowerCase()}}},content}});
@@ -105,7 +108,7 @@ def channel_header_and_chips(browser):
       document.querySelector('ytd-browse').data={
         metadata:{channelMetadataRenderer:{title:'Data Creator',externalId:'UCdatacreator0000000000',vanityChannelUrl:'https://www.youtube.com/@creator',
           avatar:{thumbnails:[{url:'https://yt3.ggpht.com/avatar=s88',width:88},{url:'https://yt3.ggpht.com/avatar=s900',width:900}]}}},
-        header:{pageHeaderRenderer:{content:{pageHeaderViewModel:{banner:{imageBannerViewModel:{image:{sources:[{url:'https://yt3.ggpht.com/banner=w1060',width:1060},{url:'https://yt3.ggpht.com/banner=w2560',width:2560}]}}},
+        header:{pageHeaderRenderer:{content:{pageHeaderViewModel:{banner:{imageBannerViewModel:{image:{sources:[{url:'https://yt3.ggpht.com/banner=w1060',width:1060},{url:'https://yt3.ggpht.com/banner=w2560-fcrop64=1,00005a57ffffa5a8-k-c0xffffffff-no-nd-rj',width:2560}]}}},
           title:{dynamicTextViewModel:{text:{content:'Data Creator',attachmentRuns:[{element:{type:{imageType:{image:{sources:[{clientResource:{imageName:'CHECK_CIRCLE_FILLED'}}]}}}}}]}}}}}}},
         contents:{twoColumnBrowseResultsRenderer:{tabs:[tab('Videos',true,{richGridRenderer:{
           header:{feedFilterChipBarRenderer:{contents:[chip('Новые',true,'chip-latest'),chip('Популярные',false,'chip-popular'),chip('Старые',false,'chip-oldest')]}},
@@ -115,7 +118,8 @@ def channel_header_and_chips(browser):
     header = page.locator('#myt-channel-header')
     expect(header.locator('.myt-ch-name')).to_have_text('Data Creator')
     expect(header.locator('.myt-ch-avatar')).to_have_attribute('src', 'https://yt3.ggpht.com/avatar=s900')
-    expect(header.locator('.myt-ch-banner img')).to_have_attribute('src', 'https://yt3.ggpht.com/banner=w2560')
+    # The banner loads the whole channel art, not YouTube's thin crop of it.
+    expect(header.locator('.myt-ch-banner img')).to_have_attribute('src', 'https://yt3.ggpht.com/banner=w2560-k-c0xffffffff-no-nd-rj')
     expect(header.locator('.myt-ch-verified')).to_be_visible()
     # YouTube's subscribe control is the only native part, beside the name.
     expect(header.locator('.myt-ch-actions #subscribe')).to_be_visible()

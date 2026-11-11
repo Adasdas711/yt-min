@@ -209,14 +209,14 @@
       .results-heading{margin:0 0 20px;font:600 18px/1.5 Arial,sans-serif;overflow-wrap:anywhere}
       .media{display:flex;flex-direction:column;gap:14px;min-width:0;height:100%;padding:12px 12px 18px;border-radius:18px;background:var(--myt-surface);transition:background .12s}
       .media:is(:hover,:focus-within){background:var(--myt-soft)}.cover{position:relative;display:block;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:var(--myt-soft)}.cover img{display:block;width:100%;height:100%;object-fit:cover}.media-info{display:flex;flex-direction:column;justify-content:center;gap:12px;min-width:0;padding:0 3px}
-      .media-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;font-size:20px;line-height:1.35;font-weight:700}.media.video .media-title{font-size:18px}
+      .media-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;font-size:17px;line-height:1.35;font-weight:700}.media.video .media-title{font-size:16px}.media-date{display:block;color:var(--myt-muted);font-size:14px;line-height:1.4}.media-date[hidden]{display:none}
       .media-channel{display:block;overflow-wrap:anywhere;color:var(--myt-muted);font-size:18px;font-weight:500;line-height:1.4}.media-channel:is(:hover,:focus-visible){color:var(--myt-ink)}
-      .media.playlist{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:center;gap:20px;padding-bottom:12px}.media.playlist .cover{width:100%}.playlist-badge{position:absolute;right:8px;bottom:8px;padding:4px 8px;border-radius:6px;background:#000b;color:#fff;font-size:13px}
+      .media.playlist{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:center;gap:20px;padding-bottom:12px}.media.playlist .cover{width:100%}.playlist-badge{position:absolute;right:8px;bottom:8px;display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:6px;background:#000b;color:#fff;font-size:13px}
       .group{min-width:0;padding:20px;border-radius:22px;background:var(--myt-soft)}.group h2{margin:0 0 18px;padding-inline-end:.2em;overflow:visible;overflow-wrap:anywhere;font:italic 900 40px/1.05 "MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:-.025em}
-      :host([data-channel]) .media.playlist{display:flex;flex-direction:column;gap:14px;padding-bottom:18px}:host([data-channel]) .media.playlist .media-title{font-size:18px}
+      :host([data-channel]) .media.playlist{display:flex;flex-direction:column;gap:14px;padding-bottom:18px}:host([data-channel]) .media.playlist .media-title{font-size:16px}.playlist-badge[hidden]{display:none}.playlist-badge svg{width:15px;height:15px;flex:none}.media.playlist :is(.media-info,.playlist-badge){font-family:"SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace}.media.playlist .media-title{font-weight:600}
       /* Keep 20px gaps fixed while reducing channel column widths by 15%. */
       :host([data-channel]) :is(.row,.results-heading){width:calc(85% + (var(--myt-columns,1) - 1)*3px);margin-inline:auto}
-      .empty{padding:32px 0;color:var(--myt-muted)}.more{height:1px}
+      .empty{padding:32px 0;color:var(--myt-muted)}:host([data-channel]) .empty{display:flex;align-items:center;justify-content:center;min-height:max(240px,calc(100vh - 360px));margin:0;padding:24px 0;text-align:center;font:700 32px/1.3 Arial,sans-serif;color:var(--myt-ink)}:host([data-channel]) .empty[hidden]{display:none}.more{height:1px}
       .chips{display:flex;flex-wrap:wrap;gap:12px;margin:0 auto 24px}.chips[hidden]{display:none}:host([data-channel]) .chips{width:calc(85% + (var(--myt-columns,1) - 1)*3px)}
       .chip{height:32px;margin:0;padding:0 12px;border:0;border-radius:8px;background:var(--myt-soft);color:var(--myt-ink);font:500 14px/32px Roboto,Arial,sans-serif;cursor:pointer}
       .chip:hover{filter:brightness(1.15)}.chip[aria-pressed="true"]{background:var(--myt-ink);color:var(--myt-bg)}.chip:focus-visible{outline:2px solid var(--myt-muted);outline-offset:2px}
@@ -228,15 +228,18 @@
       .post-media{display:grid;grid-template-columns:minmax(0,200px) minmax(0,1fr);gap:14px;align-items:center;margin-bottom:12px;color:inherit;text-decoration:none}.post-media img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:10px;background:var(--myt-soft)}.post-media span{font-weight:600;overflow-wrap:anywhere}
       .post-poll{display:grid;gap:8px;margin:0 0 8px;padding:0;list-style:none}.post-poll li{padding:10px 14px;border:1px solid var(--myt-border);border-radius:10px}
       .post-meta{display:flex;flex-wrap:wrap;gap:16px;color:var(--myt-muted);font-size:13px}.post-meta:empty{display:none}
-      @media(max-width:600px){.post{padding:16px}.post-media{grid-template-columns:1fr}}@media(max-width:700px){.channels{grid-template-columns:1fr}.media-title{font-size:18px}.media.video .media-title{font-size:16px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}:host([data-channel]) .row{width:calc(85% + (var(--myt-columns,1) - 1)*2.4px)}}
+      @media(max-width:600px){.post{padding:16px}.post-media{grid-template-columns:1fr}}@media(max-width:700px){.channels{grid-template-columns:1fr}.media-title{font-size:16px}.media.video .media-title{font-size:15px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}:host([data-channel]) .row{width:calc(85% + (var(--myt-columns,1) - 1)*2.4px)}}
     `;
+    const videoIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3Z"/></svg>';
+    const datedText=value=>(globalThis.MinimalYouTubeSearchData?.publishedPattern||/\bago\b|назад/iu).test(value);
     class MediaCard{
         constructor(source,kind){
             this.source=source;this.host=node('article','media '+kind);this.host.dataset.kind=kind;
             this.cover=node('a','cover');this.image=node('img');this.image.alt='';this.image.decoding='async';this.cover.append(this.image);
-            this.info=node('div','media-info');this.title=node('a','media-title');this.owner=node('a','media-channel');this.info.append(this.title,this.owner);
+            this.info=node('div','media-info');this.title=node('a','media-title');this.owner=node('a','media-channel');this.date=node('span','media-date');this.date.hidden=true;this.info.append(this.title,this.owner,this.date);
             this.host.append(this.cover,this.info);
-            if(kind==='playlist'){this.badge=node('span','playlist-badge','Playlist');this.cover.append(this.badge);}
+            // A playlist shows its video count with a video icon, or nothing.
+            if(kind==='playlist'){this.badge=node('span','playlist-badge');this.badgeCount=node('span');this.badge.append(this.badgeCount);this.badge.insertAdjacentHTML('beforeend',videoIcon);this.badge.hidden=true;this.cover.append(this.badge);}
             for(const control of [this.cover,this.title,this.owner])control.addEventListener('click',event=>{
                 if(event.button||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey)return;
                 const main=control===this.title?this.source.querySelector(titleSelector):null;
@@ -252,7 +255,8 @@
             this.owner.hidden=!data.channel.name;if(data.channel.href)this.owner.href=data.channel.href;else this.owner.removeAttribute('href');
             if(this.image.getAttribute('src')!==data.image){if(data.image)this.image.src=data.image;else this.image.removeAttribute('src');}
             this.image.hidden=!data.image;
-            if(this.badge){const label=data.count?data.count+(data.count==='1'?' video':' videos'):'Playlist';if(this.badge.textContent!==label)this.badge.textContent=label;}
+            const date=data.published||'';if(this.date.textContent!==date)this.date.textContent=date;this.date.hidden=!date;
+            if(this.badge){const count=data.count||'';if(this.badgeCount.textContent!==count)this.badgeCount.textContent=count;this.badge.hidden=!count;this.badge.setAttribute('aria-label',count?count+(count==='1'?' video':' videos'):'');}
         }
         destroy(){this.host.remove();}
     }
@@ -433,7 +437,8 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             if(!image&&parsed.searchParams.get('v')?.match(/^[-\w]{11}$/))image='https://i.ytimg.com/vi/'+parsed.searchParams.get('v')+'/hqdefault.jpg';
             const count=kind==='playlist'?([...source.querySelectorAll(countSelector)].map(node=>countNumber(node.getAttribute('data-video-count')||node.getAttribute('aria-label')||text(node))).find(Boolean)||countNumber(record?.count)||countNumber(cached?.count)):'';
             const hideChannel=this.channel&&/\/search\/?$/.test(location.pathname);
-            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,count,channel:hideChannel?{name:'',href:''}:{name:text(owner)||record?.channel?.name||'',href:channelURL(owner?.href||record?.channel?.href)}};
+            const published=kind==='video'?record?.published||[...source.querySelectorAll('#metadata-line span,.inline-metadata-item,.ytContentMetadataViewModelMetadataText,[class*="MetadataText"]')].map(text).find(value=>value&&value.length<100&&datedText(value))||'':'';
+            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,count,published,channel:hideChannel?{name:'',href:''}:{name:text(owner)||record?.channel?.name||'',href:channelURL(owner?.href||record?.channel?.href)}};
         }
         sync(searches){
             if(!this.nativeStyle.isConnected)document.documentElement.append(this.nativeStyle);
@@ -524,6 +529,8 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             this.q('.empty').textContent=this.channel&&!query?(/\/playlists\/?$/.test(url.pathname)?'No playlists yet.':/\/(?:posts|community)\/?$/.test(url.pathname)?'No posts yet.':'No videos yet.'):'No results found.';
             this.renderChips(model);
             this.q('.channels').hidden=!this.channels.size||blank;this.q('.empty').hidden=Boolean(blank||this.channels.size||stream.length||busy||this.channel&&!query&&!confirmedEmpty);
+            // One message for an empty search: no heading above it.
+            if(!this.q('.empty').hidden)this.q('.results-heading').hidden=true;
             this.prepareNative(search);this.translateFilters();this.layout();this.requestMore();
         }
         pageModel(){
