@@ -11,8 +11,8 @@ from search import video, channel
 from channel import fixture as channel_fixture
 
 CONFIG = "window.ytcfg={get:name=>name==='INNERTUBE_CONTEXT'?{client:{clientName:'WEB',clientVersion:'2.20260101'}}:name==='INNERTUBE_API_KEY'?'fixture':undefined};"
-ITEM = """const item=(id,title,owner)=>({videoRenderer:{videoId:id,title:{runs:[{text:title}]},
-    thumbnail:{thumbnails:[{url:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg',width:480}]},publishedTimeText:{simpleText:'3 days ago'},
+ITEM = """const item=(id,title,owner,published)=>({videoRenderer:{videoId:id,title:{runs:[{text:title}]},
+    thumbnail:{thumbnails:[{url:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg',width:480}]},publishedTimeText:{simpleText:published||'3 days ago'},
     ownerText:{runs:[{text:owner||'Data creator',navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/@datacreator'}},browseEndpoint:{browseId:'UCdata',canonicalBaseUrl:'/@datacreator'}}}]},
     navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/watch?v='+id}},watchEndpoint:{videoId:id}}}});
 const more=token=>({continuationItemRenderer:{continuationEndpoint:{continuationCommand:{token}}}});"""
@@ -75,11 +75,17 @@ def channel_page(browser):
     page.evaluate(CONFIG + ITEM + """
       const tab=(name,selected,content)=>({tabRenderer:{title:name,selected,endpoint:{commandMetadata:{webCommandMetadata:{url:'/@creator/'+name.toLowerCase()}}},content}});
       document.querySelector('ytd-browse').data={contents:{twoColumnBrowseResultsRenderer:{tabs:[
-        tab('Videos',true,{richGridRenderer:{contents:[{richItemRenderer:{content:item('chanVideo01','Channel one')}},{richItemRenderer:{content:item('chanVideo02','Channel two')}},more('channel-two')]}})]}}};
+        tab('Videos',true,{richGridRenderer:{contents:[{richItemRenderer:{content:item('chanVideo01','Channel one')}},{richItemRenderer:{content:item('chanVideo02','Channel two','','1 year ago')}},more('channel-two')]}})]}}};
       document.dispatchEvent(new Event('yt-page-data-updated'));""")
     expect(page.locator('#myt-search .media-title')).to_have_text(['Channel one', 'Channel two', 'Channel three'])
     # Every video shows its upload date below the title.
-    expect(page.locator('#myt-search .media-date')).to_have_text(['3 days ago'] * 3)
+    # Older than four months: month and year, counted back from today.
+    import datetime
+    year_ago = datetime.date.today().replace(year=datetime.date.today().year - 1).strftime('%B %Y')
+    expect(page.locator('#myt-search .media-date')).to_have_text(['3 days ago', year_ago, '3 days ago'])
+    # A channel's own cards carry no owner line.
+    expect(page.locator('#myt-search .media-channel')).to_have_count(3)
+    assert page.locator('#myt-search .media-channel').evaluate_all('nodes=>nodes.every(n=>!n.getClientRects().length)')
     expect(page.locator('#sort-latest')).to_be_visible()
     page.locator('#sort-latest').scroll_into_view_if_needed()
     hit = page.locator('#sort-latest').evaluate('e=>{const r=e.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {height:r.height,hit:e===hit||e.contains(hit)}}')
@@ -153,6 +159,7 @@ def channel_posts(browser):
     posts = page.locator('#myt-search .post')
     expect(posts).to_have_count(2)
     expect(posts.first.locator('.post-text')).to_have_text('First post\nwith two lines')
+    assert 'monospace' in posts.first.locator('.post-text').evaluate('e=>getComputedStyle(e).fontFamily')
     expect(posts.first.locator('.post-images img')).to_have_attribute('src', 'https://yt3.ggpht.com/post-image=s1080')
     expect(posts.first.locator('.post-time')).to_have_attribute('href', 'https://www.youtube.com/post/UgPost1')
     expect(posts.nth(1).locator('.post-poll li')).to_have_text(['Option A', 'Option B'])

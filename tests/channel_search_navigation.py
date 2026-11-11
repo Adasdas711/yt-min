@@ -39,7 +39,7 @@ def labels_and_sections(browser,width):
         wait_section(page,section)
         assert not pending
         expect(root.locator('.media-title')).to_have_text([expected])
-        expect(root.locator('.media-channel')).to_be_visible()
+        expect(root.locator('.media-channel')).to_be_hidden()
         expect(root.get_by_role('heading',name='Результаты поиска',exact=True)).to_be_hidden()
         expect(root.locator('.empty')).to_be_hidden()
         expect(nav.get_by_role('link',name=title,exact=True)).to_have_attribute('aria-current','page')

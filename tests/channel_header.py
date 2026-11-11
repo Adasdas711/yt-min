@@ -44,7 +44,7 @@ def tabbed_fixture():
     return f'''<style>ytd-browse,ytd-tabbed-page-header,tp-yt-app-header-layout,tp-yt-app-header,tp-yt-app-toolbar,tp-yt-paper-tabs,yt-page-header-renderer,yt-page-header-view-model{{display:block}}
       tp-yt-app-header{{background:#0f0f0f}}#tabsContainer{{position:relative;overflow:hidden;height:48px}}#tabsContent{{display:flex;position:absolute;left:0;top:0}}
       ytd-tabbed-page-header #page-header{{max-width:1284px;margin:0 auto;padding:0 24px}}ytd-app > #content{{display:block;overflow-x:hidden}}html[dark],ytd-app{{background:#0f0f0f}}</style><ytd-app>{MASTHEAD}<div id="content"><ytd-page-manager><ytd-browse page-subtype="channels">
-      <div id="header"><ytd-tabbed-page-header><tp-yt-app-header-layout><div id="wrapper"><tp-yt-app-header id="header" style="position:fixed;top:56px;left:0;right:0;z-index:2;transform:translateY(0)"><div id="contentContainer">
+      <div id="header"><ytd-tabbed-page-header style="padding-top:24px"><div class="empty-row" style="height:36px"></div><tp-yt-app-header-layout><div id="wrapper"><tp-yt-app-header id="header" style="position:fixed;top:56px;left:0;right:0;z-index:2;transform:translateY(0)"><div id="contentContainer">
         <div id="page-header-container"><div id="page-header-banner"><img alt="" src="{avatar}" style="width:100%;height:120px"></div>
           <div id="page-header"><yt-page-header-renderer><yt-page-header-view-model><yt-image-banner-view-model><img alt="" src="{avatar}" style="width:100%;height:150px"></yt-image-banner-view-model>
             <div class="yt-page-header-view-model__page-header-headline"><yt-decorated-avatar-view-model><img alt="" src="{avatar}" style="width:160px;height:160px"></yt-decorated-avatar-view-model>
