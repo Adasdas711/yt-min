@@ -53,11 +53,18 @@ def check_popup(browser):
 
 def check_layout(browser):
     page = popup(browser, 'https://www.youtube.com/')
-    # Three blocks; the only visible text is the extension's name.
-    assert page.evaluate("document.querySelector('main').children.length") == 4  # three blocks + a hidden live region
+    # Three blocks: the name, a custom toggle and a button of the same shape, without frames.
+    assert page.evaluate("[...document.querySelector('main').children].filter(e => !e.matches('.visually-hidden')).length") == 2
+    assert page.locator('.controls > .toggle').count() == 2
     visible = page.evaluate('''() => { const out = [], walk = document.createTreeWalker(document.querySelector('main'), NodeFilter.SHOW_TEXT);
       while (walk.nextNode()) { const n = walk.currentNode; if (n.data.trim() && !n.parentElement.closest('.visually-hidden,[hidden]')) out.push(n.data.trim()); } return out; }''')
     assert visible == ['Minimal YouTube'], visible
+    # The switch and the copy button share one outer shape; only the switch has a knob.
+    sizes = page.evaluate("[...document.querySelectorAll('.toggle')].map(e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e); return [Math.round(r.width), Math.round(r.height), s.borderTopWidth, s.borderTopLeftRadius]; })")
+    assert len(sizes) == 2 and sizes[0] == sizes[1] and sizes[0][1] >= 64 and sizes[0][2] == '0px', sizes
+    assert page.locator('.setting .toggle__knob').bounding_box()['width'] >= 48
+    assert page.locator('#diagnostics .toggle__knob').count() == 0
+    expect(page.locator('#diagnostics')).to_have_attribute('type', 'button')
     expect(page.get_by_role('switch', name='Focus mode')).to_be_checked()
     expect(page.get_by_role('button', name='Copy diagnostic report')).to_be_visible()
     page.close()

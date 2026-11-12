@@ -6,53 +6,56 @@
     --muted: #64676d;
     --border: #e5e6e9;
     --accent: #d9233c;
-    --track: #c7cad0;
+    --track: #e3e5e9;
+    --knob: #ffffff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 * { box-sizing: border-box; }
-body { width: 300px; margin: 0; background: var(--background); color: var(--text); font-size: 13px; line-height: 1.5; }
-main { display: grid; gap: 12px; padding: 20px; }
+body { width: 340px; margin: 0; background: var(--background); color: var(--text); font-size: 13px; line-height: 1.5; }
+main { display: grid; gap: 22px; padding: 24px; }
 
 /* 1. Name */
-.brand { display: flex; align-items: center; gap: 12px; margin: 0 0 6px; }
+.brand { display: flex; align-items: center; gap: 12px; margin: 0; }
 .brand__mark { width: 36px; height: 27px; flex-shrink: 0; color: var(--accent); }
 h1 { margin: 0; font-size: 16px; line-height: 1.3; letter-spacing: -.4px; font-weight: 650; }
 
-/* 2. On/off and 3. Logs: symbols only, one card style. */
-.card { display: flex; align-items: center; width: 100%; min-height: 60px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--text); font: inherit; }
-.card__icon { width: 22px; height: 22px; flex-shrink: 0; fill: none; stroke: var(--muted); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; transition: stroke .18s ease; }
-.setting { gap: 12px; cursor: pointer; }
-.setting:has(input:checked) .card__icon { stroke: var(--accent); }
-.setting__error { display: inline-flex; margin-left: auto; }
-.setting__error[hidden] { display: none; }
-.setting__error svg { width: 20px; height: 20px; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; }
-.switch { position: relative; flex-shrink: 0; width: 42px; height: 25px; margin-left: auto; }
-.setting__error:not([hidden]) + .switch { margin-left: 0; }
-.switch input { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; opacity: 0; margin: 0; cursor: pointer; }
-.switch__track { position: absolute; inset: 0; border-radius: 30px; background: var(--track); transition: background .18s ease; }
-.switch__track::before { content: ""; position: absolute; top: 3px; left: 3px; width: 19px; height: 19px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0002; transition: transform .18s ease; }
-.switch input:checked + .switch__track { background: var(--accent); }
-.switch input:checked + .switch__track::before { transform: translateX(17px); }
-.switch input:focus-visible + .switch__track { outline: 3px solid var(--accent); outline-offset: 4px; }
-.switch input:disabled { cursor: wait; }
-.switch input:disabled + .switch__track { opacity: .55; }
+/* 2. On/off and 3. Logs: two large custom toggles of one shape, no frames.
+   The knob carries the symbol; it slides to show the state. */
+.controls { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.toggle { position: relative; display: block; width: 100%; height: 72px; margin: 0; padding: 0; border: 0; border-radius: 36px; background: var(--track); color: var(--text); font: inherit; cursor: pointer; transition: background .2s ease; -webkit-tap-highlight-color: transparent; }
+.toggle__knob { position: absolute; top: 8px; left: 8px; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--knob); box-shadow: 0 2px 6px #0003; transition: transform .22s cubic-bezier(.3,.7,.3,1), left .22s cubic-bezier(.3,.7,.3,1); }
+.toggle__knob svg { width: 26px; height: 26px; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: stroke .2s ease; }
+.toggle:hover { filter: brightness(1.06); }
 
-.logs { justify-content: center; cursor: pointer; transition: border-color .15s ease; }
-.logs:hover { border-color: var(--muted); }
-.logs:hover .logs__icon--copy { stroke: var(--text); }
-.logs:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.setting input { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.setting:has(input:checked) { background: var(--accent); }
+.setting:has(input:checked) .toggle__knob { left: calc(100% - 64px); }
+.setting:has(input:checked) .toggle__knob svg { stroke: var(--accent); }
+.setting:has(input:focus-visible), .logs:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.setting:has(input:disabled) { opacity: .55; }
+.setting input:disabled { cursor: wait; }
+.toggle__error { position: absolute; top: 50%; right: 22px; translate: 0 -50%; display: flex; }
+.setting:has(input:checked) .toggle__error { right: auto; left: 22px; }
+.toggle__error[hidden] { display: none; }
+.toggle__error svg { width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; }
+
+.logs { display: grid; place-items: center; transition: background .2s ease, transform .12s ease; }
+/* A button in the toggle's shape: no knob; the symbol sits in the middle. */
+.logs:active { transform: scale(.97); }
 .logs:disabled { cursor: wait; }
-.logs__icon { display: none; }
+.logs:focus { outline: none; }
+.logs__icon { display: none; width: 30px; height: 30px; fill: none; stroke: var(--text); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .logs:not([data-state]) .logs__icon--copy, .logs[data-state="busy"] .logs__icon--busy,
 .logs[data-state="done"] .logs__icon--done, .logs[data-state="error"] .logs__icon--error { display: block; }
+.logs[data-state="done"] { background: #2e9e5b; }
+.logs[data-state="error"] { background: var(--accent); }
+.logs:is([data-state="done"], [data-state="error"]) .logs__icon { stroke: #fff; stroke-width: 2.2; }
 .logs__icon--busy { animation: logs-spin .8s linear infinite; }
-.logs__icon--done { stroke: #2e9e5b; }
-.logs__icon--error { stroke: var(--accent); }
 @keyframes logs-spin { to { transform: rotate(360deg); } }
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (prefers-color-scheme: dark) {
-    :root { --background: #111214; --surface: #1b1c20; --text: #f0f1f3; --muted: #a2a5ae; --border: #2c2e34; --accent: #f04459; --track: #484b54; }
+    :root { --background: #111214; --surface: #1b1c20; --text: #f0f1f3; --muted: #a2a5ae; --border: #2c2e34; --accent: #f04459; --track: #2a2c32; --knob: #f4f5f7; }
 }
-@media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; } .logs__icon--busy { animation: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; } .logs__icon--busy { animation: none; } .toggle, .toggle__knob { transition: none !important; } .logs:active { transform: none; } }
