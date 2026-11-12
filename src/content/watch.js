@@ -1219,7 +1219,7 @@ main.has-sidecar .details { min-height:0; }
             if(this.surface.style.getPropertyValue('--playlist-min-height')!==minimum)this.surface.style.setProperty('--playlist-min-height',minimum);
         }
         clearScrollBinding(node,state) {
-            state.scrollAnimation?.cancel();state.scrollAnimation=null;state.scrollKey=null;
+            for(const animation of state.scrollAnimations||[])animation.cancel();state.scrollAnimations=null;state.scrollKey=null;
             node.removeAttribute('data-myt-scroll-bound');
         }
         positionScrollIsland(node,state,box,scroll) {
@@ -1239,11 +1239,18 @@ main.has-sidecar .details { min-height:0; }
                     node.style.removeProperty('translate');node.style.removeProperty('clip-path');
                     const offsets=[0,1],crossing=(base.y-header)/extent;
                     if(crossing>0&&crossing<1)offsets.splice(1,0,crossing);
-                    const frames=offsets.map(offset=>({offset,translate:`0px ${-extent*offset}px`,clipPath:`inset(${Math.max(0,header-base.y+extent*offset)}px 0px 0px)`}));
-                    state.scrollAnimation=node.animate(frames,{timeline:this.scrollTimeline,duration:1,fill:'both',easing:'linear'});
+                    // Two animations: Chrome cannot composite clip-path, and one
+                    // shared effect would pull the movement onto the main thread,
+                    // where it lags while YouTube boots. The movement stays on
+                    // the compositor; only the clip under the header follows.
+                    const timing={timeline:this.scrollTimeline,duration:1,fill:'both',easing:'linear'};
+                    state.scrollAnimations=[
+                        node.animate(offsets.map(offset=>({offset,translate:`0px ${-extent*offset}px`})),timing),
+                        node.animate(offsets.map(offset=>({offset,clipPath:`inset(${Math.max(0,header-base.y+extent*offset)}px 0px 0px)`})),timing),
+                    ];
                     state.scrollKey=key;node.setAttribute('data-myt-scroll-bound','');return;
                 }catch{this.clearScrollBinding(node,state);}
-            }else if(state.scrollAnimation)this.clearScrollBinding(node,state);
+            }else if(state.scrollAnimations)this.clearScrollBinding(node,state);
             // Chrome 114 fallback: the same cached document coordinates and
             // immediate wheel handling, with no smoothing or repeated layout.
             const translation=`0px ${-scroll}px`,clip=`inset(${Math.max(0,header-box.y)}px 0px 0px)`;
