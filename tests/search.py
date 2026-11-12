@@ -107,7 +107,10 @@ def check(browser,width,dark,prune=True):
         expect(images.nth(i)).to_have_attribute('src',f'https://yt3.googleusercontent.com/avatar{i+1}')
         expect(images.nth(i)).to_be_visible()
         page.wait_for_function("""i=>[...document.querySelector('#myt-search').shadowRoot.querySelectorAll('[data-myt-search-channel-card]')][i].shadowRoot.querySelector('img').naturalWidth===176""",arg=i)
-    expected=['video','playlist','video','playlist','group','video','group']
+    # Two columns: a playlist after a video does not fit, so the next video
+    # fills that row instead of leaving an empty cell.
+    columns=page.evaluate("()=>Number(document.querySelector('#myt-search').shadowRoot.querySelector('.stream > .row').style.gridTemplateColumns.match(/repeat\\((\\d+)/)[1])")
+    expected=['video','video','playlist','playlist','group','video','group'] if columns==2 else ['video','playlist','video','playlist','group','video','group']
     actual=root.locator('.stream > .row > .media,.stream > .group').evaluate_all('(nodes)=>nodes.map(node=>node.dataset.kind)')
     assert actual==expected,actual
     geometry(page)

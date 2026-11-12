@@ -731,17 +731,32 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             for(const group of this.groups.values())this.place(group.stream,group.items,columns===3&&[2,4].includes(group.items.length)?2:columns);
         }
         place(container,items,columns){
-            // Preserve source order and fixed units; native wrappers never
-            // reserve cells. A playlist occupies exactly two video columns.
+            // Source order with fixed units; native wrappers never reserve
+            // cells. A playlist occupies exactly two video columns, and rows
+            // never keep a gap a later video can fill.
             const signature=items.map(item=>item.host.dataset.kind+':'+(item.host.dataset.href||item.title?.textContent||'')).join('|')+':'+columns;
             if(container.dataset.layout===signature&&items.every(item=>item.host.isConnected))return;
             container.dataset.layout=signature;let row=null,used=0,content=[];
             const flush=()=>{if(!row)return;row.style.gridTemplateColumns='repeat('+columns+',minmax(0,1fr))';if(this.channel)row.style.setProperty('--myt-columns',String(columns));content.push(row);row=null;used=0;};
-            for(const item of items){
-                if(item.items||item.host.dataset.kind==='post'){flush();content.push(item.host);continue;}
-                const units=Math.min(columns,!this.channel&&item.host.dataset.kind==='playlist'?2:1);
-                if(row&&used+units>columns)flush();
-                if(!row)row=node('div','row');item.host.style.gridColumn='span '+units;row.append(item.host);used+=units;
+            const solo=item=>item.items||item.host.dataset.kind==='post';
+            const unitsOf=item=>Math.min(columns,!this.channel&&item.host.dataset.kind==='playlist'?2:1);
+            const put=(item,units)=>{if(!row)row=node('div','row');item.host.style.gridColumn='span '+units;row.append(item.host);used+=units;};
+            const queue=items.slice();
+            while(queue.length){
+                const item=queue.shift();
+                if(solo(item)){flush();content.push(item.host);continue;}
+                const units=unitsOf(item);
+                if(row&&used+units>columns){
+                    // A playlist that does not fit would leave an empty cell:
+                    // the nearest following videos fill it first. Items never
+                    // move across a group or a post.
+                    for(let index=0;index<queue.length&&used<columns;index++){
+                        const next=queue[index];if(solo(next))break;
+                        const size=unitsOf(next);if(used+size<=columns){put(next,size);queue.splice(index--,1);}
+                    }
+                    flush();
+                }
+                put(item,units);
                 if(used===columns)flush();
             }
             flush(false);container.replaceChildren(...content);
