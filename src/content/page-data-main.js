@@ -95,14 +95,19 @@
         }
         return null;
     }
-    function chips(content){
+    // Channel sort chips and the search header chips (All, Unwatched,
+    // Videos...). Each reloads the feed with its continuation; a selected
+    // chip without one (search "All") restores the original results.
+    function chips(content,header){
         const data=globalThis.MinimalYouTubeSearchData;
-        const bar=content?.richGridRenderer?.header?.feedFilterChipBarRenderer||content?.sectionListRenderer?.header?.feedFilterChipBarRenderer;
+        const bar=content?.richGridRenderer?.header?.feedFilterChipBarRenderer||content?.sectionListRenderer?.header?.feedFilterChipBarRenderer||header?.chipBar?.chipCloudRenderer;
         const result=[];
-        for(const item of bar?.contents||[]){
-            const chip=item.chipCloudChipRenderer||item.chipViewModel;if(!chip)continue;
-            const label=data.label(chip.text||chip.title).trim(),value=token(chip.navigationEndpoint||chip.tapCommand||chip);
-            if(label&&value)result.push({label:label.slice(0,60),selected:Boolean(chip.isSelected||chip.selected),token:value});
+        for(const item of bar?.contents||bar?.chips||[]){
+            const chip=item?.chipCloudChipRenderer||item?.chipViewModel;if(!chip)continue;
+            const label=data.label(chip.text||chip.title).trim(),value=token(chip.navigationEndpoint||chip.tapCommand||chip),selected=Boolean(chip.isSelected||chip.selected);
+            // Shorts never appear, so their chip would only empty the page.
+            if(!label||shortsTitle.test(label)||!value&&!selected)continue;
+            result.push({label:label.slice(0,60),selected,token:value});
         }
         return result.slice(0,8);
     }
@@ -144,7 +149,8 @@
             const search=document.querySelector('#myt-search')?.closest('ytd-search')||[...document.querySelectorAll('ytd-search')].find(visible);
             const data=search?.data;
             const list=(data?.contents||data?.response?.contents)?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents;
-            return Array.isArray(list)?{type:'search',list,content:data}:null;
+            const header=[...(search.querySelectorAll('ytd-search-header-renderer')||[])].map(node=>node.data).find(value=>value?.chipBar)||(data?.header||data?.response?.header)?.searchHeaderRenderer;
+            return Array.isArray(list)?{type:'search',list,content:data,header}:null;
         }
         if(path==='/playlist'){
             const list=new URL(location.href).searchParams.get('list')||'';
@@ -174,8 +180,12 @@
         if(!value){
             value={key:routeKey(),type:found.type,items:[],continuation:'',loading:false,failed:false,chips:[]};
             try{parse(found.list,value,'',found.type!=='search');value.chips=found.type==='channel'?chips(found.content):[];}catch{return null;}
+            value.initial={items:value.items.slice(),continuation:value.continuation};
             models.set(found.list,value);
         }
+        // The search header renders after the results: read its chips once
+        // they exist.
+        if(found.type==='search'&&!value.chips.length&&found.header){try{value.chips=chips(null,found.header);}catch{value.chips=[];}}
         return value;
     }
     function publish(){
@@ -277,7 +287,8 @@
         const chip=state?.chips?.[index];
         if(!chip||chip.selected||state.loading||state.key!==routeKey())return;
         for(const item of state.chips)item.selected=item===chip;
-        load(state,chip.token,true);
+        if(chip.token){load(state,chip.token,true);return;}
+        state.items=state.initial.items.slice();state.continuation=state.initial.continuation;state.failed=false;publish();
     });
     // Public watch page data: title, description with its links and
     // timestamps, chapters, views, date, owner and the playlist panel. Data

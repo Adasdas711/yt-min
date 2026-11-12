@@ -365,6 +365,10 @@ html.minimal-youtube[data-myt-search-ui]:not([data-myt-page-data]) ytd-search yt
     display:block !important;position:static !important;width:100% !important;height:2px !important;margin:0 !important;padding:0 !important;overflow:hidden !important;
 }
 html.minimal-youtube[data-myt-search-ui][data-myt-own-chips] ytd-search :is(ytd-feed-filter-chip-bar-renderer, yt-chip-cloud-renderer) { display:none !important; }
+/* "About these results" is YouTube's help, not a search control. With own
+   chips and own filters nothing of the native search header remains. */
+html.minimal-youtube[data-myt-search-ui] ytd-search ytd-search-header-renderer #about-these-results { display:none !important; }
+html.minimal-youtube[data-myt-search-ui][data-myt-own-chips] ytd-search ytd-search-header-renderer[data-myt-own-filters] { display:none !important; }
 html.minimal-youtube[data-myt-search-ui][data-myt-page-data] ytd-search ytd-continuation-item-renderer,
 html.minimal-youtube[data-myt-search-ui][data-myt-page-data] ytd-search ytd-continuation-item-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) { display:none !important; }
 html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) {
@@ -669,12 +673,14 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             for(const[button,value]of state.buttons){if(value===null)button.removeAttribute('aria-expanded');else button.setAttribute('aria-expanded',value);}
         }
         renderChips(model){
-            const bar=this.q('.chips'),chips=this.channel&&Array.isArray(model?.chips)?model.chips:[];
+            const bar=this.q('.chips'),chips=Array.isArray(model?.chips)?model.chips:[];
+            // Search chips take the place of YouTube's chip bar: above Filters.
+            if(!this.channel&&bar.nextElementSibling!==this.q('.filters'))this.q('.filters').before(bar);
             const signature=JSON.stringify(chips);
             if(bar.dataset.value!==signature){
                 bar.dataset.value=signature;
                 bar.replaceChildren(...chips.map((chip,index)=>{
-                    const button=node('button','chip',chipLabels.get(String(chip.label).toLocaleLowerCase())||chip.label);button.type='button';
+                    const button=node('button','chip',chipLabels.get(String(chip.label).toLocaleLowerCase())||englishFilter(String(chip.label))||chip.label);button.type='button';
                     button.setAttribute('aria-pressed',String(Boolean(chip.selected)));
                     button.addEventListener('click',()=>{document.documentElement.setAttribute('data-myt-page-model-chip',String(index));document.dispatchEvent(new Event('minimal-youtube:page-model-chip'));});
                     return button;
