@@ -49,7 +49,7 @@ async function main() {
     vm.runInContext(fs.readFileSync(path.join(__dirname, "../src/optimization.js"), "utf8"), context);
     vm.runInContext(fs.readFileSync(path.join(__dirname, "../src/background.js"), "utf8"), context);
     await new Promise(setImmediate);
-    assert.equal(rules.size, 3);assert.equal(sessionRules.size, 1);assert.equal(registered.size, 1);
+    assert.equal(rules.size, 4);assert.equal(sessionRules.size, 1);assert.equal(registered.size, 1);
     assert(!rules.has(470001), 'A legacy persistent homepage redirect must be removed');
     assert.deepEqual([...probes].sort(), [...homeFiles].sort());
     const rule = [...sessionRules.values()][0], script = [...registered.values()][0];
@@ -75,6 +75,11 @@ async function main() {
     for (const url of ['https://www.youtube.com/watch?v=keep', 'https://www.youtube.com/youtubei/v1/player', 'https://www.youtube.com/youtubei/v1/next', 'https://www.youtube.com/live/keep', 'https://www.youtube.com/live_chat_settings', 'https://youtube.com.example/live_chat', 'https://media.example/video']) assert(!chatURL.test(url), url);
     const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '../manifest.json'), 'utf8'));
     for (const domain of ['doubleclick.net','googleadservices.com','googlesyndication.com']) assert(manifest.host_permissions.includes('https://*.'+domain+'/*'));
+    const extras = rules.get(470005), blocksExtra = url => new RegExp(extras.condition.regexFilter).test(url);
+    assert.equal(extras.action.type, 'block');assert.deepEqual([...extras.condition.initiatorDomains], ['youtube.com']);
+    assert(!extras.condition.resourceTypes.includes('main_frame') && !extras.condition.resourceTypes.includes('script'));
+    for (const url of ['https://www.youtube.com/s/search/audio/open.mp3', 'https://www.youtube.com/s/search/audio/no_input.mp3', 'https://www.youtube.com/youtube/img/lottie/custom_animated_like_icon/animated_like_learning_dark_v2.json']) assert(blocksExtra(url), url);
+    for (const url of ['https://www.youtube.com/s/player/a5c2aafe/player_es6.vflset/ru_RU/base.js', 'https://www.youtube.com/s/desktop/cb518cf3/jsbin/scheduler.vflset/scheduler.js', 'https://www.youtube.com/youtubei/v1/search', 'https://www.youtube.com/api/stats/watchtime', 'https://www.youtube.com/s/search/audio']) assert(!blocksExtra(url), url);
     const adRules = [rules.get(470003), rules.get(470004)];
     for (const ad of adRules) {
         assert.equal(ad.action.type, 'block');
@@ -101,15 +106,15 @@ async function main() {
     const native = await request("minimal-youtube:open-native-home");
     assert.equal(native.url, "https://www.youtube.com/");assert.equal(rules.size, 0);assert.equal(sessionRules.size, 0);assert.equal(registered.size, 0);
     state.enabled = true;storageListener({ enabled: { newValue: true } }, "local");
-    await new Promise(setImmediate);assert.equal(rules.size, 3);assert.equal(sessionRules.size, 1);assert.equal(registered.size, 1);
+    await new Promise(setImmediate);assert.equal(rules.size, 4);assert.equal(sessionRules.size, 1);assert.equal(registered.size, 1);
     await Promise.all([context.MinimalYouTubeOptimization.configure(false), context.MinimalYouTubeOptimization.configure(true), context.MinimalYouTubeOptimization.configure(false)]);
     assert.equal(rules.size, 0);assert.equal(sessionRules.size, 0);assert.equal(registered.size, 0);
     state.enabled = true;events.startup();await new Promise(setImmediate);
-    assert.equal(rules.size, 3);assert.equal(sessionRules.size, 1);assert.equal(registered.size, 1);
+    assert.equal(rules.size, 4);assert.equal(sessionRules.size, 1);assert.equal(registered.size, 1);
     // Missing HTML or any of its dependencies must never enable a broken redirect.
     for (const file of homeFiles) {
         missing.add(file);await context.MinimalYouTubeOptimization.configure(true);
-        assert.equal(sessionRules.size, 0, file);assert.equal(rules.size, 3);assert.equal(registered.size, 1);
+        assert.equal(sessionRules.size, 0, file);assert.equal(rules.size, 4);assert.equal(registered.size, 1);
         missing.clear();
     }
     rejected.add(homeFiles[0]);await context.MinimalYouTubeOptimization.configure(true);
@@ -132,7 +137,7 @@ async function main() {
     assert.equal(sessionChanges.filter(Boolean).length, addsBefore, 'A late probe must not re-enable a disabled redirect');
     assert.equal(sessionRules.size, 0);assert.equal(rules.size, 0);assert.equal(registered.size, 0);
     await context.MinimalYouTubeOptimization.configure(true);
-    assert.equal(sessionRules.size, 1);assert.equal(rules.size, 3);assert.equal(registered.size, 1);
+    assert.equal(sessionRules.size, 1);assert.equal(rules.size, 4);assert.equal(registered.size, 1);
     console.log("PASS verified session-only home redirect, old-rule migration, missing/rejected files, WAR/API fallback, racing disable, scoped ad request filters that preserve video CDN/player requests, persistent chat/pruning and sender/cookie scope");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

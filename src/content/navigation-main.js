@@ -67,6 +67,19 @@
         const app=document.querySelector('ytd-app');if(!app)throw new Error('Missing app');
         app.dispatchEvent(new CustomEvent('yt-navigate',{bubbles:true,composed:true,cancelable:true,detail:{endpoint}}));
     }
+    // No miniplayer: leaving a watch page stops the video and closes
+    // YouTube's miniplayer (its CSS never shows it), so nothing keeps playing.
+    function closeMiniplayer(){
+        if(!document.documentElement.classList.contains('minimal-youtube')||location.pathname==='/watch')return;
+        const app=document.querySelector('ytd-app'),mini=document.querySelector('ytd-miniplayer');
+        if(!app?.hasAttribute('miniplayer-is-active')&&!mini?.hasAttribute('active'))return;
+        try{document.querySelector('#movie_player')?.stopVideo?.();}catch{}
+        for(const video of mini?.querySelectorAll('video')||[])video.pause();
+        mini?.querySelector('.ytp-miniplayer-close-button,#close-button button,button#close-button')?.click();
+    }
+    new MutationObserver(records=>{if(records.some(record=>record.target.localName==='ytd-app'||record.target.localName==='ytd-miniplayer'))closeMiniplayer();})
+        .observe(document.documentElement,{subtree:true,attributes:true,attributeFilter:['miniplayer-is-active','active']});
+    document.addEventListener('yt-navigate-finish',closeMiniplayer);
     document.addEventListener('minimal-youtube:navigate',()=>{
         const root=document.documentElement;
         let request;try{request=JSON.parse(root.getAttribute('data-myt-navigate-request')||'{}');}catch{return;}
