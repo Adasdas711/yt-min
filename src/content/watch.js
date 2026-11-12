@@ -80,6 +80,7 @@ main.has-sidecar .details { min-height:0; }
 .own-playlist { display:flex;flex-direction:column;height:100%;min-height:0;max-height:inherit; }
 .own-playlist-head { display:flex;align-items:flex-start;gap:12px;padding:16px 12px 12px 18px;border-bottom:1px solid var(--border); }
 .own-playlist-info { flex:1;min-width:0; }
+.own-playlist-page { color:inherit;text-decoration:none; } .own-playlist-page:hover { text-decoration:underline; }
 .own-playlist-title { margin:0;font-size:18px;font-weight:700;line-height:1.3;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden; }
 .own-playlist-meta { margin:4px 0 0;color:var(--muted);font-size:14px; }
 .own-playlist-close { flex:none;width:36px;min-height:36px;padding:0;border:0;background:transparent;color:var(--muted); }
@@ -770,7 +771,11 @@ main.has-sidecar .details { min-height:0; }
             if(this.ownPlaylist.parentElement!==sidecar)sidecar.replaceChildren(this.ownPlaylist);
             const panel=this.ownPlaylist,close=panel.querySelector('.own-playlist-close');close.title=this.copy.closePlaylist;close.setAttribute('aria-label',this.copy.closePlaylist);
             const current=playlist.items.findIndex(item=>item.selected);
-            panel.querySelector('.own-playlist-title').textContent=playlist.title||'Playlist';
+            // The title opens the playlist itself. Mixes have no playlist page.
+            const title=panel.querySelector('.own-playlist-title'),page=/^[\w-]{2,}$/.test(list||'')&&!/^RD/.test(list)&&!playlist.infinite?safeURL('/playlist?list='+encodeURIComponent(list)):'';
+            let titleLink=title.querySelector('a');
+            if(page){if(!titleLink){titleLink=this.node('a','own-playlist-page');title.replaceChildren(titleLink);}if(titleLink.href!==page)titleLink.href=page;titleLink.textContent=playlist.title||'Playlist';}
+            else title.textContent=playlist.title||'Playlist';
             panel.querySelector('.own-playlist-meta').textContent=[playlist.owner,playlist.infinite?'':(current>=0?(current+1)+' / ':'')+(playlist.total||playlist.items.length)].filter(Boolean).join(' · ');
             const signature=JSON.stringify(playlist.items.map(item=>[item.href,item.title,item.channel,item.duration,item.index,item.image,item.selected]));
             const items=panel.querySelector('.own-playlist-items');
