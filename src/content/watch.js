@@ -2,6 +2,13 @@
    manual popovers expose only their interactive rectangles above our canvas. */
 (() => {
     "use strict";
+    // Fullscreen styles key on this mark instead of html:has(:fullscreen),
+    // which made every DOM insertion restyle the whole page.
+    if(!globalThis.__mytFullscreenMark){
+        globalThis.__mytFullscreenMark=true;
+        const mark=()=>document.documentElement?.toggleAttribute('data-myt-fullscreen',Boolean(document.fullscreenElement));
+        document.addEventListener('fullscreenchange',mark,true);mark();
+    }
     const css = `
 :host { all:initial!important;position:fixed!important;inset:0!important;width:100%!important;height:100%!important;min-width:0!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;border:0!important;display:block!important;isolation:isolate!important;filter:none!important;transform:none!important;box-shadow:none!important;overflow:hidden!important;background:var(--bg)!important;color:var(--ink)!important;font:16px/1.6 Arial,sans-serif!important;color-scheme:only light!important; --bg:#f9f9fb; --surface:#fff; --soft:#f0f0f4; --ink:#18181b; --muted:#71717c; --border:#e3e3e9; --link:#315dca; font:16px/1.6 Arial,sans-serif; color:var(--ink); }
 :host([dark]) { color-scheme:only dark!important; --bg:#101012; --surface:#19191d; --soft:#24242b; --ink:#f4f4f5; --muted:#a0a0ac; --border:#303039; --link:#b6caff; }
