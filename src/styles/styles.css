@@ -1815,6 +1815,11 @@ html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#myt-channel-header
     overflow-wrap: anywhere;
 }
 html.minimal-youtube [data-myt-channel-tab-hidden] { display: none !important; }
+/* Native parts the owned pages replace stay in the DOM with their data, but
+   the browser never styles, lays out or paints them. */
+html.minimal-youtube [data-myt-dormant] { content-visibility: hidden !important; }
+/* No miniplayer: navigation.js stops and closes it; it never shows. */
+html.minimal-youtube ytd-miniplayer { display: none !important; }
 /* Only the owned header, navigation and results remain on a channel page. */
 html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-extra] { display: none !important; }
 /* Owned channel header: viewport-wide banner, centered profile with a large

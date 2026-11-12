@@ -729,9 +729,24 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             for(const element of nativeUI)element.setAttribute('data-myt-search-native-ui','');
             if(toolbar)toolbar.setAttribute('data-myt-search-toolbar','');
             if(this.channel)for(const control of nativeUI)control.setAttribute('data-myt-search-toolbar','');
+            // With page data the hidden native results are no source: the
+            // browser skips their style, layout and paint. Channel cards keep
+            // their live native nodes, so a branch holding one is split.
+            const dormant=new Set();
+            if(this.model){
+                const add=node=>{
+                    if(paths.has(node)||nativeUI.has(node)||node===toolbar||node.matches('ytd-channel-renderer,ytd-continuation-item-renderer,[data-myt-search-channel-card]')||node===this.host)return;
+                    if(!node.querySelector('ytd-channel-renderer,ytd-continuation-item-renderer'))dormant.add(node);else for(const child of node.children)add(child);
+                };
+                for(const child of search.children)if(child!==this.host)add(child);
+            }
+            for(const node of this.dormant||[])if(!dormant.has(node))node.removeAttribute('data-myt-dormant');
+            for(const node of dormant)if(!node.hasAttribute('data-myt-dormant'))node.setAttribute('data-myt-dormant','');
+            this.dormant=dormant;
         }
 
         restoreNative(){
+            for(const node of this.dormant||[])node.removeAttribute('data-myt-dormant');this.dormant=new Set();
             for(const native of this.nativeNodes){native.removeAttribute('data-myt-search-native-root');native.removeAttribute('data-myt-search-layout-path');native.removeAttribute('data-myt-search-toolbar');native.removeAttribute('data-myt-search-native-ui');}
             this.nativeNodes.clear();
         }

@@ -757,7 +757,11 @@ main.has-sidecar .details { min-height:0; }
             const list=new URL(location.href).searchParams.get('list')||playlist.id;
             if(this.dataPlaylistList!==list){this.dataPlaylistList=list;this.dataPlaylistOpen=true;}
             this.dataPlaylist=playlist;
+            // YouTube still builds its own hidden panel (thousands of nodes for
+            // a long playlist). The owned panel replaces it: the browser skips
+            // its style, layout and paint, while YouTube keeps its data.
             for(const[node,state]of this.islands)if(state.kind==='sidecar')this.restore(node);
+            this.markDormant(this.native.querySelectorAll('ytd-playlist-panel-renderer'));
             this.playlistStateObserver?.disconnect();this.restorePlaylistChrome();this.observePlaylist(null);
             this.playlistPanel=null;this.playlistCollapsed=!this.dataPlaylistOpen;
             const sidecar=this.q('.sidecar');
@@ -807,7 +811,13 @@ main.has-sidecar .details { min-height:0; }
         }
         leaveDataPlaylist() {
             if(!this.dataPlaylist)return;
-            this.dataPlaylist=null;this.dataPlaylistList=null;this.ownPlaylist?.remove();
+            this.dataPlaylist=null;this.dataPlaylistList=null;this.ownPlaylist?.remove();this.markDormant([]);
+        }
+        markDormant(nodes) {
+            const next=new Set([...nodes].filter(node=>![...this.islands.keys()].some(island=>node.contains(island)||island.contains(node))));
+            for(const node of this.dormant||[])if(!next.has(node))node.removeAttribute('data-myt-dormant');
+            for(const node of next)if(!node.hasAttribute('data-myt-dormant'))node.setAttribute('data-myt-dormant','');
+            this.dormant=next;
         }
         descriptionData(metadata) {
             const root = this.native.querySelector('ytd-watch-metadata #description, ytd-video-secondary-info-renderer #description, ytd-video-description-body-renderer, ytd-structured-description-content-renderer');
@@ -1294,7 +1304,7 @@ main.has-sidecar .details { min-height:0; }
             this.q('.transcript-status').textContent=data.length?(filtered.length?'':this.copy.noResults):(this.transcriptLoading?this.copy.loading:this.copy.unavailable);this.q('.transcript-retry').hidden=!!data.length||this.transcriptLoading;this.q('.transcript-search').hidden=!data.length;
         }
         closeTranscript() {this.transcriptOpen=false;clearTimeout(this.transcriptTimeout);if(this.q){this.q('#watch-transcript').hidden=true;this.q('.transcript-menu-toggle')?.setAttribute('aria-expanded','false');this.q('.transcript-content').hidden=true;this.q('.transcript-toggle').setAttribute('aria-expanded','false');}if(this.nativePanelState){for(const[name,value]of this.nativePanelState.attrs){if(value===null)this.nativePanelState.node.removeAttribute(name);else this.nativePanelState.node.setAttribute(name,value);}this.nativePanelState=null;}}
-        destroy() {this.playlistStateObserver?.disconnect();this.restorePlaylistChrome();clearTimeout(this.titleTimer);cancelAnimationFrame(this.geometryFrame);cancelAnimationFrame(this.sourceFrame);this.subscriptionPress?.cancel();this.subscriptionPress=null;this.clearSubscription(true);this.clearFullscreenPreview();this.restoreFullscreenLayout();for(const type of ['click','dblclick','keydown','keyup'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('pointerover',this.pointerGuard,true);this.wheelGuards?.clear();window.removeEventListener('touchmove',this.fullscreenTouch,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);for(const type of ['timeupdate','seeked'])this.media?.removeEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.removeEventListener(type,this.videoMetadata);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;window.dispatchEvent(new Event('resize'));}
+        destroy() {this.markDormant([]);this.playlistStateObserver?.disconnect();this.restorePlaylistChrome();clearTimeout(this.titleTimer);cancelAnimationFrame(this.geometryFrame);cancelAnimationFrame(this.sourceFrame);this.subscriptionPress?.cancel();this.subscriptionPress=null;this.clearSubscription(true);this.clearFullscreenPreview();this.restoreFullscreenLayout();for(const type of ['click','dblclick','keydown','keyup'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('pointerover',this.pointerGuard,true);this.wheelGuards?.clear();window.removeEventListener('touchmove',this.fullscreenTouch,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);for(const type of ['timeupdate','seeked'])this.media?.removeEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.removeEventListener(type,this.videoMetadata);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;window.dispatchEvent(new Event('resize'));}
     }
     WatchView.loadTitleFonts=loadTitleFonts;
     WatchView.readSubscriptionState=WatchView.prototype.subscriptionState;

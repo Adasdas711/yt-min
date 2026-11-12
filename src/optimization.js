@@ -5,6 +5,9 @@
     const ruleId = 470001;
     const chatRuleId = 470002;
     const adRuleIds = [470003, 470004];
+    // Decorations the owned pages never show: voice search sounds (its button
+    // is hidden) and Lottie animations (like/subscribe effects).
+    const extrasRuleId = 470005;
     const scriptId = "minimal-youtube-data-pruning";
     const homePath = "src/home/index.html";
     const homeFiles = [homePath, "src/home/home.js", "src/home/home.css", "src/content/content.js", "src/styles/styles.css"];
@@ -35,7 +38,7 @@
         configuration = configuration.catch(() => {}).then(async () => {
             if (!supported || current !== revision) return;
             await chrome.declarativeNetRequest.updateDynamicRules({
-                removeRuleIds: [ruleId, chatRuleId, ...adRuleIds],
+                removeRuleIds: [ruleId, chatRuleId, ...adRuleIds, extrasRuleId],
                 addRules: enabled ? [{
                     id: chatRuleId,
                     priority: 1,
@@ -59,6 +62,13 @@
                         regexFilter: "^https://([a-z0-9-]+\\.)?youtube\\.com/(pagead/|api/stats/ads([/?]|$)|youtubei/v1/player/ad_break([/?]|$))",
                         initiatorDomains: ["youtube.com"], excludedInitiatorDomains: ["music.youtube.com"],
                         resourceTypes: ["script", "xmlhttprequest", "sub_frame", "image", "media", "ping"],
+                    },
+                }, {
+                    id: extrasRuleId, priority: 1, action: { type: "block" },
+                    condition: {
+                        regexFilter: "^https://([a-z0-9-]+\\.)?youtube\\.com/(s/search/audio/|youtube/img/lottie/)",
+                        initiatorDomains: ["youtube.com"], excludedInitiatorDomains: ["music.youtube.com"],
+                        resourceTypes: ["xmlhttprequest", "media", "other"],
                     },
                 }] : [],
             });
