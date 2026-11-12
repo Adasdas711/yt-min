@@ -32,6 +32,13 @@ h1 { margin: 0; font-size: 16px; line-height: 1.35; letter-spacing: -.45px; font
 .switch input:disabled + .switch__track { opacity: .55; }
 .details { margin: 16px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .error { margin: 12px 0 0; color: var(--accent); font-size: 12px; }
+/* Diagnostics: one button that copies a report of the open YouTube tab. */
+.diagnostics { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+.diagnostics button { padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.diagnostics button:hover { border-color: var(--muted); }
+.diagnostics button:disabled { cursor: wait; opacity: .6; }
+.diagnostics button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.diagnostics__status { color: var(--muted); font-size: 11px; }
 footer { margin-top: 22px; padding-top: 15px; border-top: 1px solid var(--border); color: var(--muted); font-size: 10px; }
 @media (prefers-color-scheme: dark) {
     :root { --background: #111214; --surface: #1b1c20; --text: #f0f1f3; --muted: #a2a5ae; --border: #2c2e34; --accent: #f04459; --track: #484b54; }

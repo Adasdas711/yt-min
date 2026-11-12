@@ -30,8 +30,13 @@
             </label>
             <p id="details" class="details">A clean home, centered channels, and videos without Shorts or recommendations.</p>
             <p id="error" class="error" role="alert" hidden></p>
+            <div class="diagnostics">
+                <button id="diagnostics" type="button">Copy diagnostic report</button>
+                <span id="diagnostics-status" class="diagnostics__status" role="status"></span>
+            </div>
             <footer id="footer">Changes apply to open YouTube tabs.</footer>
         </main>
+        <script src="./diagnostics.js"></script>
         <script src="./popup.js"></script>
     </body>
 </html>

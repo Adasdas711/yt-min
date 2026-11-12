@@ -66,9 +66,9 @@
                 }, {
                     id: extrasRuleId, priority: 1, action: { type: "block" },
                     condition: {
-                        regexFilter: "^https://([a-z0-9-]+\\.)?youtube\\.com/(s/search/audio/|youtube/img/lottie/)",
+                        regexFilter: "^https://(([a-z0-9-]+\\.)?youtube\\.com/(s/search/audio/|youtube/img/lottie/)|www\\.gstatic\\.com/youtube/img/lottie/)",
                         initiatorDomains: ["youtube.com"], excludedInitiatorDomains: ["music.youtube.com"],
-                        resourceTypes: ["xmlhttprequest", "media", "other"],
+                        resourceTypes: ["xmlhttprequest", "media", "image", "other"],
                     },
                 }] : [],
             });

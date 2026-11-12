@@ -69,6 +69,8 @@ def check(browser,width,cached,primary=True):
     else:
         page.locator('.search-items').evaluate('e=>e.querySelectorAll("ytd-video-renderer").forEach(card=>card.remove())')
         expect(host.locator('.media')).to_have_count(0)
+        expect(host.locator('.skeleton')).to_be_visible();expect(host.locator('.empty')).to_be_hidden()
+        page.locator('.search-items').evaluate('e=>e.insertAdjacentHTML("beforeend","<ytd-message-renderer>No results</ytd-message-renderer>")')
         expect(host.locator('.empty')).to_be_visible()
     page.wait_for_timeout(100);assert_stable(page)
     Path('/tmp/yt-min-qa').mkdir(exist_ok=True)
@@ -132,7 +134,11 @@ def changed_wrappers(browser,width,untyped=False):
     page.screenshot(path=f'/tmp/yt-min-qa/channel-changed-search-{width}-{untyped}.png')
     page.locator('yt-item-section-view-model').evaluate('e=>e.querySelectorAll("ytd-video-renderer").forEach(card=>card.remove())')
     expect(host.locator('.media')).to_have_count(0)
-    expect(host.locator('.empty')).to_be_visible()
+    # Without YouTube's confirmation the results are still loading.
+    expect(host.locator('.skeleton')).to_be_visible();expect(host.locator('.empty')).to_be_hidden()
+    sentinel.evaluate('e=>e.insertAdjacentHTML("beforebegin","<ytd-message-renderer id=\\"changed-empty\\">No results</ytd-message-renderer>")')
+    expect(host.locator('.empty')).to_be_visible();expect(host.locator('.skeleton')).to_be_hidden()
+    page.locator('#changed-empty').evaluate('e=>e.remove()')
     sentinel.evaluate('(e,html)=>e.insertAdjacentHTML("beforebegin",html)',video(404))
     expect(host.locator('.media-title')).to_have_text(['Regular video 404'])
     page.evaluate('__setEnabled(false)')

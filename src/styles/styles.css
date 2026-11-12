@@ -155,6 +155,20 @@ html.minimal-youtube ytd-app ytd-page-manager.ytd-app {
 
 /* The first channel script applies this before native content can paint. */
 html.minimal-youtube[data-myt-channel-boot] ytd-browse { visibility: hidden !important; }
+/* While a channel boots, a placeholder banner and profile take its place. */
+html.minimal-youtube[data-myt-channel-boot] ytd-page-manager::before {
+    content: ""; display: block; box-sizing: border-box; width: min(100%, 1284px); height: 440px; margin: 0 auto;
+    background:
+        radial-gradient(circle at 150px 330px, var(--myt-soft) 0 90px, transparent 91px),
+        linear-gradient(var(--myt-soft), var(--myt-soft)) 270px 290px / 260px 28px no-repeat,
+        linear-gradient(var(--myt-soft), var(--myt-soft)) 270px 336px / 180px 16px no-repeat,
+        linear-gradient(var(--myt-soft), var(--myt-soft)) 0 0 / 100% 200px no-repeat;
+    border-radius: 0 0 24px 24px; animation: myt-pulse 1.4s ease-in-out infinite;
+}
+@media (max-width: 700px) { html.minimal-youtube[data-myt-channel-boot] ytd-page-manager::before { height: 300px; background:
+    radial-gradient(circle at 70px 210px, var(--myt-soft) 0 50px, transparent 51px), linear-gradient(var(--myt-soft), var(--myt-soft)) 140px 190px / 160px 22px no-repeat,
+    linear-gradient(var(--myt-soft), var(--myt-soft)) 0 0 / 100% 130px no-repeat; } }
+@media (prefers-reduced-motion: reduce) { html.minimal-youtube[data-myt-channel-boot] ytd-page-manager::before { animation: none; } }
 /* The owned renderer supplies the only empty state, including sibling feeds. */
 html.minimal-youtube[data-myt-page="channel"][data-myt-search-ui] [data-myt-channel-ready] :is(ytd-message-renderer,yt-message-view-model,ytd-background-promo-renderer) { display: none !important; }
 
@@ -1544,6 +1558,19 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] {
    Applies only while the known threads are present. */
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] ytd-item-section-renderer#sections > #contents:has(> ytd-comment-thread-renderer) > :not(ytd-comment-thread-renderer,ytd-continuation-item-renderer,template,dom-if,dom-repeat),
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] ytd-item-section-renderer#sections > #header:has(> ytd-comments-header-renderer) > :not(ytd-comments-header-renderer,template,dom-if,dom-repeat) { display: none !important; }
+/* While comments load: owned placeholders instead of YouTube's spinner. */
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] ytd-item-section-renderer#sections > #contents:not(:has(> :is(ytd-comment-thread-renderer, ytd-message-renderer))) > ytd-continuation-item-renderer { opacity: 0 !important; }
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] ytd-item-section-renderer#sections > #contents:not(:has(> :is(ytd-comment-thread-renderer, ytd-message-renderer)))::before {
+    content: ""; display: block; height: 252px; animation: myt-pulse 1.4s ease-in-out infinite;
+    background:
+        radial-gradient(circle at 20px 20px, var(--myt-soft) 0 20px, transparent 21px) 0 0 / 100% 84px repeat-y,
+        linear-gradient(var(--myt-soft), var(--myt-soft)) 56px 6px / 160px 12px no-repeat,
+        linear-gradient(var(--myt-soft), var(--myt-soft)) 56px 28px / 70% 12px no-repeat,
+        linear-gradient(var(--myt-soft), var(--myt-soft)) 56px 90px / 140px 12px no-repeat,
+        linear-gradient(var(--myt-soft), var(--myt-soft)) 56px 112px / 60% 12px no-repeat,
+        linear-gradient(var(--myt-soft), var(--myt-soft)) 56px 174px / 180px 12px no-repeat,
+        linear-gradient(var(--myt-soft), var(--myt-soft)) 56px 196px / 55% 12px no-repeat;
+}
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] :is(ytd-comments-header-renderer,ytd-comment-simplebox-renderer) {
     margin: 0 0 18px !important; padding: 0 !important; color: var(--myt-ink); background: transparent;
 }
@@ -2353,3 +2380,34 @@ html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-about] :is(a, bu
         grid-template-columns: minmax(0, 1fr);
     }
 }
+
+/* Loading UI shared by every owned page. */
+html.minimal-youtube #myt-progress {
+    position: fixed; inset: 0 0 auto 0; width: 100%; height: 3px; margin: 0; padding: 0; border: 0;
+    background: transparent; overflow: hidden; pointer-events: none; z-index: 2147483647;
+}
+html.minimal-youtube #myt-progress::before {
+    content: ""; position: absolute; inset: 0 auto 0 0; width: 40%; background: #ff0033; border-radius: 0 2px 2px 0;
+    animation: myt-progress 1.1s ease-in-out infinite;
+}
+@keyframes myt-progress { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { html.minimal-youtube #myt-progress::before { animation: none; width: 100%; opacity: .6; } }
+html.minimal-youtube #myt-playlist-rows > .myt-playlist-skeleton[hidden],
+html.minimal-youtube .myt-loading-more[hidden] { display: none; }
+html.minimal-youtube .myt-playlist-skeleton-row {
+    display: grid; grid-template-columns: 24px 168px minmax(0,1fr); align-items: center; gap: 14px;
+    margin: 0 0 12px; padding: 12px; border: 1px solid var(--myt-border); border-radius: 20px; background: var(--myt-surface);
+}
+html.minimal-youtube .myt-playlist-skeleton-row > span:first-child { height: 14px; border-radius: 7px; background: var(--myt-soft); }
+html.minimal-youtube .myt-playlist-skeleton-row > span:nth-child(2) { aspect-ratio: 16/9; border-radius: 12px; background: var(--myt-soft); }
+html.minimal-youtube .myt-playlist-skeleton-row > span:last-child { display: grid; gap: 10px; }
+html.minimal-youtube .myt-playlist-skeleton-row i { display: block; height: 14px; border-radius: 7px; background: var(--myt-soft); }
+html.minimal-youtube .myt-playlist-skeleton-row i + i { width: 45%; }
+html.minimal-youtube .myt-playlist-skeleton-row > *, html.minimal-youtube .myt-loading-more span { animation: myt-pulse 1.4s ease-in-out infinite; }
+html.minimal-youtube .myt-loading-more { display: flex; justify-content: center; gap: 8px; padding: 24px 0; }
+html.minimal-youtube .myt-loading-more span { width: 9px; height: 9px; border-radius: 50%; background: var(--myt-muted); }
+html.minimal-youtube .myt-loading-more span:nth-child(2) { animation-delay: .2s; }
+html.minimal-youtube .myt-loading-more span:nth-child(3) { animation-delay: .4s; }
+@keyframes myt-pulse { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { html.minimal-youtube :is(.myt-playlist-skeleton-row > *, .myt-loading-more span) { animation: none; } }
+@media (max-width: 600px) { html.minimal-youtube .myt-playlist-skeleton-row { grid-template-columns: 120px minmax(0,1fr); } html.minimal-youtube .myt-playlist-skeleton-row > span:first-child { display: none; } }

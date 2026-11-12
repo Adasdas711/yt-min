@@ -138,6 +138,14 @@
         const panel = item.engagementPanelSectionListRenderer;
         return Boolean(panel && [panel.targetId, panel.panelIdentifier].some(id => /live[-_]?chat/i.test(id || "")));
     }
+    // Watch-page panels the owned page never offers: ad panels (incl. the ads
+    // business chat) and the search preview. Description, transcript,
+    // chapters and comments panels stay: the owned page uses them.
+    const unusedPanelTarget = /^(?:engagement-panel-ads(?:-.*)?|PAsearch_preview)$/;
+    function unusedPanel(item) {
+        const panel = item?.engagementPanelSectionListRenderer;
+        return Boolean(panel && [panel.targetId, panel.panelIdentifier].some(id => unusedPanelTarget.test(id || "")));
+    }
     function hiddenShelf(item) {
         const content = item?.richSectionRenderer?.content || item;
         const shelf = content?.shelfRenderer || content?.richShelfRenderer;
@@ -203,7 +211,7 @@
                 if (!node || typeof node !== "object" || seen.has(node)) continue;
                 seen.add(node);
                 if (Array.isArray(node)) {
-                    removed += compact(node, item => shortItem(item) || hiddenShelf(item) || chatItem(item));
+                    removed += compact(node, item => shortItem(item) || hiddenShelf(item) || chatItem(item) || unusedPanel(item));
                     for (const child of node) if (child && typeof child === "object") stack.push(child);
                     continue;
                 }

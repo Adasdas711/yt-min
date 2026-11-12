@@ -1449,6 +1449,35 @@
         });
     }
 
+    // One loading bar for every navigation: from the request until YouTube
+    // mounts the destination (the old page stays on screen meanwhile), while
+    // a channel boots and while a channel section loads.
+    const progress = document.createElement("div");
+    progress.id = "myt-progress";progress.setAttribute("popover", "manual");progress.setAttribute("aria-hidden", "true");
+    let progressRequested = 0, progressTimer = 0;
+    function syncProgress() {
+        const busy = enabled && Boolean(pendingNavigation || root.dataset.mytPreviousPage || root.hasAttribute("data-myt-channel-boot") ||
+            (progressRequested && performance.now() - progressRequested < 8000) ||
+            document.querySelector("#myt-channel-nav")?.getAttribute("aria-busy") === "true");
+        root.toggleAttribute("data-myt-loading", busy);
+        clearTimeout(progressTimer);
+        if (busy) {
+            if (progress.parentNode !== root) root.append(progress);
+            try { if (!progress.matches(":popover-open")) progress.showPopover(); } catch { /* Popover support is optional. */ }
+            progressTimer = setTimeout(syncProgress, 250);
+        } else if (progress.isConnected) {
+            try { if (progress.matches(":popover-open")) progress.hidePopover(); } catch { /* Already closed. */ }
+            progress.remove();
+        }
+    }
+    document.addEventListener("minimal-youtube:navigate", () => { progressRequested = performance.now(); syncProgress(); });
+    for (const name of ["yt-navigate-finish", "yt-navigate-error", "yt-navigate-cancel"]) document.addEventListener(name, () => { progressRequested = 0; });
+    // A popover opened later sits above the bar: bring the bar back on top.
+    document.addEventListener("toggle", event => {
+        if (event.target === progress || event.newState !== "open" || !progress.matches(":popover-open")) return;
+        try { progress.hidePopover(); progress.showPopover(); } catch { /* Closed meanwhile. */ }
+    }, true);
+
     function schedule() {
         if (!enabled) return;
         cancelAnimationFrame(watchStatsFrame);watchStatsFrame = 0;
@@ -1458,6 +1487,7 @@
             if (!enabled) return;
             const changedRoots=compactRoots(pendingRoots);pendingRoots.clear();
             updateRoute();
+            syncProgress();
             renderTheme();
             syncPlaylistLayout();
             if (root.dataset.mytPage === "home" && home?.isConnected && !pendingNavigation && !transitionActive) {
@@ -1641,6 +1671,8 @@
             delete root.dataset.mytPage;
             delete root.dataset.mytPreviousPage;
             delete root.dataset.mytChannelSection;
+            progressRequested = 0;
+            syncProgress();
         }
     }
 
@@ -1659,6 +1691,7 @@
         }
         updateRoute(true);
         schedule();
+        syncProgress();
     }
     function navigationUpdated() {
         if (!enabled) return;
@@ -1669,6 +1702,7 @@
         pendingNavigation = null;
         transitionActive = false;
         if (enabled) { updateRoute(true); schedule(); }
+        syncProgress();
     }
     function navigationCommitted() {
         pendingNavigation = null;
