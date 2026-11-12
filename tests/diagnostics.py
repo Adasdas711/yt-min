@@ -53,16 +53,16 @@ def check_popup(browser):
 
 def check_layout(browser):
     page = popup(browser, 'https://www.youtube.com/')
-    # Three blocks; the only visible text is the extension's name.
-    assert page.evaluate("document.querySelector('main').children.length") == 4  # three blocks + a hidden live region
+    # Three blocks: the name and two custom toggles of one shape, without frames.
+    assert page.evaluate("[...document.querySelector('main').children].filter(e => !e.matches('.visually-hidden')).length") == 2
+    assert page.locator('.controls > .toggle').count() == 2
     visible = page.evaluate('''() => { const out = [], walk = document.createTreeWalker(document.querySelector('main'), NodeFilter.SHOW_TEXT);
       while (walk.nextNode()) { const n = walk.currentNode; if (n.data.trim() && !n.parentElement.closest('.visually-hidden,[hidden]')) out.push(n.data.trim()); } return out; }''')
     assert visible == ['Minimal YouTube'], visible
-    # The switch and the logs button are the same card with the same pill control.
-    sizes = page.evaluate("[...document.querySelectorAll('.card, .pill')].map(e => { const r = e.getBoundingClientRect(); return [e.classList.contains('card') ? 'card' : 'pill', Math.round(r.width), Math.round(r.height)]; })")
-    cards, pills = [s[1:] for s in sizes if s[0] == 'card'], [s[1:] for s in sizes if s[0] == 'pill']
-    assert len(cards) == 2 and cards[0] == cards[1] and cards[0][1] >= 80, sizes
-    assert len(pills) == 2 and pills[0] == pills[1], sizes
+    sizes = page.evaluate("[...document.querySelectorAll('.toggle, .toggle__knob')].map(e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e); return [e.classList.contains('toggle') ? 'toggle' : 'knob', Math.round(r.width), Math.round(r.height), s.borderTopWidth]; })")
+    toggles, knobs = [x[1:] for x in sizes if x[0] == 'toggle'], [x[1:] for x in sizes if x[0] == 'knob']
+    assert len(toggles) == 2 and toggles[0] == toggles[1] and toggles[0][1] >= 64 and toggles[0][2] == '0px', sizes
+    assert len(knobs) == 2 and knobs[0] == knobs[1] and knobs[0][0] >= 48, sizes
     expect(page.get_by_role('switch', name='Focus mode')).to_be_checked()
     expect(page.get_by_role('button', name='Copy diagnostic report')).to_be_visible()
     page.close()
