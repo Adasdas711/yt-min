@@ -12,8 +12,8 @@
 }
 
 * { box-sizing: border-box; }
-body { width: 340px; margin: 0; background: var(--background); color: var(--text); font-size: 13px; line-height: 1.5; }
-main { display: grid; gap: 22px; padding: 24px; }
+body { width: 260px; margin: 0; background: var(--background); color: var(--text); font-size: 13px; line-height: 1.5; }
+main { display: grid; gap: 18px; padding: 20px; }
 
 /* 1. Name */
 .brand { display: flex; align-items: center; gap: 12px; margin: 0; }
@@ -22,30 +22,30 @@ h1 { margin: 0; font-size: 16px; line-height: 1.3; letter-spacing: -.4px; font-w
 
 /* 2. On/off and 3. Logs: two large custom toggles of one shape, no frames.
    The knob carries the symbol; it slides to show the state. */
-.controls { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.toggle { position: relative; display: block; width: 100%; height: 72px; margin: 0; padding: 0; border: 0; border-radius: 36px; background: var(--track); color: var(--text); font: inherit; cursor: pointer; transition: background .2s ease; -webkit-tap-highlight-color: transparent; }
-.toggle__knob { position: absolute; top: 8px; left: 8px; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--knob); box-shadow: 0 2px 6px #0003; transition: transform .22s cubic-bezier(.3,.7,.3,1), left .22s cubic-bezier(.3,.7,.3,1); }
-.toggle__knob svg { width: 26px; height: 26px; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: stroke .2s ease; }
+.controls { display: grid; grid-template-columns: repeat(2, 70px); gap: 12px; }
+.toggle { position: relative; display: block; width: 100%; height: 36px; margin: 0; padding: 0; border: 0; border-radius: 18px; background: var(--track); color: var(--text); font: inherit; cursor: pointer; transition: background .2s ease; -webkit-tap-highlight-color: transparent; }
+.toggle__knob { position: absolute; top: 4px; left: 4px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--knob); box-shadow: 0 1px 3px #0003; transition: transform .22s cubic-bezier(.3,.7,.3,1), left .22s cubic-bezier(.3,.7,.3,1); }
+.toggle__knob svg { width: 15px; height: 15px; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: stroke .2s ease; }
 .toggle:hover { filter: brightness(1.06); }
 
 .setting input { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .setting:has(input:checked) { background: var(--accent); }
-.setting:has(input:checked) .toggle__knob { left: calc(100% - 64px); }
+.setting:has(input:checked) .toggle__knob { left: calc(100% - 32px); }
 .setting:has(input:checked) .toggle__knob svg { stroke: var(--accent); }
-.setting:has(input:focus-visible), .logs:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.setting:has(input:focus-visible), .logs:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .setting:has(input:disabled) { opacity: .55; }
 .setting input:disabled { cursor: wait; }
-.toggle__error { position: absolute; top: 50%; right: 22px; translate: 0 -50%; display: flex; }
-.setting:has(input:checked) .toggle__error { right: auto; left: 22px; }
+.toggle__error { position: absolute; top: 50%; right: 10px; translate: 0 -50%; display: flex; }
+.setting:has(input:checked) .toggle__error { right: auto; left: 10px; }
 .toggle__error[hidden] { display: none; }
-.toggle__error svg { width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; }
+.toggle__error svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; }
 
 .logs { display: grid; place-items: center; transition: background .2s ease, transform .12s ease; }
 /* A button in the toggle's shape: no knob; the symbol sits in the middle. */
 .logs:active { transform: scale(.97); }
 .logs:disabled { cursor: wait; }
 .logs:focus { outline: none; }
-.logs__icon { display: none; width: 30px; height: 30px; fill: none; stroke: var(--text); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.logs__icon { display: none; width: 17px; height: 17px; fill: none; stroke: var(--text); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .logs:not([data-state]) .logs__icon--copy, .logs[data-state="busy"] .logs__icon--busy,
 .logs[data-state="done"] .logs__icon--done, .logs[data-state="error"] .logs__icon--error { display: block; }
 .logs[data-state="done"] { background: #2e9e5b; }

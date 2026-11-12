@@ -61,8 +61,8 @@ def check_layout(browser):
     assert visible == ['Minimal YouTube'], visible
     # The switch and the copy button share one outer shape; only the switch has a knob.
     sizes = page.evaluate("[...document.querySelectorAll('.toggle')].map(e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e); return [Math.round(r.width), Math.round(r.height), s.borderTopWidth, s.borderTopLeftRadius]; })")
-    assert len(sizes) == 2 and sizes[0] == sizes[1] and sizes[0][1] >= 64 and sizes[0][2] == '0px', sizes
-    assert page.locator('.setting .toggle__knob').bounding_box()['width'] >= 48
+    assert len(sizes) == 2 and sizes[0] == sizes[1] and sizes[0][:2] == [70, 36] and sizes[0][2] == '0px', sizes
+    assert page.locator('.setting .toggle__knob').bounding_box()['width'] == 28
     assert page.locator('#diagnostics .toggle__knob').count() == 0
     expect(page.locator('#diagnostics')).to_have_attribute('type', 'button')
     expect(page.get_by_role('switch', name='Focus mode')).to_be_checked()
