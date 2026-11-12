@@ -69,6 +69,7 @@
     const channelStyles=`
       :host{all:initial!important;--ink:var(--myt-ink);--muted:var(--myt-muted);--surface:var(--myt-surface);--soft:var(--myt-soft);--border:var(--myt-border);display:block!important;position:relative!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;color:var(--ink)!important}
       :host::before,:host::after{content:none!important;display:none!important}
+      .channel-link,.channel-link img{-webkit-user-drag:none;user-select:none}
       *{box-sizing:border-box}[hidden]{display:none!important}a{color:inherit;text-decoration:none;cursor:pointer}button{font:inherit;cursor:pointer}a:focus-visible,button:focus-visible{outline:2px solid var(--myt-muted);outline-offset:3px}
       .surface.channel-card{position:relative;display:grid;grid-template-columns:80px minmax(0,1fr);align-items:center;width:100%;min-height:128px;padding:20px;gap:6px 16px;border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--ink)}
       .channel-card:is(:hover,:focus-visible){background:var(--soft)}
@@ -104,7 +105,7 @@
             this.source=source;this.queue=queue;this.container=container;this.parts=new Set();
             this.host=document.createElement('div');this.host.dataset.mytSearchChannelCard='';this.host.lang='en';
             this.shadow=this.host.attachShadow({mode:'open'});
-            this.shadow.innerHTML=`<style>${channelStyles}</style><a class="surface channel-card channel-link" data-myt-search-avatar-link><span class="owner"><span class="avatar"><span class="initial" aria-hidden="true"></span><img alt="" decoding="async" hidden></span><span class="info owner-text"><span class="heading"><span class="name owner-name"></span><svg class="verified" role="img" aria-label="Verified" viewBox="0 0 24 24" hidden><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m7 12 3 3 7-7" fill="none" stroke="var(--surface)" stroke-width="2"/></svg></span></span></span><span class="metadata stats" hidden><span class="channel-handle" hidden></span><span class="subscriber-count" hidden><span class="subscriber-value"></span><svg class="subscriber-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg></span></span></a>`;
+            this.shadow.innerHTML=`<style>${channelStyles}</style><a class="surface channel-card channel-link" data-myt-search-avatar-link draggable="false"><span class="owner"><span class="avatar"><span class="initial" aria-hidden="true"></span><img alt="" decoding="async" draggable="false" hidden></span><span class="info owner-text"><span class="heading"><span class="name owner-name"></span><svg class="verified" role="img" aria-label="Verified" viewBox="0 0 24 24" hidden><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m7 12 3 3 7-7" fill="none" stroke="var(--surface)" stroke-width="2"/></svg></span></span></span><span class="metadata stats" hidden><span class="channel-handle" hidden></span><span class="subscriber-count" hidden><span class="subscriber-value"></span><svg class="subscriber-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg></span></span></a>`;
             this.q=selector=>this.shadow.querySelector(selector);
             channelCards.add(this);
             this.q('img').onerror=()=>{const image=this.q('img');this.failedImage=image.getAttribute('src');if(this.fallbackImage&&image.src!==this.fallbackImage){image.src=this.fallbackImage;image.hidden=false;return;}image.hidden=true;this.q('.initial').hidden=false;};
@@ -234,13 +235,15 @@
     // Upload dates older than four months read as month and year. YouTube
     // gives only a relative age, so the month is counted back from today.
     const ageUnits={second:1/86400,minute:1/1440,hour:1/24,day:1,week:7,month:30.44,year:365.25,sec:1/86400,min:1/1440,hr:1/24,wk:7,mo:30.44,yr:365.25,
-        'секунд':1/86400,'минут':1/1440,'час':1/24,'дн':1,'день':1,'недел':7,'месяц':30.44,'мес':30.44,'год':365.25,'лет':365.25};
+        'секунд':1/86400,'сек':1/86400,'минут':1/1440,'мин':1/1440,'час':1/24,'ч':1/24,'дн':1,'день':1,'д':1,'недел':7,'нед':7,'месяц':30.44,'мес':30.44,'год':365.25,'лет':365.25,'г':365.25,'л':365.25};
+    // English words for the native prefixes before an age.
+    const datePrefixes=[[/^трансляция (?:закончилась|завершена|прошла)\s*/iu,'Streamed '],[/^премьера (?:состоялась)?\s*/iu,'Premiered '],[/^запланировано\s*/iu,'Scheduled ']];
     function publishedLabel(value){
         // YouTube may wrap words and numbers in invisible format characters
         // (direction marks, isolates, zero-width spaces) and add words
         // around the age ("Streamed", "(edited)"). Only the age is replaced.
         const text=String(value||'').replace(/\p{Cf}/gu,'').replace(/[\s\u00a0\u202f]+/g,' ').trim();
-        const match=text.match(/(\d+)\s*(second|minute|hour|day|week|month|year|секунд|минут|час|день|дн|недел|месяц|мес|год|лет|sec|min|hr|wk|mo|yr)[^\s\d]*\s+(?:ago|назад)/iu);
+        const match=text.match(/(\d+)\s*(second|minute|hour|day|week|month|year|секунд|сек|минут|мин|час|ч|день|дн|д|недел|нед|месяц|мес|год|лет|г|л|sec|min|hr|wk|mo|yr)[^\s\d]*\s+(?:ago|назад)/iu);
         if(!match){
             if(/\bago\b|назад/iu.test(text)&&!publishedLabel.reported){publishedLabel.reported=true;console.info('[Minimal YouTube] unrecognized date',JSON.stringify(text),[...String(value)].map(c=>c.codePointAt(0).toString(16)).join(' '));}
             return text;
@@ -249,10 +252,11 @@
         if(!(days>=4*30.44))return text;
         const date=new Date();
         if(/^(month|месяц|мес|mo)$/.test(unit))date.setMonth(date.getMonth()-count);
-        else if(/^(year|год|лет|yr)$/.test(unit))date.setFullYear(date.getFullYear()-count);
+        else if(/^(year|год|лет|г|л|yr)$/.test(unit))date.setFullYear(date.getFullYear()-count);
         else date.setTime(date.getTime()-days*86400000);
         const label=date.toLocaleDateString('en-US',{month:'long',year:'numeric'});
-        return (text.slice(0,match.index)+label+text.slice(match.index+match[0].length)).replace(/\s+/g,' ').trim();
+        let prefix=text.slice(0,match.index);for(const[pattern,english]of datePrefixes)prefix=prefix.replace(pattern,english);
+        return (prefix+label+text.slice(match.index+match[0].length)).replace(/\s+/g,' ').trim();
     }
     const datedText=value=>(globalThis.MinimalYouTubeSearchData?.publishedPattern||/\bago\b|назад/iu).test(value);
     // A content type label is not an owner.
