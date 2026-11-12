@@ -21,7 +21,7 @@ const more=token=>({continuationItemRenderer:{continuationEndpoint:{continuation
 
 
 def search_page(browser):
-    body = ('<ytd-app>' + MASTHEAD + '<ytd-page-manager><ytd-search><ytd-search-sub-menu-renderer id="native-toolbar"><div id="filter-menu"><div id="container"><ytd-toggle-button-renderer><button id="native-filter-button" aria-label="Filters">Filters</button></ytd-toggle-button-renderer></div></div><iron-collapse id="collapse-content">Native filter groups</iron-collapse></ytd-search-sub-menu-renderer><ytd-section-list-renderer><div id="contents"><ytd-item-section-renderer><div id="contents">'
+    body = ('<ytd-app>' + MASTHEAD + '<ytd-page-manager><ytd-search><ytd-search-sub-menu-renderer id="native-toolbar"><div id="filter-menu"><div id="container"><ytd-toggle-button-renderer><button id="native-filter-button" aria-label="Filters">Filters</button></ytd-toggle-button-renderer></div></div><iron-collapse id="collapse-content" style="max-height:0;overflow:hidden" aria-hidden="true"><ytd-search-filter-group-renderer><h4>Upload date</h4><a id="native-filter-today" href="/results?search_query=cats&amp;sp=EgIIAg%253D%253D">Today</a></ytd-search-filter-group-renderer></iron-collapse></ytd-search-sub-menu-renderer><ytd-section-list-renderer><div id="contents"><ytd-item-section-renderer><div id="contents">'
             + video(1) + channel(1) + '<ytd-continuation-item-renderer id="native-continuation"></ytd-continuation-item-renderer></div></ytd-item-section-renderer></div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>')
     page = setup(browser, '/results?search_query=cats', body)
     page.add_script_tag(path=str(ROOT / 'src/content/navigation.js'))
@@ -69,19 +69,19 @@ def search_page(browser):
     expect(card.locator('.subscriber-value')).to_have_text('1.2 M')
     card.locator('.avatar').click()
     assert '/@datachannel' in (page.evaluate("document.documentElement.getAttribute('data-myt-navigate-request')") or ''), page.evaluate("document.documentElement.getAttribute('data-myt-navigate-request')")
-    # Owned filters replace YouTube's filter button and panel.
-    filters = page.locator('#myt-search .filters')
-    expect(page.locator('#native-filter-button')).to_be_hidden()
-    expect(page.locator('#collapse-content')).to_be_hidden()
-    expect(filters.locator('.filters-panel')).to_be_hidden()
-    filters.get_by_role('button', name='Filters').click()
-    expect(filters.locator('.filter-group h3')).to_have_text(['Upload date', 'Type'])
-    expect(filters.locator('[aria-current="true"]')).to_have_text('This week')
-    today = filters.get_by_role('link', name='Today')
-    expect(today).to_have_attribute('href', 'https://www.youtube.com/results?search_query=cats&sp=EgIIAg%253D%253D')
-    today.click()
-    expect(filters.locator('.filters-panel')).to_be_hidden()
-    assert 'sp=EgIIAg' in page.evaluate("document.documentElement.getAttribute('data-myt-navigate-request')")
+    # YouTube's own filters: its button opens and closes its collapsible panel.
+    native_button = page.locator('#native-filter-button')
+    panel = page.locator('#collapse-content')
+    expect(native_button).to_be_visible()
+    expect(panel).to_be_hidden()
+    native_button.click()
+    expect(panel).to_be_visible()
+    expect(page.locator('#native-filter-today')).to_be_visible()
+    expect(native_button).to_have_attribute('aria-expanded', 'true')
+    native_button.click()
+    expect(panel).to_be_hidden()
+    native_button.click()
+    expect(page.locator('#native-filter-today')).to_have_attribute('href', '/results?search_query=cats&sp=EgIIAg%253D%253D')
     # YouTube's own continuation is off while page data loads further results.
     expect(page.locator('#native-continuation')).to_have_css('display', 'none')
     assert titles.first.get_attribute('href') == 'https://www.youtube.com/watch?v=dataVideo01'
