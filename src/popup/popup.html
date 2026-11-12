@@ -15,7 +15,7 @@
                 </svg>
                 <h1>Minimal YouTube</h1>
             </header>
-            <!-- Only the name is text. Two custom toggles of one shape, no frames. -->
+            <!-- Only the name is text. A custom toggle and a button of the same shape, no frames. -->
             <div class="controls">
                 <label class="toggle setting" for="toggle" title="Focus mode">
                     <input id="toggle" type="checkbox" role="switch" disabled aria-labelledby="setting-title" aria-describedby="status error" />
@@ -25,12 +25,10 @@
                     <span id="error" class="toggle__error" role="alert" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v7M12 17v.5" /></svg><span class="visually-hidden"></span></span>
                 </label>
                 <button id="diagnostics" class="toggle logs" type="button" aria-label="Copy diagnostic report" title="Copy diagnostic report">
-                    <span class="toggle__knob" aria-hidden="true">
-                        <svg class="logs__icon logs__icon--copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="3" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>
-                        <svg class="logs__icon logs__icon--busy" viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 0 8 8" /></svg>
-                        <svg class="logs__icon logs__icon--done" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
-                        <svg class="logs__icon logs__icon--error" viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17" /></svg>
-                    </span>
+                    <svg class="logs__icon logs__icon--copy" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="3" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>
+                    <svg class="logs__icon logs__icon--busy" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8" /></svg>
+                    <svg class="logs__icon logs__icon--done" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
+                    <svg class="logs__icon logs__icon--error" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
                 </button>
             </div>
             <span id="diagnostics-status" class="visually-hidden" role="status"></span>

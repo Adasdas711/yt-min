@@ -40,16 +40,17 @@ h1 { margin: 0; font-size: 16px; line-height: 1.3; letter-spacing: -.4px; font-w
 .toggle__error[hidden] { display: none; }
 .toggle__error svg { width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; }
 
+.logs { display: grid; place-items: center; transition: background .2s ease, transform .12s ease; }
+/* A button in the toggle's shape: no knob; the symbol sits in the middle. */
+.logs:active { transform: scale(.97); }
 .logs:disabled { cursor: wait; }
 .logs:focus { outline: none; }
-.logs__icon { display: none; }
+.logs__icon { display: none; width: 30px; height: 30px; fill: none; stroke: var(--text); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .logs:not([data-state]) .logs__icon--copy, .logs[data-state="busy"] .logs__icon--busy,
 .logs[data-state="done"] .logs__icon--done, .logs[data-state="error"] .logs__icon--error { display: block; }
-.logs[data-state] .toggle__knob { left: calc(100% - 64px); }
 .logs[data-state="done"] { background: #2e9e5b; }
-.logs[data-state="done"] .toggle__knob svg { stroke: #2e9e5b; }
 .logs[data-state="error"] { background: var(--accent); }
-.logs[data-state="error"] .toggle__knob svg { stroke: var(--accent); }
+.logs:is([data-state="done"], [data-state="error"]) .logs__icon { stroke: #fff; stroke-width: 2.2; }
 .logs__icon--busy { animation: logs-spin .8s linear infinite; }
 @keyframes logs-spin { to { transform: rotate(360deg); } }
 
@@ -57,4 +58,4 @@ h1 { margin: 0; font-size: 16px; line-height: 1.3; letter-spacing: -.4px; font-w
 @media (prefers-color-scheme: dark) {
     :root { --background: #111214; --surface: #1b1c20; --text: #f0f1f3; --muted: #a2a5ae; --border: #2c2e34; --accent: #f04459; --track: #2a2c32; --knob: #f4f5f7; }
 }
-@media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; } .logs__icon--busy { animation: none; } .toggle, .toggle__knob { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; } .logs__icon--busy { animation: none; } .toggle, .toggle__knob { transition: none !important; } .logs:active { transform: none; } }
