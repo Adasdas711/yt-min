@@ -181,20 +181,26 @@
     const youtubeURL=value=>{const url=safeURL(value);return url?.protocol==='https:'&&/(^|\.)youtube\.com$/.test(url.hostname)?url.href:'';};
     const channelURL=value=>{const href=youtubeURL(value);return href&&channelPath.test(new URL(href).pathname)?href:'';};
     const channelCards=new Set();
+    // A press anywhere on a channel card opens the channel. A release that
+    // is not followed by a click (a drag, or a click swallowed elsewhere)
+    // still opens it.
+    let channelPress=null,channelRelease=0;
+    const openChannel=href=>{clearTimeout(channelRelease);channelPress=null;if(!globalThis.MinimalYouTubeNavigation?.go(href))location.assign(href);};
     function routeChannelInput(event){
         if((event.type==='keydown'||event.type==='keyup')&&!['Enter',' ','Tab'].includes(event.key))return;
-        const path=event.composedPath();
+        const path=event.composedPath(),plain=!event.button&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey;
         for(const card of channelCards){
             const link=card.q('.channel-link');
             if(!card.host.isConnected||!path.includes(link))continue;
             event.stopImmediatePropagation();
-            if(event.type==='click'&&!event.button&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&channelURL(link.href)){
-                event.preventDefault();if(!globalThis.MinimalYouTubeNavigation?.go(link.href))location.assign(link.href);
-            }
+            const href=channelURL(link.href);
+            if(event.type==='pointerdown')channelPress=plain&&event.isPrimary!==false?card:null;
+            else if(event.type==='pointerup'&&plain&&channelPress===card&&href){clearTimeout(channelRelease);channelRelease=setTimeout(()=>{if(channelPress===card)openChannel(href);},300);}
+            else if(event.type==='click'&&plain&&href){event.preventDefault();openChannel(href);}
             return;
         }
     }
-    for(const type of ['pointerdown','mousedown','touchstart','click','auxclick','keydown','keyup'])window.addEventListener(type,routeChannelInput,{capture:true,passive:type!=='click'});
+    for(const type of ['pointerdown','pointerup','mousedown','touchstart','click','auxclick','keydown','keyup'])window.addEventListener(type,routeChannelInput,{capture:true,passive:type!=='click'});
     const headingCopy=new Map([
         ['Watch again',['Посмотреть еще раз','Посмотреть ещё раз','Посмотреть снова','Смотреть ещё раз','Erneut ansehen']],
         ['For you',['Для вас','Für dich','Für Sie']],['Previously watched',['Вы уже смотрели','Bereits angesehen']],
@@ -217,6 +223,11 @@
       :host([data-channel]) .media.playlist{display:flex;flex-direction:column;gap:14px;padding-bottom:18px}:host([data-channel]) .media.playlist .media-title{font-size:16px}.playlist-badge[hidden]{display:none}.playlist-badge svg{width:15px;height:15px;flex:none}.media.playlist :is(.media-info,.playlist-badge){font-family:"SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace}.media.playlist .media-title{font-weight:600}
       /* Keep 20px gaps fixed while reducing channel column widths by 15%. */
       :host([data-channel]) :is(.row,.results-heading){width:calc(85% + (var(--myt-columns,1) - 1)*3px);margin-inline:auto}
+      .filters{margin:0 0 20px}.filters[hidden],.filters-panel[hidden]{display:none}
+      .filters-toggle{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 16px;border:1px solid var(--myt-border);border-radius:999px;background:var(--myt-surface);color:var(--myt-ink);font:600 14px/1 Arial,sans-serif;cursor:pointer}.filters-toggle:hover,.filters-toggle[aria-expanded="true"]{background:var(--myt-soft)}.filters-toggle[data-active]::after{content:'';width:7px;height:7px;border-radius:50%;background:var(--myt-accent)}
+      .filters-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:20px;margin-top:14px;padding:18px;border:1px solid var(--myt-border);border-radius:18px;background:var(--myt-surface)}
+      .filter-group h3{margin:0 0 10px;color:var(--myt-muted);font:700 12px/1.3 Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase}.filter-group a,.filter-group span{display:block;margin:0 0 2px;padding:7px 10px;border-radius:9px;color:var(--myt-ink);font:500 14px/1.3 Arial,sans-serif}
+      .filter-group a:hover{background:var(--myt-soft)}.filter-group [aria-current="true"]{background:var(--myt-ink);color:var(--myt-bg);font-weight:700}
       .empty{padding:32px 0;color:var(--myt-muted)}:host([data-channel]) .empty{display:flex;align-items:center;justify-content:center;min-height:max(240px,calc(100vh - 360px));margin:0;padding:24px 0;text-align:center;font:700 32px/1.3 Arial,sans-serif;color:var(--myt-ink)}:host([data-channel]) .empty[hidden]{display:none}.more{height:1px}
       .chips{display:flex;flex-wrap:wrap;gap:12px;margin:0 auto 24px}.chips[hidden]{display:none}:host([data-channel]) .chips{width:calc(85% + (var(--myt-columns,1) - 1)*3px)}
       .chip{height:32px;margin:0;padding:0 12px;border:0;border-radius:8px;background:var(--myt-soft);color:var(--myt-ink);font:500 14px/32px Roboto,Arial,sans-serif;cursor:pointer}
@@ -365,6 +376,8 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
     margin:0 auto 24px !important;padding:0 0 16px !important;
     visibility:visible !important;opacity:1 !important;pointer-events:auto !important;overflow:visible !important;contain:none !important;
 }
+html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-own-filters] :is(#filter-menu,tp-yt-iron-collapse,iron-collapse,#collapse-content,ytd-search-filter-group-renderer,ytd-search-filter-dialog-renderer,yt-search-filter-dialog-view-model),
+html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { display:none !important; }
 @media(max-width:600px){html.minimal-youtube[data-myt-search-ui] ytd-search{padding:20px 16px 40px !important;}}`;
     class Search{
         constructor(channel=false){
@@ -372,12 +385,19 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             this.nativeStyle=node('style');this.nativeStyle.id='myt-search-native-style';this.nativeStyle.textContent=channel?nativeStyles.replaceAll('ytd-search','[data-myt-channel-results]'):nativeStyles;document.documentElement.append(this.nativeStyle);
             this.cards=new Map();this.channels=new Map();this.groups=new Map();this.sources=new Map();this.virtualSources=new Map();this.sequence=0;this.nativeNodes=new Set();this.filterText=new Map();this.filterAttributes=new Map();
             this.host=node('div');this.host.id='myt-search';this.host.lang='en';if(channel)this.host.dataset.channel='';this.shadow=this.host.attachShadow({mode:'open'});
-            this.shadow.innerHTML='<style>'+styles+'</style><h2 class="results-heading" lang="ru" hidden>Результаты поиска</h2><div class="channels" aria-label="Channels"></div><div class="chips" role="group" aria-label="Sort" hidden></div><div class="stream"></div><p class="empty" hidden>No results found.</p><div class="more" aria-hidden="true"></div>';
+            this.shadow.innerHTML='<style>'+styles+'</style><h2 class="results-heading" lang="ru" hidden>Результаты поиска</h2><div class="filters" hidden><button class="filters-toggle" type="button" aria-expanded="false">Filters</button><div class="filters-panel" hidden></div></div><div class="channels" aria-label="Channels"></div><div class="chips" role="group" aria-label="Sort" hidden></div><div class="stream"></div><p class="empty" hidden>No results found.</p><div class="more" aria-hidden="true"></div>';
             this.q=selector=>this.shadow.querySelector(selector);
             // YouTube's collapsible filter panel: its own toggle animation
             // sticks inside the owned layout, so the toggle opens and closes
             // the native panel directly. Filters, links and labels stay native.
             this.filters=new Map();
+            this.q('.filters-toggle').addEventListener('click',event=>{event.stopPropagation();this.filtersOpen=!this.filtersOpen;this.q('.filters-panel').hidden=!this.filtersOpen;this.q('.filters-toggle').setAttribute('aria-expanded',String(this.filtersOpen));});
+            // A filter does what YouTube's own does: it opens its URL.
+            this.q('.filters-panel').addEventListener('click',event=>{
+                const link=event.target.closest('a[href]');if(!link||event.button||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+                event.preventDefault();event.stopPropagation();this.filtersOpen=false;this.q('.filters-panel').hidden=true;this.q('.filters-toggle').setAttribute('aria-expanded','false');
+                if(!globalThis.MinimalYouTubeNavigation?.go(link.href))location.assign(link.href);
+            });
             this.filterClick=event=>{
                 if(event.button)return;
                 for(const[panel,state]of this.filters){
@@ -575,7 +595,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             const busy=this.channel&&document.querySelector('#myt-channel-nav')?.getAttribute('aria-busy')==='true';
             const confirmedEmpty=this.channel&&(model?!model.items.length&&!model.more&&!model.loading:[...search.querySelectorAll('ytd-message-renderer,yt-message-view-model,ytd-background-promo-renderer')].some(node=>nativeAvailable(node,search)));
             this.q('.empty').textContent=this.channel&&!query?(/\/playlists\/?$/.test(url.pathname)?'No playlists yet.':/\/(?:posts|community)\/?$/.test(url.pathname)?'No posts yet.':'No videos yet.'):'No results found.';
-            this.renderChips(model);this.syncFilters(search);
+            this.renderChips(model);this.renderFilters(search);
             this.q('.channels').hidden=!this.channels.size||blank;this.q('.empty').hidden=Boolean(blank||this.channels.size||stream.length||busy||this.channel&&!query&&!confirmedEmpty);
             // One message for an empty search: no heading above it.
             if(!this.q('.empty').hidden)this.q('.results-heading').hidden=true;
@@ -586,12 +606,49 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             let model=null;try{model=JSON.parse(document.documentElement.getAttribute('data-myt-page-model')||'null');}catch{}
             return model&&Array.isArray(model.items)&&(this.channel?['channel','posts'].includes(model.type):model.type==='search')?model:null;
         }
+        // YouTube's filters, read from YouTube itself: its data (via the MAIN
+        // bridge) or, failing that, its rendered filter panel.
+        readFilters(search){
+            document.dispatchEvent(new Event('minimal-youtube:search-filters'));
+            let value=null;try{value=JSON.parse(document.documentElement.getAttribute('data-myt-search-filters-data')||'null');}catch{}
+            if(value?.groups?.length)return value;
+            const groups=[];
+            for(const group of [...search.querySelectorAll('ytd-search-filter-group-renderer'),...document.querySelectorAll('ytd-popup-container ytd-search-filter-group-renderer')]){
+                const title=text(group.querySelector('#filter-group-name,h4,#title,yt-formatted-string'));
+                const options=[...group.querySelectorAll('ytd-search-filter-renderer')].map(filter=>{const link=filter.querySelector('a[href]');return {label:text(filter.querySelector('#label,yt-formatted-string')||link),href:youtubeURL(link?.href),selected:filter.hasAttribute('selected')||filter.matches('[aria-selected="true"],.selected')};}).filter(option=>option.label&&(option.href||option.selected));
+                if(title&&options.length&&!groups.some(item=>item.title===title))groups.push({title,options});
+            }
+            return groups.length?{source:'filter panel',groups}:null;
+        }
+        renderFilters(search){
+            const found=this.channel?null:this.readFilters(search),groups=found?.groups||[],bar=this.q('.filters'),panel=this.q('.filters-panel');
+            const signature=JSON.stringify(groups);
+            if(panel.dataset.value!==signature){
+                panel.dataset.value=signature;
+                const name=value=>englishFilter(value)||value;
+                panel.replaceChildren(...groups.map(group=>{
+                    const section=node('div','filter-group');section.append(node('h3','',name(group.title)));
+                    for(const option of group.options){const href=youtubeURL(option.href),item=node(href?'a':'span','',name(option.label));if(href)item.href=href;if(option.selected)item.setAttribute('aria-current','true');section.append(item);}
+                    return section;
+                }));
+                if(found?.source!==this.filterSource){this.filterSource=found?.source;console.info('[Minimal YouTube] search filters:',found?found.source+', '+groups.length+' groups':'none found, YouTube\'s own are kept');}
+            }
+            bar.hidden=!groups.length;
+            this.q('.filters-toggle').toggleAttribute('data-active',groups.some(group=>group.options.some(option=>option.selected&&option.href)));
+            // The owned filters replace YouTube's button and panel; without
+            // them, YouTube's own stay and open directly.
+            const own=groups.length>0;
+            for(const toolbar of search.querySelectorAll('[data-myt-search-toolbar],ytd-search-sub-menu-renderer'))toolbar.toggleAttribute('data-myt-own-filters',own);
+            for(const button of [...search.querySelectorAll('button,[role="button"]')].filter(button=>/filter|фильтр/iu.test((button.getAttribute('aria-label')||button.textContent||'').trim())&&!button.closest('#myt-search')))button.toggleAttribute('data-myt-native-filters',own);
+            if(own){for(const[panel,state]of this.filters)this.restoreFilter(panel,state);this.filters.clear();}
+            else this.syncFilters(search);
+        }
         syncFilters(search){
             for(const[panel,state]of this.filters)if(!panel.isConnected||!search.contains(panel)){this.restoreFilter(panel,state);this.filters.delete(panel);}
             if(this.channel)return;
             for(const header of search.querySelectorAll('ytd-search-sub-menu-renderer')){
                 const panel=header.querySelector('tp-yt-iron-collapse,iron-collapse,#collapse-content,#collapse');
-                const button=[...header.querySelectorAll('#filter-menu button,#filter-button button,button#filter-button,ytd-toggle-button-renderer button,button')].find(node=>/^(?:search filters|filters?|фильтры|filter)$/iu.test((node.getAttribute('aria-label')||node.textContent||'').trim()));
+                const button=[...header.querySelectorAll('#filter-menu button,#filter-button button,button#filter-button,ytd-toggle-button-renderer button,button')].find(node=>/filter|фильтр/iu.test((node.getAttribute('aria-label')||node.textContent||'').trim()));
                 if(!panel||!button)continue;
                 let state=this.filters.get(panel);
                 if(!state){state={button,open:panel.hasAttribute('opened')||button.getAttribute('aria-expanded')==='true'||button.getAttribute('aria-pressed')==='true',hidden:panel.getAttribute('hidden'),aria:panel.getAttribute('aria-hidden'),buttons:new Map()};this.filters.set(panel,state);}
@@ -690,6 +747,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-search-toolbar] {
             for(const [node,attributes]of this.filterAttributes)for(const [name,state]of attributes)if(node.getAttribute(name)===state.applied)node.setAttribute(name,state.original);
             this.filterText.clear();this.filterAttributes.clear();
             this.nativeStyle.remove();
+            for(const node of document.querySelectorAll('[data-myt-own-filters],[data-myt-native-filters]')){node.removeAttribute('data-myt-own-filters');node.removeAttribute('data-myt-native-filters');}
             window.removeEventListener('click',this.filterClick,true);for(const[panel,state]of this.filters)this.restoreFilter(panel,state);this.filters.clear();
             this.selectionObserver.disconnect();this.selectionNodes.clear();
             document.documentElement.removeAttribute('data-myt-search-ui');

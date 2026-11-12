@@ -78,6 +78,19 @@ def router_failure(browser):
     print('PASS a failed route resolution falls back to a regular document load', flush=True)
 
 
+def router_ignored(browser):
+    # YouTube accepts the command but never starts navigating: the page
+    # opens with a document load after about a second, not after a long wait.
+    body = '<ytd-app><ytd-page-manager><ytd-search><a id="native-channel" href="/@creator">Creator</a></ytd-search></ytd-page-manager></ytd-app>'
+    page = prepare(browser, '/results?search_query=creator', body, resolve=CHANNEL)
+    page.evaluate("document.querySelector('ytd-app').addEventListener('yt-navigate', event => event.stopImmediatePropagation(), true)")
+    start = page.evaluate('performance.now()')
+    page.evaluate("document.querySelector('#native-channel').click()")
+    page.wait_for_url('**/@creator/videos', timeout=4000)
+    page.close()
+    print('PASS an ignored route falls back to a document load within about a second', flush=True)
+
+
 def home_search(browser):
     page = prepare(browser, '/', '<ytd-app><ytd-page-manager></ytd-page-manager></ytd-app>')
     start = len(page.documents)
@@ -166,6 +179,7 @@ if __name__ == '__main__':
         browser = playwright.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
         channel_links(browser)
         router_failure(browser)
+        router_ignored(browser)
         home_search(browser)
         watch_search(browser)
         own_links(browser)

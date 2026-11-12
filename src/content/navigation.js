@@ -45,7 +45,11 @@
     }
     document.addEventListener('minimal-youtube:navigate-result',()=>{
         let result;try{result=JSON.parse(document.documentElement.getAttribute('data-myt-navigate-result')||'{}');}catch{return;}
-        if(pending&&result.id===pending.id&&!result.started)settle(false);
+        if(!pending||result.id!==pending.id)return;
+        if(!result.started){settle(false);return;}
+        // YouTube starts a navigation it accepts at once. If it ignores the
+        // command, the page opens with a document load without a long wait.
+        const id=pending.id;clearTimeout(pending.timer);pending.timer=setTimeout(()=>{if(pending?.id===id)settle(false);},1200);
     });
     document.addEventListener('yt-navigate-start',()=>settle(true));
     window.addEventListener('pagehide',()=>{if(pending){clearTimeout(pending.timer);pending=null;}});
