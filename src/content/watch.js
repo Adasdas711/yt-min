@@ -366,7 +366,34 @@ main.has-sidecar .details { min-height:0; }
                 }
                 if(this.host.matches(':popover-open'))this.host.hidePopover();
                 this.updateFullscreenLayout();this.resizeNativePlayer();
-            }else this.resumeFullscreen();
+                this.watchFullscreenControls(true);
+            }else{this.watchFullscreenControls(false);this.resumeFullscreen();}
+        }
+        // YouTube sizes its control bar (progress bar and chapter segments)
+        // from the player size it measured during the fullscreen transition.
+        // Live, YouTube's own fullscreen (on <html>) kept the window size, so
+        // no resize followed: the player stayed in ytp-tiny-mode with a 100px
+        // bar on a 1048px screen. While fullscreen, a player YouTube believes
+        // tiny, or a bar much narrower than the player, is measured again:
+        // after the transition settles and whenever its classes or bar change.
+        watchFullscreenControls(on) {
+            this.fullscreenControlsObserver?.disconnect();this.fullscreenControlsObserver=null;
+            for(const timer of this.fullscreenControlsTimers||[])clearTimeout(timer);this.fullscreenControlsTimers=[];
+            if(!on)return;
+            const player=document.fullscreenElement?.matches('#movie_player')?document.fullscreenElement:document.fullscreenElement?.querySelector('#movie_player');
+            if(!player)return;
+            this.fullscreenControlsRepairs=0;
+            this.fullscreenControlsObserver=new MutationObserver(()=>this.checkFullscreenControls(player));
+            this.fullscreenControlsObserver.observe(player,{attributes:true,attributeFilter:['class']});
+            const bar=player.querySelector('.ytp-chrome-bottom');if(bar)this.fullscreenControlsObserver.observe(bar,{attributes:true,attributeFilter:['style']});
+            this.fullscreenControlsTimers=[100,300,700,1500].map(delay=>setTimeout(()=>this.checkFullscreenControls(player),delay));
+        }
+        checkFullscreenControls(player) {
+            if(!document.fullscreenElement||!player.isConnected||this.fullscreenControlsRepairs>=6)return;
+            const width=player.getBoundingClientRect().width,bar=player.querySelector('.ytp-chrome-bottom'),measured=parseFloat(bar?.style.width||'');
+            const tiny=width>640&&player.matches('.ytp-tiny-mode,.ytp-xsmall-width-mode');
+            const narrow=width>0&&measured>0&&measured<width*.6;
+            if(tiny||narrow){this.fullscreenControlsRepairs++;this.resizeNativePlayer(true);}
         }
         restoreFullscreenLayout() {
             for(const[node,original]of this.fullscreenNodes){
@@ -407,7 +434,10 @@ main.has-sidecar .details { min-height:0; }
             this.resizeFrame=requestAnimationFrame(()=>{
                 this.resizeFrame=0;
                 if(!this.host.isConnected)return;
-                const player=document.fullscreenElement||this.nativePlayer(),box=player?.getBoundingClientRect();
+                // YouTube's own fullscreen is on <html>, which can measure 0x0:
+                // measure the player inside it, or nothing would be resized.
+                const fullscreen=document.fullscreenElement,inner=fullscreen&&!fullscreen.matches('#movie_player')?fullscreen.querySelector('#movie_player'):null;
+                const player=inner||fullscreen||this.nativePlayer(),box=player?.getBoundingClientRect();
                 if(!box||box.width<=0||box.height<=0)return;
                 const size=[Math.round(box.width),Math.round(box.height),Boolean(document.fullscreenElement),Boolean(this.fullscreenPending)].join(':');
                 if(this.resizedPlayer===player&&this.resizedMedia===this.media&&this.resizedSize===size)return;
@@ -1326,7 +1356,7 @@ main.has-sidecar .details { min-height:0; }
             this.q('.transcript-status').textContent=data.length?(filtered.length?'':this.copy.noResults):(this.transcriptLoading?this.copy.loading:this.copy.unavailable);this.q('.transcript-retry').hidden=!!data.length||this.transcriptLoading;this.q('.transcript-search').hidden=!data.length;
         }
         closeTranscript() {this.transcriptOpen=false;clearTimeout(this.transcriptTimeout);if(this.q){this.q('#watch-transcript').hidden=true;this.q('.transcript-menu-toggle')?.setAttribute('aria-expanded','false');this.q('.transcript-content').hidden=true;this.q('.transcript-toggle').setAttribute('aria-expanded','false');}if(this.nativePanelState){for(const[name,value]of this.nativePanelState.attrs){if(value===null)this.nativePanelState.node.removeAttribute(name);else this.nativePanelState.node.setAttribute(name,value);}this.nativePanelState=null;}}
-        destroy() {clearTimeout(this.detailsTimer);this.markDormant([]);this.playlistStateObserver?.disconnect();this.restorePlaylistChrome();clearTimeout(this.titleTimer);cancelAnimationFrame(this.geometryFrame);cancelAnimationFrame(this.sourceFrame);this.subscriptionPress?.cancel();this.subscriptionPress=null;this.clearSubscription(true);this.clearFullscreenPreview();this.restoreFullscreenLayout();for(const type of ['click','dblclick','keydown','keyup'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('pointerover',this.pointerGuard,true);this.wheelGuards?.clear();window.removeEventListener('touchmove',this.fullscreenTouch,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);for(const type of ['timeupdate','seeked'])this.media?.removeEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.removeEventListener(type,this.videoMetadata);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;window.dispatchEvent(new Event('resize'));}
+        destroy() {this.watchFullscreenControls(false);clearTimeout(this.detailsTimer);this.markDormant([]);this.playlistStateObserver?.disconnect();this.restorePlaylistChrome();clearTimeout(this.titleTimer);cancelAnimationFrame(this.geometryFrame);cancelAnimationFrame(this.sourceFrame);this.subscriptionPress?.cancel();this.subscriptionPress=null;this.clearSubscription(true);this.clearFullscreenPreview();this.restoreFullscreenLayout();for(const type of ['click','dblclick','keydown','keyup'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('pointerover',this.pointerGuard,true);this.wheelGuards?.clear();window.removeEventListener('touchmove',this.fullscreenTouch,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);for(const type of ['timeupdate','seeked'])this.media?.removeEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.removeEventListener(type,this.videoMetadata);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;window.dispatchEvent(new Event('resize'));}
     }
     WatchView.loadTitleFonts=loadTitleFonts;
     WatchView.readSubscriptionState=WatchView.prototype.subscriptionState;
