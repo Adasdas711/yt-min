@@ -129,10 +129,14 @@ html.minimal-youtube .myt-home__wordmark {
     letter-spacing: -1.1px;
 }
 
-/* Remove guide offsets together with the guide. Never resize a generic #primary. */
+/* Remove guide offsets together with the guide. Never resize a generic #primary.
+   The drawer itself goes too, wherever YouTube nests it (now inside
+   ytd-app > #content): on wide windows it stays open as an invisible fixed
+   column that would swallow clicks on the left of every owned page. */
 html.minimal-youtube ytd-mini-guide-renderer,
 html.minimal-youtube ytd-guide-renderer,
 html.minimal-youtube ytd-app > tp-yt-app-drawer,
+html.minimal-youtube ytd-app tp-yt-app-drawer#guide,
 html.minimal-youtube ytd-masthead #guide-button,
 html.minimal-youtube ytd-masthead #voice-search-button,
 html.minimal-youtube ytd-notification-topbar-button-renderer {
