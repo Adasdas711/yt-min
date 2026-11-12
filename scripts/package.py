@@ -28,15 +28,40 @@ assert any('src/home/index.html' in entry.get('resources', []) and '<all_urls>' 
            for entry in manifest.get('web_accessible_resources', [])), 'Homepage must be accessible to browser redirects'
 
 
-output = ROOT / 'articafts' / f'minimal-youtube-{manifest["version"]}.zip'
-output.parent.mkdir(exist_ok=True)
-with ZipFile(output, 'w', compression=ZIP_DEFLATED) as archive:
-    for path in files:
-        entry = ZipInfo(path.relative_to(ROOT).as_posix(), date_time=(2026, 1, 1, 0, 0, 0))
-        entry.compress_type = ZIP_DEFLATED
-        entry.external_attr = 0o100644 << 16
-        archive.writestr(entry, path.read_bytes())
-with ZipFile(output) as archive:
-    assert archive.testzip() is None, 'Invalid output archive'
-    assert not any(name.startswith(('_metadata/', 'tests/', 'scripts/')) for name in archive.namelist())
-print(output)
+# Firefox reads the same sources. Only its manifest differs: an event-page
+# background (no service worker), a Gecko ID and Firefox 128+, where MAIN-world
+# content scripts and scripting.registerContentScripts({world}) exist.
+GECKO_ID = 'minimal-youtube@yt-min.extension'
+FIREFOX_MIN = '128.0'
+
+
+def firefox_manifest(source):
+    value = json.loads(json.dumps(source))
+    value.pop('minimum_chrome_version', None)
+    worker = value['background'].pop('service_worker')
+    # optimization.js is loaded by the Chrome worker with importScripts.
+    value['background'] = {'scripts': ['src/optimization.js', worker]}
+    # AMO requires a data collection declaration: nothing is collected or sent.
+    value['browser_specific_settings'] = {'gecko': {'id': GECKO_ID, 'strict_min_version': FIREFOX_MIN,
+                                                    'data_collection_permissions': {'required': ['none']}}}
+    return value
+
+
+def build(output, manifest_text):
+    output.parent.mkdir(exist_ok=True)
+    with ZipFile(output, 'w', compression=ZIP_DEFLATED) as archive:
+        for path in files:
+            name = path.relative_to(ROOT).as_posix()
+            entry = ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
+            entry.compress_type = ZIP_DEFLATED
+            entry.external_attr = 0o100644 << 16
+            archive.writestr(entry, manifest_text.encode() if name == 'manifest.json' else path.read_bytes())
+    with ZipFile(output) as archive:
+        assert archive.testzip() is None, 'Invalid output archive'
+        assert not any(name.startswith(('_metadata/', 'tests/', 'scripts/')) for name in archive.namelist())
+    print(output)
+
+
+version = manifest['version']
+build(ROOT / 'articafts' / f'minimal-youtube-{version}.zip', (ROOT / 'manifest.json').read_text())
+build(ROOT / 'articafts' / f'minimal-youtube-{version}-firefox.zip', json.dumps(firefox_manifest(manifest), indent=4, ensure_ascii=False) + '\n')
