@@ -5,7 +5,9 @@ Keep the extension version at `1.0.0` for subsequent changes. Do not bump
 explicitly requests a new version.
 
 When updating the distributable, run `python scripts/package.py` and keep
-`articafts/minimal-youtube-1.0.0.zip` consistent with the current source.
+`articafts/minimal-youtube-1.0.0.zip` (Chrome) and
+`articafts/minimal-youtube-1.0.0-firefox.zip` (Firefox) consistent with the
+current source.
 
 After committing and pushing work to the development branch, always open a
 pull request into `main` and merge it, so `main` carries the latest changes.
