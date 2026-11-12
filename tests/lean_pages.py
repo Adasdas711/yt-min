@@ -37,7 +37,9 @@ def check_watch_playlist(browser):
 
 def check_search(browser):
     body = ('<ytd-app>' + MASTHEAD + '<ytd-page-manager><ytd-search><ytd-section-list-renderer><div id="contents"><ytd-item-section-renderer><div id="contents">'
-            + video(1) + channel(1) + '</div></ytd-item-section-renderer></div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>')
+            + video(1) + channel(1) + video(2) + '<ytd-continuation-item-renderer id="native-continuation"></ytd-continuation-item-renderer></div></ytd-item-section-renderer></div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>')
+    # Live: the continuation sits beside the cards, so their wrappers are
+    # layout paths; the cards inside them must still sleep.
     page = setup(browser, '/results?search_query=cats', body)
     page.evaluate(CONFIG + ITEM + """
 document.querySelector('ytd-search').data={contents:{twoColumnSearchResultsRenderer:{primaryContents:{sectionListRenderer:{contents:[
@@ -45,7 +47,11 @@ document.querySelector('ytd-search').data={contents:{twoColumnSearchResultsRende
 document.dispatchEvent(new Event('yt-page-data-updated'));""")
     expect(page.locator('#myt-search .media-title')).to_have_text(['Data one'])
     assert page.evaluate('document.documentElement.hasAttribute("data-myt-page-data")')
-    assert page.locator('#video-1').evaluate('e=>getComputedStyle(e).contentVisibility') == 'hidden'
+    for card in ['#video-1', '#video-2']:
+        assert page.locator(card).evaluate('e=>getComputedStyle(e).contentVisibility') == 'hidden', card
+    assert page.locator('#native-continuation').evaluate('e=>getComputedStyle(e).contentVisibility') == 'visible'
+    skipped = page.evaluate("[...document.querySelectorAll('[data-myt-dormant]')].reduce((s,n)=>s+n.getElementsByTagName('*').length,0)")
+    assert skipped > 20, skipped
     # Channel cards keep their live native controls.
     assert page.locator('#channel-1').evaluate('e=>getComputedStyle(e).contentVisibility') == 'visible'
     page.close()

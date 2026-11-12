@@ -734,9 +734,12 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             // their live native nodes, so a branch holding one is split.
             const dormant=new Set();
             if(this.model){
+                // Layout paths (wrappers of the continuation) and branches with
+                // a channel card are entered; everything else in them sleeps.
                 const add=node=>{
-                    if(paths.has(node)||nativeUI.has(node)||node===toolbar||node.matches('ytd-channel-renderer,ytd-continuation-item-renderer,[data-myt-search-channel-card]')||node===this.host)return;
-                    if(!node.querySelector('ytd-channel-renderer,ytd-continuation-item-renderer'))dormant.add(node);else for(const child of node.children)add(child);
+                    if(nativeUI.has(node)||node===toolbar||node===this.host||node.matches('ytd-channel-renderer,ytd-continuation-item-renderer,[data-myt-search-channel-card],template,style,script,dom-if,dom-repeat'))return;
+                    if(paths.has(node)||node.querySelector('ytd-channel-renderer,ytd-continuation-item-renderer')){for(const child of node.children)add(child);return;}
+                    if(node.childElementCount)dormant.add(node);
                 };
                 for(const child of search.children)if(child!==this.host)add(child);
             }
