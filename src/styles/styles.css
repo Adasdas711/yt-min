@@ -1693,9 +1693,11 @@ html.minimal-youtube ytd-watch-flexy :is(#chat, #chat-container, ytd-live-chat-f
 /* Banner overlays only. Never hide the native video or the skip control. */
 html.minimal-youtube #movie_player :is(.ytp-ad-overlay-container, .ytp-ad-overlay-slot) { display: none !important; }
 
-/* Fullscreen is a single native player, not YouTube's scrollable details view. */
-html.minimal-youtube[data-myt-watch-ui]:has(:fullscreen),
-html.minimal-youtube[data-myt-watch-ui]:has(:fullscreen) body,
+/* Fullscreen is a single native player, not YouTube's scrollable details view.
+   watch.js marks the document: an html:has(:fullscreen) rule would restyle
+   the whole page on every DOM insertion while YouTube builds it. */
+html.minimal-youtube[data-myt-watch-ui][data-myt-fullscreen],
+html.minimal-youtube[data-myt-watch-ui][data-myt-fullscreen] body,
 html.minimal-youtube[data-myt-watch-ui] :fullscreen,
 html.minimal-youtube[data-myt-watch-ui] [data-myt-fullscreen-part="container"] {
     overflow: clip !important; overscroll-behavior: none !important;
