@@ -3,23 +3,17 @@
 (() => {
     const russian = false;
     const translations = { ru: {
-        tagline: "Больше внимания. Меньше шума.",
         title: "Режим фокуса",
         on: "Включён",
         off: "Выключен",
-        details: "Чистая главная, каналы по центру и видео без Shorts и рекомендаций.",
-        footer: "Обновите вкладки YouTube, чтобы применить экономию памяти.",
-        disabledFooter: "Обновите YouTube, чтобы вернуть все его блоки.",
+        reload: "обновите вкладки YouTube",
         readError: "Не удалось загрузить настройки. Откройте расширение заново.",
         saveError: "Не удалось сохранить. Попробуйте ещё раз.",
     }, en: {
-        tagline: "More focus. Less noise.",
         title: "Focus mode",
         on: "Enabled",
         off: "Disabled",
-        details: "A clean home, centered channels, and videos without Shorts or recommendations.",
-        footer: "Reload YouTube tabs to apply memory savings.",
-        disabledFooter: "Reload YouTube to restore all of its sections.",
+        reload: "reload YouTube tabs",
         readError: "Could not load settings. Please reopen the extension.",
         saveError: "Could not save. Please try again.",
     }};
@@ -29,28 +23,28 @@
     const error = document.getElementById("error");
     let enabled = true;
     let ready = false;
+    let changed = false;
     function applyLanguage(value) {
         // The extension interface is English for every browser/profile language.
         copy = translations[russian ? "ru" : "en"];
         document.documentElement.lang = russian ? "ru" : "en";
-        document.getElementById("tagline").textContent = copy.tagline;
         document.getElementById("setting-title").textContent = copy.title;
-        document.getElementById("details").textContent = copy.details;
-        document.getElementById("footer").textContent = copy.footer;
     }
     applyLanguage(null);
     function render() {
         toggle.checked = enabled;
-        status.textContent = enabled ? copy.on : copy.off;
-        document.getElementById("footer").textContent = enabled ? copy.footer : copy.disabledFooter;
+        // After a change, the status line also says that open tabs need a reload.
+        status.textContent = (enabled ? copy.on : copy.off) + (changed ? " · " + copy.reload : "");
     }
     function showError(message) {
-        error.textContent = message;
+        // A symbol on screen; the message is spoken and shown on hover.
+        error.querySelector(".visually-hidden").textContent = message;
+        error.title = message;
         error.hidden = !message;
     }
     chrome.storage.local.get(["enabled", "language"], (data) => {
         if (chrome.runtime.lastError) {
-            status.textContent = "—";
+            status.textContent = "Unknown";
             showError(copy.readError);
             return;
         }
@@ -70,6 +64,7 @@
                 showError(copy.saveError);
             } else {
                 enabled = requested;
+                changed = true;
             }
             render();
             toggle.disabled = false;
@@ -79,9 +74,16 @@
     // page structure and timing only, never cookies or account data.
     const diagnostics = document.getElementById("diagnostics");
     const diagnosticsStatus = document.getElementById("diagnostics-status");
+    let diagnosticsReset = 0;
+    // The button itself says what happened, then returns to its label.
+    const showReport = (state, text) => {
+        diagnostics.dataset.state = state;diagnostics.title = text;diagnosticsStatus.textContent = text;
+        clearTimeout(diagnosticsReset);
+        if (state !== "busy") diagnosticsReset = setTimeout(() => { delete diagnostics.dataset.state;diagnostics.title = "Copy diagnostic report"; }, 2500);
+    };
     diagnostics.addEventListener("click", async () => {
         diagnostics.disabled = true;
-        diagnosticsStatus.textContent = "Collecting…";
+        showReport("busy", "Collecting…");
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             let host = "";
@@ -90,9 +92,9 @@
             const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: "MAIN", func: globalThis.minimalYouTubeDiagnostics });
             const report = { version: chrome.runtime.getManifest().version, enabled, ...(result?.result || { error: "No report" }) };
             await navigator.clipboard.writeText(JSON.stringify(report, null, 1));
-            diagnosticsStatus.textContent = "Copied. Paste it into the chat.";
+            showReport("done", "Copied. Paste it into the chat.");
         } catch (problem) {
-            diagnosticsStatus.textContent = problem?.message === "Open a YouTube tab first." ? problem.message : "Could not collect the report.";
+            showReport("error", problem?.message === "Open a YouTube tab first." ? problem.message : "Could not collect the report.");
         } finally {
             diagnostics.disabled = false;
         }
