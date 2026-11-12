@@ -157,15 +157,37 @@
         }
         if(!channelPath.test(path)||/\/featured$/.test(path)||/^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)$/.test(path))return null;
         const browse=[...document.querySelectorAll('ytd-browse')].find(visible)||document.querySelector('ytd-browse');
+        const posts=/\/(?:community|posts)$/.test(path);
+        // Posts whose tab data is not on the page still carry their own data
+        // on YouTube's post elements: the owned feed reads it from there.
+        const fallback=()=>posts&&browse?nodePosts(browse):null;
         const tabs=(browse?.data?.contents||browse?.data?.response?.contents)?.twoColumnBrowseResultsRenderer?.tabs;
-        if(!Array.isArray(tabs))return null;
+        if(!Array.isArray(tabs))return fallback();
         const selected=tabs.map(tab=>tab.tabRenderer||tab.expandableTabRenderer).find(tab=>tab?.selected);
         const url=selected?.endpoint?.commandMetadata?.webCommandMetadata?.url||'';
         // A selected tab for another section is a page still in transition.
-        if(!url||url.split('?')[0].replace(/\/$/,'').replace(/\/community$/,'/posts').toLowerCase()!==path.replace(/\/community$/,'/posts').toLowerCase())return null;
+        if(!url||url.split('?')[0].replace(/\/$/,'').replace(/\/community$/,'/posts').toLowerCase()!==path.replace(/\/community$/,'/posts').toLowerCase())return fallback();
         const content=selected.content;
         const list=content?.richGridRenderer?.contents||content?.sectionListRenderer?.contents;
-        return Array.isArray(list)?{type:/\/(?:community|posts)$/.test(path)?'posts':'channel',list,content}:null;
+        return Array.isArray(list)?{type:posts?'posts':'channel',list,content}:fallback();
+    }
+    const nodePostLists=new WeakMap();
+    function nodePosts(browse){
+        const kinds=[['ytd-backstage-post-thread-renderer','backstagePostThreadRenderer'],['ytd-post-renderer','postRenderer'],['ytd-shared-post-renderer','sharedPostRenderer']];
+        const selector=kinds.map(([tag])=>tag).join(','),list=[];
+        for(const node of browse.querySelectorAll(selector)){
+            if(node.parentElement?.closest(selector)||node.closest('[hidden]'))continue;
+            const data=node.data||node.__data?.data,key=kinds.find(([tag])=>node.localName===tag)?.[1];
+            if(data&&typeof data==='object'&&key)list.push({[key]:data});
+        }
+        if(!list.length)return null;
+        const continuation=[...browse.querySelectorAll('ytd-continuation-item-renderer')].map(node=>node.data||node.__data?.data).filter(Boolean).pop();
+        if(continuation)list.push({continuationItemRenderer:continuation});
+        // The same posts keep one list, so the model (and loaded pages) stays.
+        const first=Object.values(list[0])[0],cached=nodePostLists.get(first);
+        if(cached&&cached.length===list.length)return {type:'posts',list:cached,content:null};
+        nodePostLists.set(first,list);
+        return {type:'posts',list,content:null};
     }
     function model(){
         let found=null;try{found=source();}catch{found=null;}

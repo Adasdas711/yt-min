@@ -237,6 +237,13 @@
       .filters-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:20px;margin-top:14px;padding:18px;border:1px solid var(--myt-border);border-radius:18px;background:var(--myt-surface)}
       .filter-group h3{margin:0 0 10px;color:var(--myt-muted);font:700 12px/1.3 Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase}.filter-group a,.filter-group span{display:block;margin:0 0 2px;padding:7px 10px;border-radius:9px;color:var(--myt-ink);font:500 14px/1.3 Arial,sans-serif}
       .filter-group a:hover{background:var(--myt-soft)}.filter-group [aria-current="true"]{background:var(--myt-ink);color:var(--myt-bg);font-weight:700}
+      .skeleton{display:grid;grid-template-columns:repeat(var(--myt-skeleton-columns,3),minmax(0,1fr));gap:20px}.skeleton[hidden],.loading-more[hidden]{display:none}
+      :host([data-channel]) .skeleton{width:calc(85% + (var(--myt-columns,1) - 1)*3px);margin-inline:auto}
+      .skeleton-card{display:flex;flex-direction:column;gap:14px;padding:12px 12px 18px;border-radius:18px;background:var(--myt-surface)}
+      .skeleton-cover{aspect-ratio:16/9;border-radius:12px;background:var(--myt-soft)}.skeleton-line{height:14px;border-radius:7px;background:var(--myt-soft)}.skeleton-line.short{width:55%}
+      .skeleton-card>*,.loading-more span{animation:myt-pulse 1.4s ease-in-out infinite}.skeleton-card:nth-child(2n)>*{animation-delay:.2s}.skeleton-card:nth-child(3n)>*{animation-delay:.4s}
+      .loading-more{display:flex;justify-content:center;gap:8px;padding:28px 0}.loading-more span{width:9px;height:9px;border-radius:50%;background:var(--myt-muted)}.loading-more span:nth-child(2){animation-delay:.2s}.loading-more span:nth-child(3){animation-delay:.4s}
+      @keyframes myt-pulse{0%,100%{opacity:.45}50%{opacity:1}}@media(prefers-reduced-motion:reduce){.skeleton-card>*,.loading-more span{animation:none}}
       .empty{padding:32px 0;color:var(--myt-muted)}:host([data-channel]) .empty{display:flex;align-items:center;justify-content:center;min-height:max(240px,calc(100vh - 360px));margin:0;padding:24px 0;text-align:center;font:700 32px/1.3 Arial,sans-serif;color:var(--myt-ink)}:host([data-channel]) .empty[hidden]{display:none}.more{height:1px}
       .chips{display:flex;flex-wrap:wrap;gap:12px;margin:0 auto 24px}.chips[hidden]{display:none}:host([data-channel]) .chips{width:calc(85% + (var(--myt-columns,1) - 1)*3px)}
       .chip{height:32px;margin:0;padding:0 12px;border:0;border-radius:8px;background:var(--myt-soft);color:var(--myt-ink);font:500 14px/32px Roboto,Arial,sans-serif;cursor:pointer}
@@ -398,7 +405,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             this.nativeStyle=node('style');this.nativeStyle.id='myt-search-native-style';this.nativeStyle.textContent=channel?nativeStyles.replaceAll('ytd-search','[data-myt-channel-results]'):nativeStyles;document.documentElement.append(this.nativeStyle);
             this.cards=new Map();this.channels=new Map();this.groups=new Map();this.sources=new Map();this.virtualSources=new Map();this.sequence=0;this.nativeNodes=new Set();this.filterText=new Map();this.filterAttributes=new Map();
             this.host=node('div');this.host.id='myt-search';this.host.lang='en';if(channel)this.host.dataset.channel='';this.shadow=this.host.attachShadow({mode:'open'});
-            this.shadow.innerHTML='<style>'+styles+'</style><h2 class="results-heading" lang="ru" hidden>Результаты поиска</h2><div class="filters" hidden><button class="filters-toggle" type="button" aria-expanded="false">Filters</button><div class="filters-panel" hidden></div></div><div class="channels" aria-label="Channels"></div><div class="chips" role="group" aria-label="Sort" hidden></div><div class="stream"></div><p class="empty" hidden>No results found.</p><div class="more" aria-hidden="true"></div>';
+            this.shadow.innerHTML='<style>'+styles+'</style><h2 class="results-heading" lang="ru" hidden>Результаты поиска</h2><div class="filters" hidden><button class="filters-toggle" type="button" aria-expanded="false">Filters</button><div class="filters-panel" hidden></div></div><div class="channels" aria-label="Channels"></div><div class="chips" role="group" aria-label="Sort" hidden></div><div class="stream"></div><div class="skeleton" role="status" aria-label="Loading results" hidden><div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div><div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div><div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div><div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div><div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div><div class="skeleton-card"><div class="skeleton-cover"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div><p class="empty" hidden>No results found.</p><div class="loading-more" role="status" aria-label="Loading more" hidden><span></span><span></span><span></span></div><div class="more" aria-hidden="true"></div>';
             this.q=selector=>this.shadow.querySelector(selector);
             // YouTube's collapsible filter panel: its own toggle animation
             // sticks inside the owned layout, so the toggle opens and closes
@@ -424,7 +431,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             // Page data loads further results itself; this sentinel replaces
             // the native continuation while results come from that data.
             this.moreVisible=false;
-            this.moreObserver=new IntersectionObserver(entries=>{this.moreVisible=entries.some(entry=>entry.isIntersecting);this.requestMore();},{rootMargin:'0px 0px 1200px 0px'});
+            this.moreObserver=new IntersectionObserver(entries=>{this.moreVisible=entries.some(entry=>entry.isIntersecting);this.requestMore();if(!this.model)this.queue();},{rootMargin:'0px 0px 1200px 0px'});
             this.moreObserver.observe(this.q('.more'));
             this.modelChanged=()=>this.queue();document.addEventListener('minimal-youtube:page-model-updated',this.modelChanged);
             this.observer=new MutationObserver(records=>{
@@ -613,7 +620,15 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             const confirmedEmpty=this.channel&&(model?!model.items.length&&!model.more&&!model.loading:[...search.querySelectorAll('ytd-message-renderer,yt-message-view-model,ytd-background-promo-renderer')].some(node=>nativeAvailable(node,search)));
             this.q('.empty').textContent=this.channel&&!query?(/\/playlists\/?$/.test(url.pathname)?'No playlists yet.':/\/(?:posts|community)\/?$/.test(url.pathname)?'No posts yet.':'No videos yet.'):'No results found.';
             this.renderChips(model);this.renderFilters(search);
-            this.q('.channels').hidden=!this.channels.size||blank;this.q('.empty').hidden=Boolean(blank||this.channels.size||stream.length||busy||this.channel&&!query&&!confirmedEmpty);
+            // Loading shows placeholders; "nothing found" only once the page
+            // data (or YouTube's own message) confirms it, or after 10 s.
+            if(this.loadingKey!==location.href){this.loadingKey=location.href;this.loadingSince=performance.now();clearTimeout(this.loadingTimer);this.loadingTimer=setTimeout(()=>this.queue(),10050);}
+            const nativeEmpty=[...search.querySelectorAll('ytd-message-renderer,yt-message-view-model,ytd-background-promo-renderer')].some(node=>nativeAvailable(node,search));
+            const confirmed=(this.channel?confirmedEmpty:model?!model.items.length&&!model.more&&!model.loading:nativeEmpty)||performance.now()-this.loadingSince>10000;
+            const nothing=Boolean(blank||this.channels.size||stream.length);
+            this.q('.channels').hidden=!this.channels.size||blank;this.q('.empty').hidden=Boolean(nothing||busy||!confirmed);
+            this.q('.skeleton').hidden=Boolean(nothing||confirmed&&!busy);
+            this.q('.loading-more').hidden=!(stream.length&&!blank&&(model?model.loading:this.moreVisible&&search.querySelector('ytd-continuation-item-renderer')));
             // One message for an empty search: no heading above it.
             if(!this.q('.empty').hidden)this.q('.results-heading').hidden=true;
             this.prepareNative(search);this.translateFilters();this.layout();this.requestMore();
@@ -758,6 +773,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             if(!this.host.isConnected||!this.stream)return;
             const style=getComputedStyle(this.search),width=this.search.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),columns=width<560?1:width<900?2:3;
             if(this.channel&&this.host.style.getPropertyValue('--myt-columns')!==String(columns))this.host.style.setProperty('--myt-columns',String(columns));
+            if(this.host.style.getPropertyValue('--myt-skeleton-columns')!==String(columns))this.host.style.setProperty('--myt-skeleton-columns',String(columns));
             this.place(this.q('.stream'),this.stream,columns);
             for(const group of this.groups.values())this.place(group.stream,group.items,columns===3&&[2,4].includes(group.items.length)?2:columns);
         }
@@ -802,7 +818,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             this.selectionObserver.disconnect();this.selectionNodes.clear();
             document.documentElement.removeAttribute('data-myt-search-ui');
             cancelAnimationFrame(this.cardFrame);this.pendingCards?.clear();
-            cancelAnimationFrame(this.frame);this.observer.disconnect();this.resize.disconnect();this.search?.removeEventListener('load',this.changed,true);
+            cancelAnimationFrame(this.frame);clearTimeout(this.loadingTimer);this.observer.disconnect();this.resize.disconnect();this.search?.removeEventListener('load',this.changed,true);
             document.removeEventListener('yt-page-data-updated',this.changed);document.removeEventListener('yt-rendererstamper-finished',this.changed);
             document.removeEventListener('minimal-youtube:page-model-updated',this.modelChanged);this.moreObserver.disconnect();document.documentElement.removeAttribute('data-myt-page-data');document.documentElement.removeAttribute('data-myt-own-chips');
             for(const card of [...this.cards.values(),...this.channels.values()])card.destroy();

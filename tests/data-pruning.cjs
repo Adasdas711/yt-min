@@ -67,6 +67,12 @@ async function main() {
         assert.equal(replay.engagementPanels[0].engagementPanelSectionListRenderer.content.text, 'Keep comments');
         assert.equal(replay.engagementPanels[1].engagementPanelSectionListRenderer.content.text, 'Keep transcript');
     }
+    // Ad and search-preview panels go; description, transcript, chapters and comments stay.
+    const panels = parse({ contents: { twoColumnWatchNextResults: {} }, engagementPanels: ['engagement-panel-ads', 'engagement-panel-ads-business-agent-chat', 'PAsearch_preview',
+        'engagement-panel-structured-description', 'engagement-panel-searchable-transcript', 'PAmodern_transcript_view', 'engagement-panel-macro-markers-description-chapters', 'engagement-panel-comments-section']
+        .map(targetId => ({ engagementPanelSectionListRenderer: { targetId, content: { text: targetId } } })) });
+    assert.deepEqual(JSON.parse(JSON.stringify(panels.engagementPanels.map(panel => panel.engagementPanelSectionListRenderer.targetId))),
+        ['engagement-panel-structured-description', 'engagement-panel-searchable-transcript', 'PAmodern_transcript_view', 'engagement-panel-macro-markers-description-chapters', 'engagement-panel-comments-section']);
     const chatResponse = await new Response({ continuationContents: { liveChatContinuation: { actions: [{ addChatItemAction: { text: 'Discard message' } }] } } }).json();
     assert.equal(chatResponse.continuationContents.liveChatContinuation, undefined);
 

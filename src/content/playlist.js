@@ -84,7 +84,11 @@
             this.empty=document.createElement('p');this.empty.className='myt-playlist-empty';this.empty.textContent='No videos in this playlist.';this.empty.hidden=true;
             this.status=document.createElement('p');this.status.className='myt-playlist-status';this.status.setAttribute('role','status');
             this.more=document.createElement('div');this.more.className='myt-playlist-more';this.more.setAttribute('aria-hidden','true');
-            this.rowsHost.append(this.status,this.rowsList,this.empty,this.more);
+            // Loading: placeholder rows first, then dots while more rows load.
+            this.skeleton=document.createElement('div');this.skeleton.className='myt-playlist-skeleton';this.skeleton.setAttribute('role','status');this.skeleton.setAttribute('aria-label','Loading videos');this.skeleton.hidden=true;
+            for(let index=0;index<6;index++){const row=document.createElement('div');row.className='myt-playlist-skeleton-row';row.innerHTML='<span></span><span></span><span><i></i><i></i></span>';this.skeleton.append(row);}
+            this.loadingMore=document.createElement('div');this.loadingMore.className='myt-loading-more';this.loadingMore.setAttribute('role','status');this.loadingMore.setAttribute('aria-label','Loading more');this.loadingMore.hidden=true;this.loadingMore.innerHTML='<span></span><span></span><span></span>';
+            this.rowsHost.append(this.status,this.rowsList,this.skeleton,this.empty,this.loadingMore,this.more);
             this.moreObserver=new IntersectionObserver(entries=>{this.moreVisible=entries.some(entry=>entry.isIntersecting);this.requestMore();},{rootMargin:'800px 0px'});this.moreObserver.observe(this.more);
             this.modelChanged=()=>onChange();document.addEventListener('minimal-youtube:page-model-updated',this.modelChanged);
             this.actionResult=()=>{
@@ -135,6 +139,8 @@
                 previous=card.host;
             }
             this.empty.hidden=Boolean(wanted.size||model.more||model.loading);
+            this.skeleton.hidden=Boolean(wanted.size||!model.more&&!model.loading);
+            this.loadingMore.hidden=!(wanted.size&&model.loading);
             this.requestMore();
         }
         leaveData(){

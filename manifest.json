@@ -52,7 +52,8 @@
         "https://*.youtube.com/*",
         "https://*.doubleclick.net/*",
         "https://*.googleadservices.com/*",
-        "https://*.googlesyndication.com/*"
+        "https://*.googlesyndication.com/*",
+        "https://www.gstatic.com/*"
     ],
     "permissions": [
         "storage",

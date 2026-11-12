@@ -78,7 +78,9 @@ async function main() {
     const extras = rules.get(470005), blocksExtra = url => new RegExp(extras.condition.regexFilter).test(url);
     assert.equal(extras.action.type, 'block');assert.deepEqual([...extras.condition.initiatorDomains], ['youtube.com']);
     assert(!extras.condition.resourceTypes.includes('main_frame') && !extras.condition.resourceTypes.includes('script'));
-    for (const url of ['https://www.youtube.com/s/search/audio/open.mp3', 'https://www.youtube.com/s/search/audio/no_input.mp3', 'https://www.youtube.com/youtube/img/lottie/custom_animated_like_icon/animated_like_learning_dark_v2.json']) assert(blocksExtra(url), url);
+    for (const url of ['https://www.youtube.com/s/search/audio/open.mp3', 'https://www.youtube.com/s/search/audio/no_input.mp3', 'https://www.youtube.com/youtube/img/lottie/custom_animated_like_icon/animated_like_learning_dark_v2.json', 'https://www.gstatic.com/youtube/img/lottie/animated_like_icon/like_dark.json', 'https://www.gstatic.com/youtube/img/lottie/subscribe_action/subscribe.json']) assert(blocksExtra(url), url);
+    assert(manifest.host_permissions.includes('https://www.gstatic.com/*'), 'Blocking gstatic animations needs host access');
+    for (const url of ['https://www.gstatic.com/youtube/img/branding/favicon.png', 'https://fonts.gstatic.com/s/roboto/v30/font.woff2', 'https://www.gstatic.com/lottie/other.json']) assert(!blocksExtra(url), url);
     for (const url of ['https://www.youtube.com/s/player/a5c2aafe/player_es6.vflset/ru_RU/base.js', 'https://www.youtube.com/s/desktop/cb518cf3/jsbin/scheduler.vflset/scheduler.js', 'https://www.youtube.com/youtubei/v1/search', 'https://www.youtube.com/api/stats/watchtime', 'https://www.youtube.com/s/search/audio']) assert(!blocksExtra(url), url);
     const adRules = [rules.get(470003), rules.get(470004)];
     for (const ad of adRules) {

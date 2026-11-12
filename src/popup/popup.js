@@ -75,6 +75,28 @@
             toggle.disabled = false;
         });
     });
+    // Diagnostics: a report of the open YouTube tab, copied as JSON. It holds
+    // page structure and timing only, never cookies or account data.
+    const diagnostics = document.getElementById("diagnostics");
+    const diagnosticsStatus = document.getElementById("diagnostics-status");
+    diagnostics.addEventListener("click", async () => {
+        diagnostics.disabled = true;
+        diagnosticsStatus.textContent = "Collecting…";
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            let host = "";
+            try { host = new URL(tab?.url || "").hostname; } catch { /* No readable URL: not a YouTube tab. */ }
+            if (!tab || !/(^|\.)youtube\.com$/.test(host)) throw new Error("Open a YouTube tab first.");
+            const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: "MAIN", func: globalThis.minimalYouTubeDiagnostics });
+            const report = { version: chrome.runtime.getManifest().version, enabled, ...(result?.result || { error: "No report" }) };
+            await navigator.clipboard.writeText(JSON.stringify(report, null, 1));
+            diagnosticsStatus.textContent = "Copied. Paste it into the chat.";
+        } catch (problem) {
+            diagnosticsStatus.textContent = problem?.message === "Open a YouTube tab first." ? problem.message : "Could not collect the report.";
+        } finally {
+            diagnostics.disabled = false;
+        }
+    });
     chrome.storage.onChanged.addListener((changes, area) => {
         if (area !== "local") return;
         if (changes.language) { applyLanguage(changes.language.newValue); render(); }
