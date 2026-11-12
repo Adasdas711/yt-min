@@ -32,6 +32,10 @@ def check_popup(browser):
     page = popup(browser, 'https://www.youtube.com/watch?v=abc')
     page.get_by_role('button', name='Copy diagnostic report').click()
     expect(page.locator('#diagnostics-status')).to_have_text('Copied. Paste it into the chat.')
+    # Symbols only: the button shows a check, its label stays for screen readers.
+    expect(page.locator('#diagnostics')).to_have_attribute('data-state', 'done')
+    expect(page.locator('.logs__icon--done')).to_be_visible()
+    assert page.locator('#diagnostics').inner_text().strip() == ''
     report = json.loads(page.evaluate('__copied'))
     assert report['version'] == '1.0.0' and report['enabled'] is True and report['report'] == 'minimal-youtube-diagnostics', report
     assert page.evaluate('__injected') == {'tabId': 7, 'world': 'MAIN'}
@@ -41,9 +45,23 @@ def check_popup(browser):
     page = popup(browser, 'https://example.com/')
     page.get_by_role('button', name='Copy diagnostic report').click()
     expect(page.locator('#diagnostics-status')).to_have_text('Open a YouTube tab first.')
+    expect(page.locator('.logs__icon--error')).to_be_visible()
     assert page.evaluate('__copied') is None
     page.close()
     print('PASS popup copies a report of the YouTube tab, and only of a YouTube tab', flush=True)
+
+
+def check_layout(browser):
+    page = popup(browser, 'https://www.youtube.com/')
+    # Three blocks; the only visible text is the extension's name.
+    assert page.evaluate("document.querySelector('main').children.length") == 4  # three blocks + a hidden live region
+    visible = page.evaluate('''() => { const out = [], walk = document.createTreeWalker(document.querySelector('main'), NodeFilter.SHOW_TEXT);
+      while (walk.nextNode()) { const n = walk.currentNode; if (n.data.trim() && !n.parentElement.closest('.visually-hidden,[hidden]')) out.push(n.data.trim()); } return out; }''')
+    assert visible == ['Minimal YouTube'], visible
+    expect(page.get_by_role('switch', name='Focus mode')).to_be_checked()
+    expect(page.get_by_role('button', name='Copy diagnostic report')).to_be_visible()
+    page.close()
+    print('PASS popup: name, on/off switch and logs button; text only in the name', flush=True)
 
 
 def check_report(browser):
@@ -70,6 +88,7 @@ document.dispatchEvent(new Event('yt-page-data-updated'));""")
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
+        check_layout(browser)
         check_popup(browser)
         check_report(browser)
         browser.close()
