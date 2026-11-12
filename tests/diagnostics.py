@@ -58,6 +58,11 @@ def check_layout(browser):
     visible = page.evaluate('''() => { const out = [], walk = document.createTreeWalker(document.querySelector('main'), NodeFilter.SHOW_TEXT);
       while (walk.nextNode()) { const n = walk.currentNode; if (n.data.trim() && !n.parentElement.closest('.visually-hidden,[hidden]')) out.push(n.data.trim()); } return out; }''')
     assert visible == ['Minimal YouTube'], visible
+    # The switch and the logs button are the same card with the same pill control.
+    sizes = page.evaluate("[...document.querySelectorAll('.card, .pill')].map(e => { const r = e.getBoundingClientRect(); return [e.classList.contains('card') ? 'card' : 'pill', Math.round(r.width), Math.round(r.height)]; })")
+    cards, pills = [s[1:] for s in sizes if s[0] == 'card'], [s[1:] for s in sizes if s[0] == 'pill']
+    assert len(cards) == 2 and cards[0] == cards[1] and cards[0][1] >= 80, sizes
+    assert len(pills) == 2 and pills[0] == pills[1], sizes
     expect(page.get_by_role('switch', name='Focus mode')).to_be_checked()
     expect(page.get_by_role('button', name='Copy diagnostic report')).to_be_visible()
     page.close()
