@@ -207,6 +207,12 @@
         ['Related videos',['Похожие видео','Ähnliche Videos']],['People also watched',['Другие также посмотрели','Andere haben auch angesehen']],
     ].flatMap(([english,values])=>[english,...values].map(value=>[value.toLocaleLowerCase(),english])));
     const heading=value=>headingCopy.get(value.trim().toLocaleLowerCase())||value.replace(/^(?:Новые видео на канале|Последние видео (?:на канале|от)|Neueste Videos von)\s+/iu,'Latest from ');
+    // Search shows only sections it knows. A section YouTube adds later
+    // (a new shelf, carousel or block) never reaches the page by accident.
+    const latestFrom=/^(?:Latest from|Новые видео на канале|Последние видео (?:на канале|от)|Neueste Videos von)\s+\S/iu;
+    const knownGroup=value=>headingCopy.has(value.trim().toLocaleLowerCase())||latestFrom.test(value.trim());
+    const searchContainers=new Set(['ytd-search','ytd-two-column-search-results-renderer','ytd-section-list-renderer','ytd-item-section-renderer','ytd-shelf-renderer','ytd-vertical-list-renderer','ytd-expanded-shelf-contents-renderer','ytd-horizontal-list-renderer','yt-horizontal-list-renderer','ytd-rich-grid-renderer','ytd-rich-item-renderer','ytd-rich-section-renderer','grid-shelf-view-model','ytd-grid-renderer']);
+    const knownPlace=(source,search)=>{for(let parent=source.parentElement;parent&&parent!==search;parent=parent.parentElement)if(parent.localName.includes('-')&&!searchContainers.has(parent.localName))return false;return true;};
     const node=(tag,className,value)=>{const result=document.createElement(tag);if(className)result.className=className;if(value)result.textContent=value;return result;};
     const styles=`
       :host{all:initial!important;display:block!important;width:81%!important;margin-inline:auto!important;min-width:0!important;box-sizing:border-box!important;font:16px/1.45 Arial,sans-serif!important;color:var(--myt-ink)!important;position:relative!important}
@@ -527,7 +533,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
                 search.addEventListener('load',this.changed,true);
             }
             if(this.host.parentElement!==search)search.prepend(this.host);
-            const nativeSources=[...search.querySelectorAll(sourceSelector)].filter(source=>(!this.channel||nativeAvailable(source,search)&&!source.closest(channelExcludedSelector))&&!source.parentElement.closest(sourceSelector)&&!source.closest('[data-myt-hidden],[data-myt-hidden-section],ytd-reel-shelf-renderer')&&!/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(text(source.closest(shelfSelector)?.querySelector('#title-container,#header,h2'))));
+            const nativeSources=[...search.querySelectorAll(sourceSelector)].filter(source=>(this.channel?nativeAvailable(source,search)&&!source.closest(channelExcludedSelector):knownPlace(source,search))&&!source.parentElement.closest(sourceSelector)&&!source.closest('[data-myt-hidden],[data-myt-hidden-section],ytd-reel-shelf-renderer')&&!/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(text(source.closest(shelfSelector)?.querySelector('#title-container,#header,h2'))));
             for(const source of nativeSources){
                 let kind=source.matches('ytd-channel-renderer,[content-type="channel"],[data-content-type="channel"]')?'channel':Search.isPlaylist(source)?'playlist':'video';
                 if(!this.sources.has(source)){const key='result-'+(++this.sequence);this.sources.set(source,key);source.setAttribute('data-myt-search-source-key',key);}
@@ -574,10 +580,11 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
                     let card=this.cards.get(source);if(card&&!(card instanceof PostCard)){card.destroy();card=null;}
                     if(!card){card=new PostCard();this.cards.set(source,card);}card.update(record);stream.push(card);continue;
                 }
-                const value=this.read(source,kind,record);if(!value)continue;
-                let card=this.cards.get(source);if(card&&card.host.dataset.kind!==kind){card.destroy();card=null;}if(!card){card=new MediaCard(source,kind);this.cards.set(source,card);}card.record=record;card.update(value);
                 const dataGroup=dataRecords.get(source)?.group||'';
                 const shelf=dataGroup?this.dataGroup(dataGroup):source.closest(shelfSelector),header=dataGroup?null:shelf?.querySelector('#title-container,#header,h2,[role="heading"]'),label=dataGroup||channelText(header?.querySelector('#title,h2,h3,.ytShelfHeaderLayoutTitle')||header);
+                if(!this.channel&&shelf&&label&&!knownGroup(label))continue;
+                const value=this.read(source,kind,record);if(!value)continue;
+                let card=this.cards.get(source);if(card&&card.host.dataset.kind!==kind){card.destroy();card=null;}if(!card){card=new MediaCard(source,kind);this.cards.set(source,card);}card.record=record;card.update(value);
                 if(shelf&&label){
                     let group=groups.get(shelf);if(!group){
                         group=this.groups.get(shelf)||{host:node('section','group'),title:node('h2'),stream:node('div','group-stream')};group.host.dataset.kind='group';
