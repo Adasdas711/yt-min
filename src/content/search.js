@@ -223,7 +223,7 @@
       :host([data-channel]) .media.playlist{display:flex;flex-direction:column;gap:14px;padding-bottom:18px}:host([data-channel]) .media.playlist .media-title{font-size:16px}.playlist-badge[hidden]{display:none}.playlist-badge svg{width:15px;height:15px;flex:none}.media.playlist :is(.media-info,.playlist-badge){font-family:"SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace}.media.playlist .media-title{font-weight:600}
       /* Keep 20px gaps fixed while reducing channel column widths by 15%. */
       :host([data-channel]) :is(.row,.results-heading){width:calc(85% + (var(--myt-columns,1) - 1)*3px);margin-inline:auto}
-      .filters{margin:0 0 20px}.filters[hidden],.filters-panel[hidden]{display:none}
+      .filters{display:flex;flex-direction:column;align-items:center;margin:0 0 20px}.filters-panel{align-self:stretch}.filters[hidden],.filters-panel[hidden]{display:none}
       .filters-toggle{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 16px;border:1px solid var(--myt-border);border-radius:999px;background:var(--myt-surface);color:var(--myt-ink);font:600 14px/1 Arial,sans-serif;cursor:pointer}.filters-toggle:hover,.filters-toggle[aria-expanded="true"]{background:var(--myt-soft)}.filters-toggle[data-active]::after{content:'';width:7px;height:7px;border-radius:50%;background:var(--myt-accent)}
       .filters-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:20px;margin-top:14px;padding:18px;border:1px solid var(--myt-border);border-radius:18px;background:var(--myt-surface)}
       .filter-group h3{margin:0 0 10px;color:var(--myt-muted);font:700 12px/1.3 Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase}.filter-group a,.filter-group span{display:block;margin:0 0 2px;padding:7px 10px;border-radius:9px;color:var(--myt-ink);font:500 14px/1.3 Arial,sans-serif}
@@ -365,10 +365,10 @@ html.minimal-youtube[data-myt-search-ui]:not([data-myt-page-data]) ytd-search yt
     display:block !important;position:static !important;width:100% !important;height:2px !important;margin:0 !important;padding:0 !important;overflow:hidden !important;
 }
 html.minimal-youtube[data-myt-search-ui][data-myt-own-chips] ytd-search :is(ytd-feed-filter-chip-bar-renderer, yt-chip-cloud-renderer) { display:none !important; }
-/* "About these results" is YouTube's help, not a search control. With own
-   chips and own filters nothing of the native search header remains. */
-html.minimal-youtube[data-myt-search-ui] ytd-search ytd-search-header-renderer #about-these-results { display:none !important; }
-html.minimal-youtube[data-myt-search-ui][data-myt-own-chips] ytd-search ytd-search-header-renderer[data-myt-own-filters] { display:none !important; }
+/* Search shows no result chips and no "About these results": only Filters.
+   With own filters nothing of the native search header remains. */
+html.minimal-youtube[data-myt-search-ui] ytd-search ytd-search-header-renderer :is(#chip-bar, yt-chip-cloud-renderer, #about-these-results) { display:none !important; }
+html.minimal-youtube[data-myt-search-ui] ytd-search ytd-search-header-renderer[data-myt-own-filters] { display:none !important; }
 html.minimal-youtube[data-myt-search-ui][data-myt-page-data] ytd-search ytd-continuation-item-renderer,
 html.minimal-youtube[data-myt-search-ui][data-myt-page-data] ytd-search ytd-continuation-item-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) { display:none !important; }
 html.minimal-youtube[data-myt-search-ui] ytd-search ytd-continuation-item-renderer[data-myt-search-layout-path]:not([data-myt-search-native-ui]) {
@@ -673,14 +673,12 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             for(const[button,value]of state.buttons){if(value===null)button.removeAttribute('aria-expanded');else button.setAttribute('aria-expanded',value);}
         }
         renderChips(model){
-            const bar=this.q('.chips'),chips=Array.isArray(model?.chips)?model.chips:[];
-            // Search chips take the place of YouTube's chip bar: above Filters.
-            if(!this.channel&&bar.nextElementSibling!==this.q('.filters'))this.q('.filters').before(bar);
+            const bar=this.q('.chips'),chips=this.channel&&Array.isArray(model?.chips)?model.chips:[];
             const signature=JSON.stringify(chips);
             if(bar.dataset.value!==signature){
                 bar.dataset.value=signature;
                 bar.replaceChildren(...chips.map((chip,index)=>{
-                    const button=node('button','chip',chipLabels.get(String(chip.label).toLocaleLowerCase())||englishFilter(String(chip.label))||chip.label);button.type='button';
+                    const button=node('button','chip',chipLabels.get(String(chip.label).toLocaleLowerCase())||chip.label);button.type='button';
                     button.setAttribute('aria-pressed',String(Boolean(chip.selected)));
                     button.addEventListener('click',()=>{document.documentElement.setAttribute('data-myt-page-model-chip',String(index));document.dispatchEvent(new Event('minimal-youtube:page-model-chip'));});
                     return button;

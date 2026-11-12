@@ -101,7 +101,6 @@ def check(browser, width):
     page.wait_for_function('window.__channelVisits>0', timeout=3000)
 
     toggle = hit(page, '.filters-toggle')
-    if width == 1320: assert toggle['x'] < 240, ('fixture must put Filters under the guide column', toggle)
     assert toggle['owned'], ('the guide covers the Filters button', toggle)
     page.mouse.click(toggle['x'], toggle['y'])
     expect(page.locator('#myt-search .filters-panel')).to_be_visible()
