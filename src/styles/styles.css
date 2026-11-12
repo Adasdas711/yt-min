@@ -1539,6 +1539,11 @@ html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] {
     --yt-spec-base-background: var(--myt-surface); --yt-spec-raised-background: var(--myt-soft);
     --yt-spec-text-primary: var(--myt-ink); --yt-spec-text-secondary: var(--myt-muted);
 }
+/* Comments show the header, threads and their continuation only. A block
+   YouTube adds to the section (a teaser, summary or promo) stays hidden.
+   Applies only while the known threads are present. */
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] ytd-item-section-renderer#sections > #contents:has(> ytd-comment-thread-renderer) > :not(ytd-comment-thread-renderer,ytd-continuation-item-renderer,template,dom-if,dom-repeat),
+html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] ytd-item-section-renderer#sections > #header:has(> ytd-comments-header-renderer) > :not(ytd-comments-header-renderer,template,dom-if,dom-repeat) { display: none !important; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island="comments"] :is(ytd-comments-header-renderer,ytd-comment-simplebox-renderer) {
     margin: 0 0 18px !important; padding: 0 !important; color: var(--myt-ink); background: transparent;
 }
@@ -1755,6 +1760,10 @@ html.minimal-youtube [data-myt-playlist-list] > #contents {
     flex-direction: column !important; grid-template-columns: minmax(0,1fr) !important; gap: 0 !important;
     width: 100% !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important;
 }
+/* Only the owned summary and the list stay in the playlist layout: anything
+   YouTube adds beside them (a new banner, shelf or promo) is hidden. */
+html.minimal-youtube:is([data-myt-page="playlist"],[data-myt-previous-page="playlist"]) [data-myt-playlist-layout] > :not([data-myt-playlist-summary-slot],[data-myt-playlist-list-slot],[data-myt-playlist-source-summary],ytd-playlist-video-list-renderer,ytd-message-renderer,ytd-background-promo-renderer,template,style,script,dom-if,dom-repeat),
+html.minimal-youtube:is([data-myt-page="playlist"],[data-myt-previous-page="playlist"]) [data-myt-playlist-wrapper] > :not([data-myt-playlist-wrapper],[data-myt-playlist-layout],[data-myt-playlist-source-summary],template,style,script,dom-if,dom-repeat) { display: none !important; }
 /* Page data mode: owned rows replace the native list's content. */
 html.minimal-youtube [data-myt-playlist-list][data-myt-playlist-data] > :not(#myt-playlist-rows) { display: none !important; }
 html.minimal-youtube #myt-playlist-rows { display: block; width: 100%; min-width: 0; }
@@ -1804,6 +1813,8 @@ html.minimal-youtube[data-myt-page="channel"] ytd-browse :is(#myt-channel-header
     overflow-wrap: anywhere;
 }
 html.minimal-youtube [data-myt-channel-tab-hidden] { display: none !important; }
+/* Only the owned header, navigation and results remain on a channel page. */
+html.minimal-youtube[data-myt-page="channel"] [data-myt-channel-extra] { display: none !important; }
 /* Owned channel header: viewport-wide banner, centered profile with a large
    avatar, the name with its verified badge and YouTube's subscribe control on
    one row, then stats and description. */

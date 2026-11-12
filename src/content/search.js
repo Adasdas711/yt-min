@@ -211,8 +211,11 @@
     // (a new shelf, carousel or block) never reaches the page by accident.
     const latestFrom=/^(?:Latest from|Новые видео на канале|Последние видео (?:на канале|от)|Neueste Videos von)\s+\S/iu;
     const knownGroup=value=>headingCopy.has(value.trim().toLocaleLowerCase())||latestFrom.test(value.trim());
-    const searchContainers=new Set(['ytd-search','ytd-two-column-search-results-renderer','ytd-section-list-renderer','ytd-item-section-renderer','ytd-shelf-renderer','ytd-vertical-list-renderer','ytd-expanded-shelf-contents-renderer','ytd-horizontal-list-renderer','yt-horizontal-list-renderer','ytd-rich-grid-renderer','ytd-rich-item-renderer','ytd-rich-section-renderer','grid-shelf-view-model','ytd-grid-renderer']);
-    const knownPlace=(source,search)=>{for(let parent=source.parentElement;parent&&parent!==search;parent=parent.parentElement)if(parent.localName.includes('-')&&!searchContainers.has(parent.localName))return false;return true;};
+    const searchContainers=new Set(['ytd-search','ytd-two-column-search-results-renderer','ytd-section-list-renderer','ytd-item-section-renderer','yt-section-list-view-model','yt-item-section-view-model','ytd-shelf-renderer','ytd-vertical-list-renderer','ytd-expanded-shelf-contents-renderer','ytd-horizontal-list-renderer','yt-horizontal-list-renderer','ytd-rich-grid-renderer','ytd-rich-item-renderer','ytd-rich-section-renderer','grid-shelf-view-model','ytd-grid-renderer']);
+    // A channel's feeds: its rich grid, item sections and grids. Promotional
+    // rich sections and anything new stay out.
+    const channelContainers=new Set(['ytd-browse','ytd-two-column-browse-results-renderer','ytd-section-list-renderer','ytd-item-section-renderer','yt-section-list-view-model','yt-item-section-view-model','ytd-rich-grid-renderer','ytd-rich-grid-row','ytd-rich-item-renderer','ytd-grid-renderer','ytd-shelf-renderer','ytd-vertical-list-renderer','ytd-expanded-shelf-contents-renderer','ytd-horizontal-list-renderer','yt-horizontal-list-renderer','grid-shelf-view-model','ytd-tab-renderer']);
+    const knownPlace=(source,search,channel)=>{const known=channel?channelContainers:searchContainers;for(let parent=source.parentElement;parent&&parent!==search;parent=parent.parentElement)if(parent.localName.includes('-')&&!known.has(parent.localName))return false;return true;};
     const node=(tag,className,value)=>{const result=document.createElement(tag);if(className)result.className=className;if(value)result.textContent=value;return result;};
     const styles=`
       :host{all:initial!important;display:block!important;width:81%!important;margin-inline:auto!important;min-width:0!important;box-sizing:border-box!important;font:16px/1.45 Arial,sans-serif!important;color:var(--myt-ink)!important;position:relative!important}
@@ -533,7 +536,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
                 search.addEventListener('load',this.changed,true);
             }
             if(this.host.parentElement!==search)search.prepend(this.host);
-            const nativeSources=[...search.querySelectorAll(sourceSelector)].filter(source=>(this.channel?nativeAvailable(source,search)&&!source.closest(channelExcludedSelector):knownPlace(source,search))&&!source.parentElement.closest(sourceSelector)&&!source.closest('[data-myt-hidden],[data-myt-hidden-section],ytd-reel-shelf-renderer')&&!/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(text(source.closest(shelfSelector)?.querySelector('#title-container,#header,h2'))));
+            const nativeSources=[...search.querySelectorAll(sourceSelector)].filter(source=>(this.channel?nativeAvailable(source,search)&&!source.closest(channelExcludedSelector):true)&&knownPlace(source,search,this.channel)&&!source.parentElement.closest(sourceSelector)&&!source.closest('[data-myt-hidden],[data-myt-hidden-section],ytd-reel-shelf-renderer')&&!/\bshorts\b|коротки[еех]\s+(?:видео|ролик)/iu.test(text(source.closest(shelfSelector)?.querySelector('#title-container,#header,h2'))));
             for(const source of nativeSources){
                 let kind=source.matches('ytd-channel-renderer,[content-type="channel"],[data-content-type="channel"]')?'channel':Search.isPlaylist(source)?'playlist':'video';
                 if(!this.sources.has(source)){const key='result-'+(++this.sequence);this.sources.set(source,key);source.setAttribute('data-myt-search-source-key',key);}

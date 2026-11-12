@@ -99,7 +99,7 @@
             document.addEventListener('minimal-youtube:channel-about-updated',this.aboutUpdated);
             this.stats=document.createElement('div');this.stats.id='myt-channel-stats';this.stats.lang='en';
             this.stats.attachShadow({mode:'open'}).innerHTML='<style>:host{display:block;color:var(--myt-muted);font:14px/1.6 Arial,sans-serif}.row{display:flex;align-items:center;flex-wrap:wrap;gap:0 8px}.metric{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}svg{width:15px;height:15px;flex:none}[hidden]{display:none!important}</style><div class="row"></div>';
-            this.unclipped=new Set();this.headerSlots=new Set();this.scrollEffects=null;this.markedBrowse=null;
+            this.unclipped=new Set();this.headerSlots=new Set();this.extras=new Set();this.scrollEffects=null;this.markedBrowse=null;
             this.nav=document.createElement('div');this.nav.id='myt-channel-nav';this.nav.lang='en';
             this.nav.attachShadow({mode:'open'}).innerHTML=`<style>
                 :host{display:block!important;min-width:0;font:600 16px/1.4 Arial,sans-serif;color:var(--myt-ink)}*{box-sizing:border-box}[hidden]{display:none!important}
@@ -456,6 +456,18 @@
             for(const node of slots)if(!node.hasAttribute('data-myt-channel-header-slot'))node.setAttribute('data-myt-channel-header-slot','');
             for(const node of this.headerSlots)if(!slots.has(node))node.removeAttribute('data-myt-channel-header-slot');
             this.headerSlots=slots;
+            // Only the owned header, the owned navigation and the results stay
+            // on a channel page. Anything else YouTube places beside them (a
+            // new banner, promo or section) is hidden instead of leaking in.
+            const results=own&&browse.querySelector('[data-myt-channel-results]'),extras=new Set();
+            if(own&&results){
+                const kept=[own,results,this.nav].filter(node=>node?.isConnected&&browse.contains(node)),path=new Set([browse]);
+                for(const node of kept)for(let parent=node;parent&&parent!==browse;parent=parent.parentElement)path.add(parent);
+                for(const parent of path)if(!kept.includes(parent))for(const child of parent.children)if(!path.has(child)&&!kept.includes(child)&&!/^(?:template|style|script|dom-if|dom-repeat)$/.test(child.localName))extras.add(child);
+            }
+            for(const node of extras)if(!node.hasAttribute('data-myt-channel-extra'))node.setAttribute('data-myt-channel-extra','');
+            for(const node of this.extras)if(!extras.has(node))node.removeAttribute('data-myt-channel-extra');
+            this.extras=extras;
             const app=[...slots].find(node=>node.localName==='tp-yt-app-header')||null;
             if(this.scrollEffects!==app){
                 this.scrollEffects?.removeAttribute('disabled');this.scrollEffects=null;
