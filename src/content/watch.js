@@ -204,7 +204,10 @@ main.has-sidecar .details { min-height:0; }
                 // gesture from reaching YouTube's hidden page.
                 if(ownPage&&!media&&!comments)return;
                 if(!media&&!comments)return;
-                if(media&&target.closest('.ytp-settings-menu,.ytp-popup,.ytp-panel,.ytp-volume-area,.ytp-volume-panel,[role="menu"],[role="dialog"],[role="listbox"],[role="slider"]'))return;
+                // Controls that use the wheel themselves keep it. The progress
+                // bar is a slider too, but YouTube never seeks by wheel: over
+                // it the page keeps scrolling.
+                if(media&&target.closest('.ytp-settings-menu,.ytp-popup,.ytp-panel,.ytp-volume-area,.ytp-volume-panel,[role="menu"],[role="dialog"],[role="listbox"],[role="slider"]:not(.ytp-progress-bar)'))return;
                 const unit=event.deltaMode===WheelEvent.DOM_DELTA_PAGE?this.viewport.clientHeight:event.deltaMode===WheelEvent.DOM_DELTA_LINE?20:1;
                 // Native layers above the viewport forward the gesture to it.
                 // Consume it even at either boundary, so YouTube's hidden page
