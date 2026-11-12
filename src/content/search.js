@@ -443,7 +443,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             this.selectionNodes=new Set();this.selectionObserver=new MutationObserver(()=>this.queue());
             this.changed=()=>this.queue();document.addEventListener('yt-page-data-updated',this.changed);document.addEventListener('yt-rendererstamper-finished',this.changed);
         }
-        static isPlaylist(card){return card.matches('ytd-playlist-renderer,ytd-grid-playlist-renderer,ytd-radio-renderer,[is-playlist],[content-type="playlist"],[data-content-type="playlist"]')||!!card.querySelector('yt-collection-thumbnail-view-model,yt-collections-stack,ytd-thumbnail-overlay-side-panel-renderer')||safeURL(card.querySelector(titleSelector)?.href)?.pathname==='/playlist';}
+        static isPlaylist(card){return card.matches('ytd-playlist-renderer,ytd-grid-playlist-renderer,ytd-radio-renderer,[is-playlist],[content-type="playlist"],[data-content-type="playlist"]')||!!card.querySelector('yt-collection-thumbnail-view-model,yt-collections-stack,ytd-thumbnail-overlay-side-panel-renderer,yt-lockup-view-model[content-type="playlist"]')||safeURL(card.querySelector(titleSelector)?.href)?.pathname==='/playlist';}
         prepareChannelRoute(href){
             if(!this.channel)return;
             const url=new URL(href),key=JSON.stringify([url.pathname.replace(/\/$/,''),/\/search\/?$/.test(url.pathname)?url.searchParams.get('query')?.trim()||'':'']);
@@ -505,8 +505,11 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             const title=source.querySelector(titleSelector);
             const main=(title?.matches('a[href]')?title:title?.closest('a[href]')||title?.querySelector('a[href]'))||anchors.find(link=>{const url=safeURL(link.href);return kind==='video'?url?.pathname==='/watch':url?.pathname==='/playlist'||url?.searchParams.has('list');});
             const owner=source.querySelector('ytd-channel-name a[href],#channel-info a[href],.ytLockupMetadataViewModelMetadata a[href],a[href^="/@"]')||anchors.find(link=>channelURL(link.href));
-            const href=youtubeURL(main?.href||record?.href);
+            let href=youtubeURL(main?.href||record?.href);
             if(!href||kind==='video'&&(new URL(href).pathname!=='/watch'||!new URL(href).searchParams.has('v')))return null;
+            // On a channel, a playlist card opens the playlist itself, not its
+            // first video. Mixes have no playlist page.
+            if(kind==='playlist'&&this.channel){const list=new URL(href).searchParams.get('list')||record?.id||'';if(/^[\w-]{2,}$/.test(list)&&!/^RD/.test(list))href=youtubeURL('/playlist?list='+encodeURIComponent(list))||href;}
             const parsed=new URL(href),cached=kind==='playlist'?this.playlistMetadata?.get(parsed.searchParams.get('list')||record?.id):null;
             let image=coverImage(source)||record?.image||cached?.image;
             if(!image&&parsed.searchParams.get('v')?.match(/^[-\w]{11}$/))image='https://i.ytimg.com/vi/'+parsed.searchParams.get('v')+'/hqdefault.jpg';

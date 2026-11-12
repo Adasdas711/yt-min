@@ -81,6 +81,14 @@ def check(browser, width):
     toggle.click()
     expect(root.locator('.sidecar')).to_be_visible()
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    # The playlist title opens the playlist itself.
+    title = panel.locator('.own-playlist-title a')
+    expect(title).to_have_text('Watch playlist')
+    expect(title).to_have_attribute('href', 'https://www.youtube.com/playlist?list=PLwatch')
+    page.evaluate('''()=>navigation.addEventListener('navigate',event=>{if(new URL(event.destination.url).pathname==='/playlist'){event.preventDefault();window.__playlistOpened=event.destination.url;}})''')
+    title.click()
+    page.wait_for_function('window.__playlistOpened')
+    assert page.evaluate('__playlistOpened') == 'https://www.youtube.com/playlist?list=PLwatch'
     page.close()
     print(f'PASS watch page text, links, chapters, stats and playlist panel from page data: {width}px', flush=True)
 
