@@ -373,6 +373,49 @@
         if(root.classList.contains('minimal-youtube'))try{const model=watchModel();text=model?JSON.stringify(model):'';}catch{text='';}
         if(root.getAttribute('data-myt-watch-model')!==text){if(text)root.setAttribute('data-myt-watch-model',text);else root.removeAttribute('data-myt-watch-model');}
     });
+    // YouTube's search filters, read where YouTube keeps them: the filter
+    // strip's own data, the filter dialog command of the newer header, or
+    // the page data. Each filter keeps YouTube's own action (its URL).
+    function filterGroups(root,limit=20000){
+        const data=globalThis.MinimalYouTubeSearchData,groups=[],seen=new Set(),stack=[root],visited=new Set();let scans=0;
+        while(stack.length&&scans++<limit&&groups.length<8){
+            const item=stack.pop();if(!item||typeof item!=='object'||visited.has(item))continue;visited.add(item);
+            const group=item.searchFilterGroupRenderer;
+            if(group){
+                const title=data.label(group.title).trim(),options=[];
+                for(const entry of group.filters||[]){
+                    const filter=entry.searchFilterRenderer;if(!filter)continue;
+                    const label=data.label(filter.label).trim(),href=data.endpoint(filter.navigationEndpoint);
+                    const selected=/SELECTED/.test(filter.status||'')&&!/UNSELECTED/.test(filter.status||'');
+                    if(label&&(href||selected))options.push({label:label.slice(0,60),href,selected});
+                }
+                if(title&&options.length&&!seen.has(title)){seen.add(title);groups.push({title:title.slice(0,60),options:options.slice(0,12)});}
+                continue;
+            }
+            // Result lists are large and hold no filters.
+            const children=Object.entries(item).filter(([key,child])=>child&&typeof child==='object'&&(Array.isArray(item)||!/^(?:contents|items|continuationItems)$/.test(key)));
+            for(let i=children.length-1;i>=0;i--)stack.push(children[i][1]);
+        }
+        return groups;
+    }
+    document.addEventListener('minimal-youtube:search-filters',()=>{
+        const root=document.documentElement;let value=null;
+        if(root.classList.contains('minimal-youtube')&&location.pathname==='/results'&&globalThis.MinimalYouTubeSearchData){
+            try{
+                const search=document.querySelector('#myt-search')?.closest('ytd-search')||[...document.querySelectorAll('ytd-search')].find(visible);
+                const sources=[
+                    ['filter strip',[...(search?.querySelectorAll('ytd-search-sub-menu-renderer,yt-search-sub-menu-view-model')||[])].map(node=>node.data||node.__data?.data)],
+                    ['filter dialog',[...(search?.querySelectorAll('ytd-search-header-renderer,yt-search-header-view-model,ytd-search-filter-options-dialog-renderer')||[]),...document.querySelectorAll('ytd-popup-container ytd-search-filter-options-dialog-renderer')].map(node=>node.data||node.__data?.data)],
+                    ['page data',[(search?.data?.contents||search?.data?.response?.contents)?.twoColumnSearchResultsRenderer,search?.data?.header||search?.data?.response?.header]]];
+                for(const [name,roots]of sources){
+                    const groups=filterGroups(roots.filter(Boolean));
+                    if(groups.length){value={source:name,groups};break;}
+                }
+            }catch{value=null;}
+        }
+        const text=value?JSON.stringify(value):'';
+        if(root.getAttribute('data-myt-search-filters-data')!==text){if(text)root.setAttribute('data-myt-search-filters-data',text);else root.removeAttribute('data-myt-search-filters-data');}
+    });
     // Public channel identity for the owned header: name, avatar, banner and
     // the verified badge. Account controls are not part of it.
     function largest(root,test){

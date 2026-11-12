@@ -69,24 +69,38 @@ def search_page(browser):
     expect(card.locator('.subscriber-value')).to_have_text('1.2 M')
     # The photo and the card cannot be dragged, so a click on the photo is never lost to a drag.
     assert card.locator('.channel-link').get_attribute('draggable') == 'false' and card.locator('.avatar img').get_attribute('draggable') == 'false'
+    # A press and release that never becomes a click still opens the channel.
+    page.evaluate("document.documentElement.removeAttribute('data-myt-navigate-request')")
+    for kind in ('pointerdown', 'pointerup'):
+        card.locator('.avatar img').dispatch_event(kind, {'button': 0, 'isPrimary': True, 'bubbles': True, 'composed': True})
+    page.wait_for_function("(document.documentElement.getAttribute('data-myt-navigate-request')||'').includes('/@datachannel')")
+    page.evaluate("document.documentElement.removeAttribute('data-myt-navigate-request')")
     # A real click that moves the mouse a few pixels (as hands do) still opens the channel.
     photo = card.locator('.avatar').bounding_box()
     page.mouse.move(photo['x'] + 40, photo['y'] + 40); page.mouse.down()
     page.mouse.move(photo['x'] + 46, photo['y'] + 44, steps=3); page.mouse.up()
     assert '/@datachannel' in (page.evaluate("document.documentElement.getAttribute('data-myt-navigate-request')") or ''), page.evaluate("document.documentElement.getAttribute('data-myt-navigate-request')")
-    # YouTube's own filters: its button opens and closes its collapsible panel.
-    native_button = page.locator('#native-filter-button')
-    panel = page.locator('#collapse-content')
-    expect(native_button).to_be_visible()
-    expect(panel).to_be_hidden()
-    native_button.click()
-    expect(panel).to_be_visible()
-    expect(page.locator('#native-filter-today')).to_be_visible()
-    expect(native_button).to_have_attribute('aria-expanded', 'true')
-    native_button.click()
-    expect(panel).to_be_hidden()
-    native_button.click()
-    expect(page.locator('#native-filter-today')).to_have_attribute('href', '/results?search_query=cats&sp=EgIIAg%253D%253D')
+    # YouTube's filters are read from YouTube and rebuilt: same groups, same
+    # applied state, same action (the filter's URL); YouTube's own are hidden.
+    filters = page.locator('#myt-search .filters')
+    expect(page.locator('#native-filter-button')).to_be_hidden()
+    expect(page.locator('#collapse-content')).to_be_hidden()
+    expect(filters.locator('.filters-panel')).to_be_hidden()
+    filters.get_by_role('button', name='Filters').click()
+    expect(filters.locator('.filter-group h3')).to_have_text(['Upload date', 'Type'])
+    expect(filters.locator('[aria-current="true"]')).to_have_text('This week')
+    today = filters.get_by_role('link', name='Today')
+    expect(today).to_have_attribute('href', 'https://www.youtube.com/results?search_query=cats&sp=EgIIAg%253D%253D')
+    today.click()
+    expect(filters.locator('.filters-panel')).to_be_hidden()
+    assert 'sp=EgIIAg' in page.evaluate("document.documentElement.getAttribute('data-myt-navigate-request')")
+    # Without readable data, the filters come from YouTube's rendered panel.
+    page.evaluate("""()=>{const d=document.querySelector('ytd-search').data;delete d.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.subMenu;
+      document.querySelector('#collapse-content').innerHTML='<ytd-search-filter-group-renderer><h4 id="filter-group-name">Duration</h4><ytd-search-filter-renderer><a id="endpoint" href="/results?search_query=cats&sp=EgIYAQ%253D%253D"><yt-formatted-string id="label">Under 4 minutes</yt-formatted-string></a></ytd-search-filter-renderer></ytd-search-filter-group-renderer>';
+      document.dispatchEvent(new Event('yt-page-data-updated'));}""")
+    expect(filters.locator('.filter-group h3')).to_have_text(['Duration'])
+    filters.get_by_role('button', name='Filters').click()
+    expect(filters.get_by_role('link', name='Under 4 minutes')).to_have_attribute('href', 'https://www.youtube.com/results?search_query=cats&sp=EgIYAQ%253D%253D')
     # YouTube's own continuation is off while page data loads further results.
     expect(page.locator('#native-continuation')).to_have_css('display', 'none')
     assert titles.first.get_attribute('href') == 'https://www.youtube.com/watch?v=dataVideo01'
