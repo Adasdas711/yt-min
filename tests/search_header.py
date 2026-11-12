@@ -1,12 +1,11 @@
-"""Search header chips (All, Unwatched, Watched, Videos...) in the owned design.
+"""Search page header: no result chips, no "About these results", centered Filters.
 
 Live data (Chrome, search "mr"): ytd-search-header-renderer[has-chip-bar]
-holds div#chip-bar > yt-chip-cloud-renderer and div#about-these-results; its
-data carries chipBar.chipCloudRenderer.chips. "All" is selected and has no
-endpoint; every other chip reloads the results with a continuationCommand
-sent to /youtubei/v1/search, without changing the URL. The owned page shows
-those chips itself (Shorts excluded), reloads its results the same way, and
-hides the native header and "About these results".
+holds div#chip-bar > yt-chip-cloud-renderer (All, Unwatched, Watched,
+Videos, Recently uploaded, Live) and div#about-these-results; the groups of
+the filter dialog live in its data. The owned search page shows none of the
+chips and none of the native header: only its own Filters button, centered
+above the results.
 """
 import json
 from playwright.sync_api import sync_playwright, expect
@@ -46,58 +45,35 @@ def main():
         browser = p.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
         body = ('<ytd-app>' + MASTHEAD + '<ytd-page-manager><ytd-search><div id="container">' + HEADER
                 + '<ytd-section-list-renderer><div id="contents"><ytd-item-section-renderer><div id="contents"><ytd-continuation-item-renderer id="native-continuation"></ytd-continuation-item-renderer></div></ytd-item-section-renderer></div></ytd-section-list-renderer></div></ytd-search></ytd-page-manager></ytd-app>')
-        page = setup(browser, '/results?search_query=mr', body)
-        page.add_script_tag(path=str(ROOT / 'src/content/navigation.js'))
-        requests = []
-
-        def api(route):
-            token = route.request.post_data_json.get('continuation')
-            requests.append(token)
-            items = {'token-unwatched': "item('unwVideo001','Unwatched one')", 'token-videos': "item('vidVideo001','Videos one'),item('vidVideo002','Videos two')"}.get(token, "item('pageVideo01','Page two')")
-            command = 'appendContinuationItemsAction' if token == 'page-two' else 'reloadContinuationItemsCommand'
-            route.fulfill(content_type='application/json', body=page.evaluate('()=>(()=>{' + ITEM + 'return JSON.stringify({onResponseReceivedCommands:[{reloadContinuationItemsCommand:{slot:"RELOAD_CONTINUATION_SLOT_HEADER",continuationItems:[]}},{' + command + ':{slot:"RELOAD_CONTINUATION_SLOT_BODY",continuationItems:[{itemSectionRenderer:{contents:[' + items + ']}}]}}]});})()'))
-        page.route('https://www.youtube.com/youtubei/v1/search**', api)
-        page.evaluate(CONFIG + DATA)
-
-        root = page.locator('#myt-search')
-        titles = root.locator('.media-title')
-        chips = root.locator('.chips .chip')
-        expect(titles).to_have_text(['All one', 'All two'])
-        # The same chips as YouTube, without Shorts; All is selected.
-        expect(chips).to_have_text(['All', 'Unwatched', 'Watched', 'Videos'])
-        expect(chips.first).to_have_attribute('aria-pressed', 'true')
-        # They take the native bar's place: above Filters.
-        assert page.evaluate("()=>{const s=document.querySelector('#myt-search').shadowRoot;return s.querySelector('.chips').nextElementSibling===s.querySelector('.filters')}")
-        expect(root.locator('.filters-toggle')).to_be_visible()
-        # The native header, its chips and "About these results" are hidden.
-        for selector in ['ytd-search-header-renderer', 'yt-chip-cloud-renderer', '#about-these-results']:
-            expect(page.locator(selector)).to_be_hidden()
-
-        url = page.url
-        chips.nth(3).click()
-        expect(titles).to_have_text(['Videos one', 'Videos two'])
-        assert requests[-1] == 'token-videos', requests
-        expect(chips.nth(3)).to_have_attribute('aria-pressed', 'true')
-        expect(chips.first).to_have_attribute('aria-pressed', 'false')
-        assert page.url == url
-        chips.nth(1).click()
-        expect(titles).to_have_text(['Unwatched one'])
-        # All restores the original results without a request.
-        count = len(requests)
-        chips.first.click()
-        expect(titles).to_have_text(['All one', 'All two'])
-        expect(chips.first).to_have_attribute('aria-pressed', 'true')
-        assert len(requests) == count, requests
-
-        # Disabling the extension returns YouTube's own header.
-        page.evaluate('__setEnabled(false)')
-        for selector in ['ytd-search-header-renderer', 'yt-chip-cloud-renderer', '#about-these-results']:
-            expect(page.locator(selector)).to_be_visible()
-        page.evaluate('__setEnabled(true)')
-        expect(page.locator('#about-these-results')).to_be_hidden()
-        page.close()
+        for width in [1440, 900, 390]:
+            page = setup(browser, '/results?search_query=mr', body, width=width)
+            page.add_script_tag(path=str(ROOT / 'src/content/navigation.js'))
+            page.evaluate(CONFIG + DATA)
+            root = page.locator('#myt-search')
+            expect(root.locator('.media-title')).to_have_text(['All one', 'All two'])
+            # No chips at all: neither YouTube's nor owned ones.
+            expect(root.locator('.chips .chip')).to_have_count(0)
+            for selector in ['ytd-search-header-renderer', 'yt-chip-cloud-renderer', '#about-these-results']:
+                expect(page.locator(selector)).to_be_hidden()
+            # Filters is centered over the results and still opens.
+            toggle = root.locator('.filters-toggle')
+            expect(toggle).to_be_visible()
+            box, area = toggle.bounding_box(), page.locator('#myt-search').bounding_box()
+            assert abs((box['x'] + box['width'] / 2) - (area['x'] + area['width'] / 2)) < 2, (box, area)
+            toggle.click()
+            panel = root.locator('.filters-panel')
+            expect(panel).to_be_visible()
+            panel_box = panel.bounding_box()
+            assert abs(panel_box['width'] - area['width']) < 2, (panel_box, area)
+            # Disabling the extension returns YouTube's own header.
+            page.evaluate('__setEnabled(false)')
+            for selector in ['ytd-search-header-renderer', 'yt-chip-cloud-renderer', '#about-these-results']:
+                expect(page.locator(selector)).to_be_visible()
+            page.evaluate('__setEnabled(true)')
+            expect(page.locator('ytd-search-header-renderer')).to_be_hidden()
+            page.close()
+            print(f'PASS search header: no chips, native header hidden, Filters centered: {width}px', flush=True)
         browser.close()
-        print('PASS search chips from YouTube data, reload in place, All restores, native header hidden and restored', flush=True)
 
 
 if __name__ == '__main__':
