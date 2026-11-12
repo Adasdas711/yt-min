@@ -1698,6 +1698,17 @@
             if (!globalThis.MinimalYouTubeNavigation?.go(destination)) location.assign(destination);
         }
     }, true);
+    // YouTube's hotkeys (space plays a video still loaded in the background,
+    // k/j/l/f/m and arrows control it) see a key typed into an owned field
+    // inside Shadow DOM as a key on a plain element. Keys typed into owned
+    // fields stay there; Tab, Escape and Enter still reach the owned UI.
+    const ownedTyping = event => {
+        if (!enabled || ["Tab", "Escape", "Enter"].includes(event.key)) return;
+        const path = event.composedPath(), target = path[0];
+        if (!(target instanceof Element) || !target.matches("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) return;
+        if (path.some(node => node instanceof Element && node.id?.startsWith("myt-"))) event.stopImmediatePropagation();
+    };
+    for (const type of ["keydown", "keypress", "keyup"]) window.addEventListener(type, ownedTyping, true);
     document.addEventListener("focusin", () => { if (enabled) schedule(); });
     document.addEventListener("keydown", event => {
         if (!enabled || event.key !== "/" || watchView ||

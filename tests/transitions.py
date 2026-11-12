@@ -187,10 +187,38 @@ def watch_to_watch(browser, width=1440):
     print(f'PASS watch -> watch: the watch page stays on screen ({width}px)', flush=True)
 
 
+def home_typing(browser):
+    # After a video, YouTube's player and hotkeys stay alive on the home page.
+    # A space typed into the owned home search is text, not play/pause.
+    page = setup(browser, PATHS['watch'], document('watch'), native_dark=True)
+    expect(page.locator('#myt-watch')).to_be_visible()
+    page.evaluate(r"""() => {
+      window.__hotkeys = 0;
+      // YouTube-like hotkeys: capture on document, skip only real inputs.
+      document.addEventListener('keydown', event => {
+        if ([' ', 'k', 'j', 'l', 'ArrowLeft'].includes(event.key) && !/^(INPUT|TEXTAREA)$/.test(event.target.tagName)) { window.__hotkeys++; event.preventDefault(); }
+      }, true);
+      history.pushState({}, '', '/'); dispatchEvent(new PopStateEvent('popstate'));
+    }""")
+    field = page.locator('#myt-query')
+    expect(field).to_be_visible()
+    field.click()
+    page.keyboard.type('cats and jokes')
+    page.keyboard.press('ArrowLeft')
+    expect(field).to_have_value('cats and jokes')
+    assert page.evaluate('__hotkeys') == 0, page.evaluate('__hotkeys')
+    # Outside owned fields, YouTube's hotkeys keep working.
+    page.locator('#myt-home').evaluate("e=>e.dispatchEvent(new KeyboardEvent('keydown',{key:' ',bubbles:true,composed:true}))")
+    assert page.evaluate('__hotkeys') == 1
+    page.close()
+    print('PASS typing into the owned home search never triggers YouTube hotkeys', flush=True)
+
+
 if __name__ == '__main__':
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
         for width in (1440, 390):
             run(browser, width)
             watch_to_watch(browser, width)
+        home_typing(browser)
         browser.close()

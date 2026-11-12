@@ -67,7 +67,12 @@ def search_page(browser):
     card = page.locator('#myt-search [data-myt-search-channel-card]').filter(has_text='Data Channel')
     expect(card.locator('.channel-link')).to_have_attribute('href', 'https://www.youtube.com/@datachannel')
     expect(card.locator('.subscriber-value')).to_have_text('1.2 M')
-    card.locator('.avatar').click()
+    # The photo and the card cannot be dragged, so a click on the photo is never lost to a drag.
+    assert card.locator('.channel-link').get_attribute('draggable') == 'false' and card.locator('.avatar img').get_attribute('draggable') == 'false'
+    # A real click that moves the mouse a few pixels (as hands do) still opens the channel.
+    photo = card.locator('.avatar').bounding_box()
+    page.mouse.move(photo['x'] + 40, photo['y'] + 40); page.mouse.down()
+    page.mouse.move(photo['x'] + 46, photo['y'] + 44, steps=3); page.mouse.up()
     assert '/@datachannel' in (page.evaluate("document.documentElement.getAttribute('data-myt-navigate-request')") or ''), page.evaluate("document.documentElement.getAttribute('data-myt-navigate-request')")
     # YouTube's own filters: its button opens and closes its collapsible panel.
     native_button = page.locator('#native-filter-button')
@@ -108,16 +113,18 @@ def channel_page(browser):
     page.evaluate(CONFIG + ITEM + """
       const tab=(name,selected,content)=>({tabRenderer:{title:name,selected,endpoint:{commandMetadata:{webCommandMetadata:{url:'/@creator/'+name.toLowerCase()}}},content}});
       document.querySelector('ytd-browse').data={contents:{twoColumnBrowseResultsRenderer:{tabs:[
-        tab('Videos',true,{richGridRenderer:{contents:[{richItemRenderer:{content:item('chanVideo01','Channel one')}},{richItemRenderer:{content:item('chanVideo02','Channel two','','\u202aStreamed \u20681\u2069 year ago\u202c')}},more('channel-two')]}})]}}};
+        tab('Videos',true,{richGridRenderer:{contents:[{richItemRenderer:{content:item('chanVideo01','Channel one')}},{richItemRenderer:{content:item('chanVideo02','Channel two','','\u202aStreamed \u20681\u2069 year ago\u202c')}},{richItemRenderer:{content:item('chanVideo04','Channel four','','Трансляция закончилась 2 г. назад')}},{richItemRenderer:{content:item('chanVideo05','Channel five','','3 нед. назад')}},more('channel-two')]}})]}}};
       document.dispatchEvent(new Event('yt-page-data-updated'));""")
-    expect(page.locator('#myt-search .media-title')).to_have_text(['Channel one', 'Channel two', 'Channel three'])
+    expect(page.locator('#myt-search .media-title')).to_have_text(['Channel one', 'Channel two', 'Channel four', 'Channel five', 'Channel three'])
     # Every video shows its upload date below the title.
     # Older than four months: month and year, counted back from today.
     import datetime
     year_ago = datetime.date.today().replace(year=datetime.date.today().year - 1).strftime('%B %Y')
-    expect(page.locator('#myt-search .media-date')).to_have_text(['3 days ago', 'Streamed ' + year_ago, '3 days ago'])
+    # YouTube's Russian abbreviations convert too: "2 г. назад", "6 л. назад".
+    two_years = datetime.date.today().replace(year=datetime.date.today().year - 2).strftime('%B %Y')
+    expect(page.locator('#myt-search .media-date')).to_have_text(['3 days ago', 'Streamed ' + year_ago, 'Streamed ' + two_years, '3 нед. назад', '3 days ago'])
     # A channel's own cards carry no owner line.
-    expect(page.locator('#myt-search .media-channel')).to_have_count(3)
+    expect(page.locator('#myt-search .media-channel')).to_have_count(5)
     assert page.locator('#myt-search .media-channel').evaluate_all('nodes=>nodes.every(n=>!n.getClientRects().length)')
     expect(page.locator('#sort-latest')).to_be_visible()
     page.locator('#sort-latest').scroll_into_view_if_needed()
