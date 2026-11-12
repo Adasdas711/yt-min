@@ -5,8 +5,9 @@
     const ruleId = 470001;
     const chatRuleId = 470002;
     const adRuleIds = [470003, 470004];
-    // Decorations the owned pages never show: voice search sounds (its button
-    // is hidden) and Lottie animations (like/subscribe effects).
+    // Voice search sounds: its button is hidden. Lottie animations are not
+    // blocked: YouTube's loader retries a failed animation without end
+    // (thousands of failed requests within seconds).
     const extrasRuleId = 470005;
     const scriptId = "minimal-youtube-data-pruning";
     const homePath = "src/home/index.html";
@@ -66,9 +67,9 @@
                 }, {
                     id: extrasRuleId, priority: 1, action: { type: "block" },
                     condition: {
-                        regexFilter: "^https://(([a-z0-9-]+\\.)?youtube\\.com/(s/search/audio/|youtube/img/lottie/)|www\\.gstatic\\.com/youtube/img/lottie/)",
+                        regexFilter: "^https://([a-z0-9-]+\\.)?youtube\\.com/s/search/audio/",
                         initiatorDomains: ["youtube.com"], excludedInitiatorDomains: ["music.youtube.com"],
-                        resourceTypes: ["xmlhttprequest", "media", "image", "other"],
+                        resourceTypes: ["media", "xmlhttprequest", "other"],
                     },
                 }] : [],
             });
