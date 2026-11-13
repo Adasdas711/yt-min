@@ -831,6 +831,10 @@
         }
     }
 
+    const chatSelector = "#chat, #chat-container, ytd-live-chat-frame, iframe#chatframe";
+    const liveNoiseSelector = chatSelector + ", #teaser-carousel, yt-reaction-control-panel-overlay-view-model, " +
+        "like-button-view-model, dislike-button-view-model, segmented-like-dislike-button-view-model, " +
+        "ytd-segmented-like-dislike-button-renderer, #segmented-like-button, #segmented-dislike-button";
     function syncChatFrames() {
         for (const [frame, source] of suspendedChatFrames) {
             if (!frame.isConnected) suspendedChatFrames.delete(frame);
@@ -1529,7 +1533,7 @@
         const stableWatch = watchView && root.dataset.mytPage === "watch" && !pendingNavigation && !transitionActive;
         const stableSearch=searchView&&root.dataset.mytPage==='search'&&!pendingNavigation&&!transitionActive;
         const filterScope=globalThis.MinimalYouTubeSearch?.filterScopeSelector||'ytd-search-sub-menu-renderer';
-        let statsChanged = false;
+        let statsChanged = false, chatChanged = false;
         const relevant = records.filter(record => {
             const target = record.target instanceof Element ? record.target : record.target.parentElement;
             if (!target) return false;
@@ -1568,6 +1572,13 @@
                     node instanceof Element && (node.matches("video, ytd-player") || node.querySelector("video, ytd-player")));
             }
             if (watchView && target.closest("ytd-popup-container, ytd-comments")) return false;
+            // Live streams: chat, reaction overlays and like counters change
+            // several times a second and never feed the owned watch UI. Only
+            // a chat frame (re)load matters: it is suspended right away.
+            if (watchView && target.closest(liveNoiseSelector)) {
+                if (target.closest(chatSelector)) chatChanged = true;
+                return false;
+            }
             if (playlistView && target.closest("ytd-popup-container,ytd-masthead,yt-video-preview")) return false;
             // Native playlist virtualization and playback markers never change
             // the watch metadata. Its scoped observer handles header/state only.
@@ -1585,6 +1596,7 @@
             }
             return true;
         });
+        if (chatChanged) syncChatFrames();
         if (!relevant.length) { if (statsChanged) scheduleWatchStats();return; }
         if(enabled&&root.dataset.mytPage==='search'){
             const added=new Set();
