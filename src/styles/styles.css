@@ -370,7 +370,10 @@ html.minimal-youtube:is([data-myt-page="channel"], [data-myt-previous-page="chan
 
 /* Watch: retain YouTube's player sizing, controls, theater and fullscreen logic. */
 html.minimal-youtube ytd-watch-flexy #related,
-html.minimal-youtube ytd-watch-flexy ytd-watch-next-secondary-results-renderer {
+html.minimal-youtube ytd-watch-flexy ytd-watch-next-secondary-results-renderer,
+/* Ambient mode repaints a blurred copy of every video frame behind the page,
+   a constant GPU cost on long live streams; the owned page never shows it. */
+html.minimal-youtube ytd-watch-flexy #cinematics {
     display: none !important;
 }
 

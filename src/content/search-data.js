@@ -38,6 +38,24 @@
         }
         return '';
     }
+    // A video that is streaming now: YouTube marks it with a LIVE thumbnail
+    // overlay or badge style; its view line counts current viewers.
+    const watchingPattern=/\bwatching\b|смотрят|зрител/iu;
+    function liveState(value){
+        let live=false;const stack=[value.badges,value.thumbnailOverlays,value.contentImage,value.thumbnail?.thumbnailOverlays];let scans=0;
+        while(stack.length&&scans++<600&&!live){
+            const item=stack.pop();if(!item||typeof item!=='object')continue;
+            for(const [key,child]of Object.entries(item)){
+                if(typeof child==='string'){if(/^(?:style|badgeStyle|iconType)$/.test(key)&&/(?:^|_)LIVE(?:_NOW)?(?:$|_)/.test(child)&&!/UPCOMING/.test(child)){live=true;break;}}
+                else if(child&&typeof child==='object')stack.push(child);
+            }
+        }
+        let viewers=[label(value.viewCountText),label(value.shortViewCountText)].find(text=>watchingPattern.test(text))||'';
+        const metadata=value.metadata?.lockupMetadataViewModel||value.metadata||{};
+        if(!viewers)for(const row of metadata.metadata?.contentMetadataViewModel?.metadataRows||metadata.metadataRows||[])for(const part of row.metadataParts||[]){const text=label(part.text).trim();if(!viewers&&watchingPattern.test(text))viewers=text;}
+        if(viewers)live=true;
+        return {live,viewers:viewers.trim().slice(0,60)};
+    }
     const publishedPattern=/\bago\b|назад|^(?:streamed|premiered|scheduled)\b|^(?:трансляция|премьера)/iu;
     function record(input,hint=''){
         if(!input||typeof input!=='object')return null;
@@ -73,7 +91,7 @@
                 for(const text of label(part.text).split(/\s*[•·]\s*/))if(!published&&publishedPattern.test(text.trim()))published=text.trim();
             }
         }
-        return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,kind==='channel'?8:4),count:kind==='playlist'?playlistCount(value):'',published:published.slice(0,100)};
+        return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,kind==='channel'?8:4),count:kind==='playlist'?playlistCount(value):'',published:published.slice(0,100),...(kind==='video'?liveState(value):{})};
     }
     function collect(root){
         const records=[],filters=[],seen=new Set(),stack=[root];let scans=0;
@@ -85,7 +103,7 @@
         }
         return {records,filters};
     }
-    globalThis.MinimalYouTubeSearchData={label,url,youtube,channelURL,endpoint,image,playlistCount,record,collect,publishedPattern};
+    globalThis.MinimalYouTubeSearchData={label,url,youtube,channelURL,endpoint,image,playlistCount,record,collect,publishedPattern,watchingPattern};
     // Static MAIN injection also serves the first page after installation,
     // before the background has registered its optional response-pruning hook.
     if(typeof document!=='undefined'&&!globalThis.chrome?.runtime?.id)document.addEventListener('minimal-youtube:search-snapshot',()=>{
