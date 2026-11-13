@@ -55,10 +55,23 @@ def check_recorded(browser):
     print('PASS recorded video keeps views without a Live badge')
 
 
+def check_russian(browser):
+    page = setup(browser, '/watch?v=native', native_watch_fixture(), native_dark=True, language='ru')
+    page.evaluate('''()=>{
+      document.querySelector('#info-container').textContent='Сейчас смотрят: 1 232';
+      document.querySelector('#movie_player').classList.add('ytp-live');
+      document.dispatchEvent(new Event('yt-navigate-finish'));
+    }''')
+    expect(page.locator('#myt-watch .stats-value')).to_have_text('1,232 watching')
+    page.close()
+    print('PASS the audience is always English')
+
+
 if __name__ == '__main__':
     with sync_playwright() as p:
         browser = p.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
         for width in (1440, 390):
             check_live(browser, width)
         check_recorded(browser)
+        check_russian(browser)
         browser.close()
