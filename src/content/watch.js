@@ -971,10 +971,8 @@ main.has-sidecar .details { min-height:0; }
         }
         liveText(count) {
             if(count===null)return '';
-            const ru=this.options.language==='ru',formatted=new Intl.NumberFormat(ru?'ru-RU':'en-US').format(count).replace(/\u00a0|\u202f/g,' ');
-            if(!ru)return formatted+' watching';
-            const tens=count%100,ones=count%10;
-            return formatted+' '+(tens>10&&tens<20?'зрителей':ones===1?'зритель':ones>1&&ones<5?'зрителя':'зрителей');
+            // Always English, whatever the interface language.
+            return new Intl.NumberFormat('en-US').format(count)+' watching';
         }
         statsText(root) {
             const liveInfo=this.native.querySelector('ytd-watch-info-text, ytd-video-primary-info-renderer #info, #info-strings');
