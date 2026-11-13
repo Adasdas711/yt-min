@@ -227,7 +227,7 @@
       .media:is(:hover,:focus-within){background:var(--myt-soft)}.cover{position:relative;display:block;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:var(--myt-soft)}.cover img{display:block;width:100%;height:100%;object-fit:cover}.media-info{display:flex;flex-direction:column;justify-content:center;gap:12px;min-width:0;padding:0 3px}
       .media-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;font-size:17px;line-height:1.35;font-weight:700}.media.video .media-title{font-size:16px}.media-date{display:block;color:var(--myt-muted);font-size:14px;line-height:1.4}.media-date[hidden]{display:none}
       .media-channel{display:block;overflow-wrap:anywhere;color:var(--myt-muted);font-size:18px;font-weight:500;line-height:1.4}.media-channel:is(:hover,:focus-visible){color:var(--myt-ink)}
-      .media.playlist{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:center;gap:20px;padding-bottom:12px}.media.playlist .cover{width:100%}.playlist-badge{position:absolute;right:8px;bottom:8px;display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:6px;background:#000b;color:#fff;font-size:13px}
+      .media.playlist{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:center;gap:20px;padding-bottom:12px}.media.playlist .cover{width:100%}.live-badge{position:absolute;left:8px;bottom:8px;padding:0 7px;border-radius:999px;background:#e5202b;color:#fff;font-size:11px;font-weight:700;line-height:18px;letter-spacing:.04em}.live-badge::before{content:"LIVE"}.live-badge[hidden]{display:none}.playlist-badge{position:absolute;right:8px;bottom:8px;display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:6px;background:#000b;color:#fff;font-size:13px}
       .group{min-width:0;padding:20px;border-radius:22px;background:var(--myt-soft)}.group h2{margin:0 0 18px;padding-inline-end:.2em;overflow:visible;overflow-wrap:anywhere;font:italic 900 40px/1.05 "MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:-.025em}
       :host([data-channel]) .media.playlist{display:flex;flex-direction:column;gap:14px;padding-bottom:18px}:host([data-channel]) .media.playlist .media-title{font-size:16px}.playlist-badge[hidden]{display:none}.playlist-badge svg{width:15px;height:15px;flex:none}.media.playlist :is(.media-info,.playlist-badge){font-family:"SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace}.media.playlist .media-title{font-weight:600}
       /* Keep 20px gaps fixed while reducing channel column widths by 15%. */
@@ -285,6 +285,7 @@
         let prefix=text.slice(0,match.index);for(const[pattern,english]of datePrefixes)prefix=prefix.replace(pattern,english);
         return (prefix+label+text.slice(match.index+match[0].length)).replace(/\s+/g,' ').trim();
     }
+    const liveSelector='ytd-thumbnail-overlay-time-status-renderer[overlay-style="LIVE"],.badge-style-type-live-now,.badge-style-type-live-now-alternate,[class*="thumbnail-live"],[class*="BadgeShapeThumbnailLive"]';
     const datedText=value=>(globalThis.MinimalYouTubeSearchData?.publishedPattern||/\bago\b|назад/iu).test(value);
     // A content type label is not an owner.
     const ownerLine=(name,href)=>/^(?:playlist|плейлист|mix|микс|podcast|подкаст)$/iu.test(name.trim())?{name:'',href:''}:{name,href};
@@ -311,7 +312,11 @@
             this.owner.hidden=!data.channel.name;if(data.channel.href)this.owner.href=data.channel.href;else this.owner.removeAttribute('href');
             if(this.image.getAttribute('src')!==data.image){if(data.image)this.image.src=data.image;else this.image.removeAttribute('src');}
             this.image.hidden=!data.image;
-            const date=publishedLabel(data.published);if(this.date.textContent!==date)this.date.textContent=date;this.date.hidden=!date;
+            // A stream that is live now: a LIVE badge on the cover and the
+            // current viewers in place of a publication date.
+            if(data.live&&!this.live){this.live=node('span','live-badge');this.live.setAttribute('role','img');this.live.setAttribute('aria-label','Live');this.cover.append(this.live);}
+            if(this.live)this.live.hidden=!data.live;
+            const date=data.live?data.viewers||'':publishedLabel(data.published);if(this.date.textContent!==date)this.date.textContent=date;this.date.hidden=!date;
             if(this.badge){const count=data.count||'';if(this.badgeCount.textContent!==count)this.badgeCount.textContent=count;this.badge.hidden=!count;this.badge.setAttribute('aria-label',count?count+(count==='1'?' video':' videos'):'');}
         }
         destroy(){this.host.remove();}
@@ -524,7 +529,10 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             // A channel's own cards need no owner line; it is the page's channel.
             const hideChannel=this.channel;
             const published=kind==='video'?record?.published||[...source.querySelectorAll('#metadata-line span,.inline-metadata-item,.ytContentMetadataViewModelMetadataText,[class*="MetadataText"]')].map(text).find(value=>value&&value.length<100&&datedText(value))||'':'';
-            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,count,published,channel:hideChannel?{name:'',href:''}:ownerLine(text(owner)||record?.channel?.name||'',channelURL(owner?.href||record?.channel?.href))};
+            const watching=globalThis.MinimalYouTubeSearchData?.watchingPattern||/\bwatching\b/iu;
+            const viewers=kind==='video'?record?.viewers||[...source.querySelectorAll('#metadata-line span,.inline-metadata-item,.ytContentMetadataViewModelMetadataText,[class*="MetadataText"]')].map(text).find(value=>value&&value.length<60&&watching.test(value))||'':'';
+            const live=kind==='video'&&Boolean(record?.live||viewers||source.querySelector(liveSelector));
+            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,count,published,live,viewers,channel:hideChannel?{name:'',href:''}:ownerLine(text(owner)||record?.channel?.name||'',channelURL(owner?.href||record?.channel?.href))};
         }
         sync(searches){
             if(!this.nativeStyle.isConnected)document.documentElement.append(this.nativeStyle);
