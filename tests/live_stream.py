@@ -67,6 +67,22 @@ def check_russian(browser):
     print('PASS the audience is always English')
 
 
+def check_ambient(browser):
+    # Ambient mode is off everywhere: watch (normal and theater) and other pages.
+    for path, body in (('/watch?v=native', native_watch_fixture()), ('/watch?v=native', native_watch_fixture(theater=True)),
+                       ('/results?search_query=x', '<ytd-app><ytd-page-manager><ytd-browse></ytd-browse><ytd-search></ytd-search></ytd-page-manager></ytd-app>')):
+        page = setup(browser, path, body, native_dark=True)
+        page.evaluate('''()=>{const host=document.querySelector('ytd-watch-flexy')||document.querySelector('ytd-browse');
+          host.insertAdjacentHTML('afterbegin','<div id=cinematics><ytd-cinematic-container-renderer><canvas></canvas></ytd-cinematic-container-renderer></div><div id=cinematic-container><canvas></canvas></div>');}''')
+        hidden = page.evaluate("[...document.querySelectorAll('#cinematics,#cinematic-container,ytd-cinematic-container-renderer')].map(e=>getComputedStyle(e).display)")
+        assert hidden == ['none'] * 3, (path, hidden)
+        if 'watch' in path:
+            expect(page.locator('#myt-watch')).to_be_attached()
+            assert page.locator('video').evaluate('v=>getComputedStyle(v).display') != 'none'
+        page.close()
+    print('PASS ambient mode is off on every page, the player stays visible')
+
+
 if __name__ == '__main__':
     with sync_playwright() as p:
         browser = p.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
@@ -74,4 +90,5 @@ if __name__ == '__main__':
             check_live(browser, width)
         check_recorded(browser)
         check_russian(browser)
+        check_ambient(browser)
         browser.close()
