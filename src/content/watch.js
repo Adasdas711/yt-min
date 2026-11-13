@@ -62,7 +62,7 @@ main.has-sidecar .details { min-height:0; }
 .playlist-toggle,.more-toggle { border-radius:999px; }.more-actions { display:flex; }.more-toggle { width:44px;min-width:44px;padding:10px; }.more-popup { position:fixed;inset:auto;margin:0;padding:8px;width:min(260px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;border:1px solid var(--border);border-radius:24px;background:var(--surface);color:var(--ink);box-shadow:0 12px 36px #0002; }.more-popup::backdrop { background:transparent; }.more-popup button { border-radius:16px;display:flex;width:100%;justify-content:flex-start;white-space:normal;text-align:left;border:0;background:transparent; }.more-popup button:hover,.more-popup button:focus-visible { background:var(--soft); }.more-popup button:focus-visible { outline-offset:-2px; }
 #myt-comments-toggle { display:inline-flex;align-items:center;gap:9px; }.description { --description-side:28px;--description-bottom:28px;--description-round:20px;margin-top:28px;border:1px solid var(--border);border-radius:20px;background:var(--surface);padding:28px; }
 .stats { font-size:14px;font-weight:500;color:var(--muted);margin:0; }.prose { font-family:"SFMono-Regular","SF Mono",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace;font-size:17px;font-weight:400;line-height:1.75;letter-spacing:normal;font-variant-ligatures:none;overflow-wrap:anywhere;white-space:pre-wrap; }.prose p { margin:0 0 18px; }.prose ul,.prose ol { padding-left:24px; }.prose:not(.expanded) { max-height:8.75em;overflow:hidden; }.expand { display:flex;width:calc(100% + var(--description-side) + var(--description-side));margin:18px calc(0px - var(--description-side)) calc(0px - var(--description-bottom));min-height:48px;padding:12px var(--description-side);border-radius:0 0 var(--description-round) var(--description-round);background:transparent; }
-.channel-card .stats { display:flex;align-items:flex-start;gap:6px; }.views-icon { display:inline-flex;flex:none;margin-top:3px; }.views-icon svg { width:14px;height:14px; }.stats-value { min-width:0; }
+.channel-card .stats { display:flex;align-items:flex-start;gap:6px; }.views-icon { display:inline-flex;flex:none;margin-top:3px; }.views-icon svg { width:14px;height:14px; }.stats-value { min-width:0; }.live-badge { flex:none;margin-top:2px;padding:0 7px;border-radius:999px;background:#e5202b;color:#fff;font-size:11px;font-weight:700;line-height:17px;letter-spacing:.04em;text-transform:uppercase; }.live-badge::before { content:"Live"; }
 .prose a { font-weight:700; }.prose .link-symbol { display:inline-block;width:.95em;height:.95em;margin-right:.3em;vertical-align:-.12em;pointer-events:none; }
 .section { margin-top:32px; }.section-head { display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px; }.hint { color:var(--muted);font-size:15px;line-height:1.6; }
 .chapter-list { display:flex;flex-flow:row nowrap;gap:12px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-color:var(--border) transparent;padding-bottom:12px; }.chapter { flex:0 0 220px;scroll-snap-align:start;display:grid;grid-template-columns:minmax(0,1fr);gap:8px;align-content:start;text-align:left;white-space:normal;justify-content:initial;min-height:112px;padding:16px;border-color:var(--border);--chapter-bg:var(--surface);background:var(--chapter-bg);border-radius:24px; }
@@ -109,6 +109,7 @@ main.has-sidecar .details { min-height:0; }
     };
     const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${({save:'<path d="M6 4h12v16l-6-4-6 4Z"/>',chevron:'<path d="m6 9 6 6 6-6"/>', transcript:'<path d="M5 3h14v18H5Z"/><path d="M8 8h8M8 12h8M8 16h5"/>', arrow:'<path d="m7 17 10-10M7 7h10v10"/>', share:'<path d="m15 4 6 6-6 6v-4C8 12 5 14 3 19c0-8 3-12 12-12Z"/>', close:'<path d="m6 6 12 12M18 6 6 18"/>', playlist:'<path d="M8 6h12M8 12h12M8 18h12M3 6h.01M3 12h.01M3 18h.01"/>', eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>', link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>', menu:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'})[name] || ''}</svg>`;
     const text = element => element?.textContent.replace(/\s+/g," ").trim() || "";
+    const voteSelector = "like-button-view-model,dislike-button-view-model,segmented-like-dislike-button-view-model,ytd-segmented-like-dislike-button-renderer,#segmented-like-button,#segmented-dislike-button,[data-myt-votes]";
     const seconds = value => {
         const parts = value?.trim().split(":");
         if (!parts?.length || parts.some(part => !/^\d+$/.test(part))) return null;
@@ -140,7 +141,7 @@ main.has-sidecar .details { min-height:0; }
             this.options=options; this.native=options.native; this.islands=new Map(); this.fullscreenNodes=new Map(); this.expanded=false; this.transcriptOpen=false; this.signature=""; this.sources=new Map(); this.sequence=0; this.nativePanelState=null;
             this.host=document.createElement("div"); this.host.id="myt-watch"; this.host.setAttribute("popover","manual");
             this.surface=document.createElement("div"); this.shadow=this.surface.attachShadow({mode:"open"});this.host.append(this.surface);
-            this.shadow.innerHTML=`<style>${css}</style><div class="viewport"><header class="header"><a class="brand" href="/" aria-label="YouTube"><svg viewBox="0 0 28 20" fill="currentColor" aria-hidden="true"><rect width="28" height="20" rx="6"/><path d="m11 5 8 5-8 5Z" fill="#fff"/></svg><span>YouTube</span></a><form class="search" action="/results" method="get" role="search"><input name="search_query" id="watch-search" autocomplete="off"><button type="button" id="watch-clear" hidden aria-label="Clear">×</button></form></header><main><div class="layout"><div class="primary"><div class="media" aria-label="YouTube player"></div><article class="details"><h1 id="watch-title"></h1><div class="meta-row"><div class="channel-card" hidden><button type="button" class="channel-subscribe" data-watch-action="subscription" aria-describedby="watch-subscription-status" disabled></button><div class="owner"></div><span class="subscription-state" id="watch-subscription-status" aria-live="polite"></span><div class="stats" hidden><span class="views-icon" hidden>${icon('eye')}</span><span class="stats-value"></span></div></div><div class="actions"></div></div><section class="section" id="watch-chapters" hidden aria-label="Chapters"><div class="chapter-list"></div></section><section class="description" aria-label="Description"><div class="prose" id="watch-description"></div><button class="expand" aria-expanded="false" aria-controls="watch-description"></button></section><section class="section" id="watch-people" hidden><div class="section-head"><h2></h2></div><div class="people"></div></section><section class="section transcript-card" id="watch-transcript" hidden><div class="transcript-head"><div class="transcript-intro"><span class="transcript-icon">${icon('transcript')}</span><div class="transcript-copy"><h2></h2><p class="hint"></p></div></div><button class="transcript-toggle" aria-expanded="false" aria-controls="watch-transcript-content"></button></div><div class="transcript-content" id="watch-transcript-content" hidden><input class="transcript-search" type="search"><div class="segments"></div><p class="transcript-status" role="status"></p><button class="transcript-retry" hidden></button></div></section><section class="section" id="watch-socials" hidden><div class="section-head"><h2></h2></div><div class="socials"></div></section><section class="comments-section" id="watch-comments" hidden><h2></h2><div class="comments"></div></section></article></div><aside class="sidecar" hidden></aside></div></main></div>`;
+            this.shadow.innerHTML=`<style>${css}</style><div class="viewport"><header class="header"><a class="brand" href="/" aria-label="YouTube"><svg viewBox="0 0 28 20" fill="currentColor" aria-hidden="true"><rect width="28" height="20" rx="6"/><path d="m11 5 8 5-8 5Z" fill="#fff"/></svg><span>YouTube</span></a><form class="search" action="/results" method="get" role="search"><input name="search_query" id="watch-search" autocomplete="off"><button type="button" id="watch-clear" hidden aria-label="Clear">×</button></form></header><main><div class="layout"><div class="primary"><div class="media" aria-label="YouTube player"></div><article class="details"><h1 id="watch-title"></h1><div class="meta-row"><div class="channel-card" hidden><button type="button" class="channel-subscribe" data-watch-action="subscription" aria-describedby="watch-subscription-status" disabled></button><div class="owner"></div><span class="subscription-state" id="watch-subscription-status" aria-live="polite"></span><div class="stats" hidden><span class="views-icon" hidden>${icon('eye')}</span><span class="live-badge" role="img" aria-label="Live" hidden></span><span class="stats-value"></span></div></div><div class="actions"></div></div><section class="section" id="watch-chapters" hidden aria-label="Chapters"><div class="chapter-list"></div></section><section class="description" aria-label="Description"><div class="prose" id="watch-description"></div><button class="expand" aria-expanded="false" aria-controls="watch-description"></button></section><section class="section" id="watch-people" hidden><div class="section-head"><h2></h2></div><div class="people"></div></section><section class="section transcript-card" id="watch-transcript" hidden><div class="transcript-head"><div class="transcript-intro"><span class="transcript-icon">${icon('transcript')}</span><div class="transcript-copy"><h2></h2><p class="hint"></p></div></div><button class="transcript-toggle" aria-expanded="false" aria-controls="watch-transcript-content"></button></div><div class="transcript-content" id="watch-transcript-content" hidden><input class="transcript-search" type="search"><div class="segments"></div><p class="transcript-status" role="status"></p><button class="transcript-retry" hidden></button></div></section><section class="section" id="watch-socials" hidden><div class="section-head"><h2></h2></div><div class="socials"></div></section><section class="comments-section" id="watch-comments" hidden><h2></h2><div class="comments"></div></section></article></div><aside class="sidecar" hidden></aside></div></main></div>`;
             this.q=selector=>this.shadow.querySelector(selector);this.viewport=this.q('.viewport');
             this.q('.expand').onclick=()=>{this.expanded=!this.expanded;this.updateExpanded();};
             this.q('.transcript-toggle').onclick=()=>this.toggleTranscript();
@@ -780,7 +781,7 @@ main.has-sidecar .details { min-height:0; }
         // Save is an owned button that presses YouTube's own; video votes
         // (likes, dislikes and their counts) are not shown.
         voteControls(nativeActions) {
-            const save=[...(nativeActions?.querySelectorAll('button')||[])].find(button=>!button.closest('like-button-view-model,dislike-button-view-model,segmented-like-dislike-button-view-model,ytd-segmented-like-dislike-button-renderer,#segmented-like-button,#segmented-dislike-button,[data-myt-votes]')&&/^(?:save|сохранить)\b/iu.test(((button.getAttribute('aria-label')||'')+' '+text(button)).trim()));
+            const save=[...(nativeActions?.querySelectorAll('button')||[])].find(button=>!button.closest(voteSelector)&&/^(?:save|сохранить)\b/iu.test(((button.getAttribute('aria-label')||'')+' '+text(button)).trim()));
             if(!save)return [];
             const button=this.button('Save',save,'save');button.classList.add('save');return [button];
         }
@@ -892,8 +893,9 @@ main.has-sidecar .details { min-height:0; }
             const stats=this.statsText(this.descriptionRoot?.isConnected?this.descriptionRoot:null),node=this.q('.stats');
             const value=node.querySelector('.stats-value');if(value.textContent!==stats)value.textContent=stats;
             const eye=node.querySelector('.views-icon');if(eye.hidden===this.statsHasViews)eye.hidden=!this.statsHasViews;
-            if(node.hidden!==!stats)node.hidden=!stats;
-            const card=this.q('.channel-card'),hidden=!this.subscriptionData?.owner&&!stats;
+            const badge=node.querySelector('.live-badge');if(badge.hidden===this.statsLive)badge.hidden=!this.statsLive;
+            const shown=Boolean(stats||this.statsLive);if(node.hidden!==!shown)node.hidden=!shown;
+            const card=this.q('.channel-card'),hidden=!this.subscriptionData?.owner&&!shown;
             if(card.hidden!==hidden)card.hidden=hidden;
         }
         viewCount(value) {
@@ -942,14 +944,18 @@ main.has-sidecar .details { min-height:0; }
             for(const node of details){const date=parse(node.getAttribute('title')||text(node));if(date)return date;}
             return '';
         }
-        statsText(root) {
+        // A live stream shows its current audience instead of views/date.
+        liveViewers(readable) {
             const model=this.model;
-            if(model?.views){
-                const count=this.compactViews(model.views+' views'),date=model.date?this.publicationDate(()=>null,null,model.date):'';
-                if(count&&date){this.statsHasViews=true;return count+' · '+date;}
-            }
-            const liveInfo=this.native.querySelector('ytd-watch-info-text, ytd-video-primary-info-renderer #info, #info-strings');
-            const info = liveInfo || root?.querySelector('#info-container, #info');
+            const marked=model?.live||this.native.hasAttribute('is-live')||Boolean(this.native.querySelector('#movie_player.ytp-live,.html5-video-player.ytp-live'));
+            const watching=readable.match(/(\d[\d\s.,\u00a0\u202f]*)\s*(?:watching|зрител|смотр)/iu)||readable.match(/(?:смотрят|watching)\D{0,12}(\d[\d\s.,\u00a0\u202f]*)/iu);
+            if(!marked&&!watching)return null;
+            const digits=(watching?.[1]||model?.viewers||'').replace(/\D/g,'');
+            const count=digits&&digits.length<=12?Number(digits):null;
+            return {count};
+        }
+        readableInfo(info) {
+            if(!info)return '';
             const semantic = node => {
                 if (node.nodeType === Node.TEXT_NODE) return node.data.trim();
                 if (!(node instanceof Element) || node.matches('tp-yt-paper-tooltip, yt-tooltip, [role="tooltip"], [aria-hidden="true"]') || (node !== info && node.matches('button, [role="button"]'))) return '';
@@ -961,7 +967,28 @@ main.has-sidecar .details { min-height:0; }
                 }
                 return [...node.childNodes].map(semantic).filter(Boolean).join(' ');
             };
-            const readable = info ? semantic(info).replace(/\s+/g, ' ').trim() : '';
+            return semantic(info).replace(/\s+/g, ' ').trim();
+        }
+        liveText(count) {
+            if(count===null)return '';
+            const ru=this.options.language==='ru',formatted=new Intl.NumberFormat(ru?'ru-RU':'en-US').format(count).replace(/\u00a0|\u202f/g,' ');
+            if(!ru)return formatted+' watching';
+            const tens=count%100,ones=count%10;
+            return formatted+' '+(tens>10&&tens<20?'зрителей':ones===1?'зритель':ones>1&&ones<5?'зрителя':'зрителей');
+        }
+        statsText(root) {
+            const liveInfo=this.native.querySelector('ytd-watch-info-text, ytd-video-primary-info-renderer #info, #info-strings');
+            const info=liveInfo||root?.querySelector('#info-container, #info'),readable=this.readableInfo(info);
+            const live=this.liveViewers(readable);this.statsLive=Boolean(live);
+            if(live){this.statsHasViews=false;return this.liveText(live.count);}
+            return this.recordedStatsText(info,liveInfo,readable);
+        }
+        recordedStatsText(info,liveInfo,readable) {
+            const model=this.model;
+            if(model?.views){
+                const count=this.compactViews(model.views+' views'),date=model.date?this.publicationDate(()=>null,null,model.date):'';
+                if(count&&date){this.statsHasViews=true;return count+' · '+date;}
+            }
             const viewMatch = readable.match(/\d[\d\s.,]*\s*(?:(?:тыс\.?|млн|млрд|[kmb])\s*)?(?:просмотр[а-яё]*|views?)/iu);
             let views = viewMatch?.[0].trim() || readable.match(/no views|нет просмотров|без просмотров/iu)?.[0] || '';
             if (views.replace(/\D/g, '').length > 18) views = '';
@@ -1065,7 +1092,7 @@ main.has-sidecar .details { min-height:0; }
             const sectionData=[...this.native.querySelectorAll('ytd-macro-markers-list-item-renderer,ytd-info-card-contents-renderer,ytd-video-description-channel-section-renderer')].map(node=>[text(node),node.querySelector('a[href]')?.href]);
             // Only native source data forms this signature. Typing, focus and scroll
             // in our shadow tree do not rebuild controls or disturb selection.
-            const signature=JSON.stringify([model,options.video,options.language,Boolean(options.commentsButton),this.transcriptAvailable,text(metadata?.querySelector('h1'))||document.title,ownerData.name,(ownerData.avatars||[]).map(a=>[a.image.currentSrc||a.image.getAttribute('src'),a.image.naturalWidth]),text(nativeActions),text(descriptionData.body),sectionData,[...this.native.querySelectorAll('ytd-watch-metadata a[href],ytd-video-secondary-info-renderer a[href],ytd-watch-metadata img,ytd-video-secondary-info-renderer img,#description a[href],#description img')].map(node=>[node.href,node.currentSrc||node.getAttribute('src'),node.getAttribute('srcset'),node.getAttribute('data-src'),node.naturalWidth])]);
+            const signature=JSON.stringify([model,options.video,options.language,Boolean(options.commentsButton),this.transcriptAvailable,text(metadata?.querySelector('h1'))||document.title,ownerData.name,(ownerData.avatars||[]).map(a=>[a.image.currentSrc||a.image.getAttribute('src'),a.image.naturalWidth]),[...(nativeActions?.querySelectorAll('button')||[])].filter(button=>!button.closest(voteSelector)).map(button=>(button.getAttribute('aria-label')||'')+' '+text(button)),text(descriptionData.body),sectionData,[...this.native.querySelectorAll('ytd-watch-metadata a[href],ytd-video-secondary-info-renderer a[href],ytd-watch-metadata img,ytd-video-secondary-info-renderer img,#description a[href],#description img')].map(node=>[node.href,node.currentSrc||node.getAttribute('src'),node.getAttribute('srcset'),node.getAttribute('data-src'),node.naturalWidth])]);
             if(signature!==this.signature||[...this.sources.values()].some(node=>!node.isConnected)){
                 if(this.video!==options.video){this.video=options.video;this.expanded=false;this.closeTranscript();this.viewport.scrollTop=0;}
                 this.signature=signature;this.sources.clear();this.sequence=0;

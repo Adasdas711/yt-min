@@ -383,7 +383,8 @@
                 total:Number(playlist.totalVideos)||items.length,current:Number.isInteger(playlist.localCurrentIndex)?playlist.localCurrentIndex:Number.isInteger(playlist.currentIndex)?playlist.currentIndex:items.findIndex(item=>item.selected),
                 infinite:Boolean(playlist.isInfinite),items};
         }
-        model={video,title:data.label(primary.title).trim().slice(0,1000),description,chapters,views,
+        const viewers=live&&/\d/.test(viewText)?(viewText.match(/\d[\d\s,.\u00a0\u202f]*/)?.[0]||'').replace(/\D/g,'').slice(0,12):'';
+        model={video,title:data.label(primary.title).trim().slice(0,1000),description,chapters,views,live,viewers,
             date:data.label(primary.dateText).trim().slice(0,100)||data.label(header.publishDate).trim().slice(0,100),
             owner:{name:data.label(ownerRenderer.title).trim().slice(0,300),href:data.endpoint(ownerRun?.navigationEndpoint)||'',avatar:data.image(ownerRenderer.thumbnail),subscribers:data.label(ownerRenderer.subscriberCountText).trim().slice(0,100)},
             playlist:panel};
