@@ -21,4 +21,10 @@ const notACount={metadata:{lockupMetadataViewModel:{
 assert.equal(model.playlistCount(notACount),'');
 const modernChannel=plain(model.record({lockupViewModel:{contentId:'UCmodern',contentType:'LOCKUP_CONTENT_TYPE_CHANNEL',metadata:{lockupMetadataViewModel:{title:{content:'Joe Speen'},metadata:{contentMetadataViewModel:{metadataRows:[{metadataParts:[{text:{content:'@JoeSpeen'}},{text:{content:'2.24M subscribers'}}]}]}}}}}}));
 assert(modernChannel.metadata.includes('2.24M subscribers'));assert.equal(modernChannel.handle,'@JoeSpeen');
+// Courses are playlists with their own lockup type and a lesson count.
+const course=plain(model.record({lockupViewModel:{contentId:'PLcourse01',contentType:'LOCKUP_CONTENT_TYPE_COURSE',contentImage:{collectionThumbnailViewModel:{primaryThumbnail:{thumbnailViewModel:{overlays:[{thumbnailOverlayBadgeViewModel:{thumbnailBadges:[{thumbnailBadgeViewModel:{text:'33 lessons',icon:{sources:[{clientResource:{imageName:'SCHOOL'}}]}}}]}}]}}}},metadata:{lockupMetadataViewModel:{title:{content:'Немецкий язык A2'}}}}}));
+assert.equal(course.kind,'playlist');assert.equal(course.count,'33');assert.equal(course.course,true);assert.equal(course.href,'https://www.youtube.com/playlist?list=PLcourse01');
+const lessons=plain(model.record({lockupViewModel:{contentId:'PLcourse02',contentType:'LOCKUP_CONTENT_TYPE_PLAYLIST',contentImage:{collectionThumbnailViewModel:{primaryThumbnail:{thumbnailViewModel:{overlays:[{thumbnailBadgeViewModel:{text:'94 урока'}}]}}}}}}));
+assert.equal(lessons.count,'94');assert.equal(lessons.course,true);
+assert.equal(plain(model.record({lockupViewModel:{contentId:'PLplain',contentType:'LOCKUP_CONTENT_TYPE_PLAYLIST',videoCountText:{simpleText:'19 videos'}}})).course,undefined);
 console.log('PASS legacy and modern public search records, nested avatars, channel endpoints, native filters and unchanged user text');
