@@ -84,7 +84,7 @@ main.has-sidecar .details { min-height:0; }
 .own-playlist { display:flex;flex-direction:column;height:100%;min-height:0;max-height:inherit; }
 .own-playlist-head { display:flex;align-items:flex-start;gap:12px;padding:16px 12px 12px 18px;border-bottom:1px solid var(--border); }
 .own-playlist-info { flex:1;min-width:0; }
-.own-playlist-page { color:inherit;text-decoration:none; } .own-playlist-page:is(:hover,:focus-visible) { text-decoration:none;font-weight:800; }
+.own-playlist-page { color:inherit;text-decoration:none; } .own-playlist-page:hover { text-decoration:underline; }
 .own-playlist-title { margin:0;font-size:18px;font-weight:700;line-height:1.3;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden; }
 .own-playlist-meta { margin:4px 0 0;color:var(--muted);font-size:14px; }
 .own-playlist-close { flex:none;width:36px;min-height:36px;padding:0;border:0;background:transparent;color:var(--muted); }
@@ -92,7 +92,6 @@ main.has-sidecar .details { min-height:0; }
 .own-playlist-items { flex:1;min-height:0;margin:0;padding:6px;list-style:none;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin; }
 .own-playlist-link { display:grid;grid-template-columns:22px 112px minmax(0,1fr);align-items:center;gap:10px;padding:6px;border-radius:12px;color:var(--ink);text-decoration:none; }
 .own-playlist-link:hover { background:var(--soft); }
-.own-playlist-link:is(:hover,:focus-visible) { text-decoration:none; }.own-playlist-link:is(:hover,:focus-visible) .own-playlist-name { font-weight:800; }.own-playlist-link:is(:hover,:focus-visible) :is(.own-playlist-channel,.own-playlist-index) { font-weight:700; }
 .own-playlist-link[data-watched] { background:color-mix(in srgb,#e5202b 12%,transparent); }.own-playlist-link[data-watched]:hover { background:color-mix(in srgb,#e5202b 20%,transparent); }.own-playlist-link[aria-current="true"] { background:var(--soft); }
 .own-playlist-index { color:var(--muted);font-size:12px;text-align:center;font-variant-numeric:tabular-nums; }
 .own-playlist-link[aria-current="true"] .own-playlist-index { color:var(--ink); }
