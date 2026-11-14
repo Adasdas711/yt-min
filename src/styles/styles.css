@@ -1526,7 +1526,8 @@ html.minimal-youtube #myt-watch::after { content: none !important; display: none
 html.minimal-youtube #myt-watch::backdrop { background: transparent !important; backdrop-filter: none !important; }
 html.minimal-youtube #myt-watch:not(:popover-open) { display: none !important; }
 html.minimal-youtube[data-myt-watch-ui] [data-myt-watch-island] {
-    visibility: visible !important;
+    /* The scroll animation hides the player once it is wholly under the header. */
+    visibility: var(--myt-island-visibility, visible) !important;
     position: fixed !important; inset: auto !important;
     left: var(--myt-island-x, 0px) !important; top: var(--myt-island-y, 0px) !important;
     width: var(--myt-island-w, 0px) !important; height: var(--myt-island-h, 0px) !important;
