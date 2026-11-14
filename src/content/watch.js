@@ -1316,9 +1316,18 @@ main.has-sidecar .details { min-height:0; }
                     // where it lags while YouTube boots. The movement stays on
                     // the compositor; only the clip under the header follows.
                     const timing={timeline:this.scrollTimeline,duration:1,fill:'both',easing:'linear'};
+                    // Once the player is wholly under the header it is hidden,
+                    // not only clipped: a clipped video keeps its own GPU layer,
+                    // and on macOS that layer tints the page below it.
+                    const clipAt=offset=>`inset(${Math.max(0,header-base.y+extent*offset)}px 0px 0px)`;
+                    const gone=(base.y+base.height-header)/extent,clipFrames=offsets.map(offset=>({offset,clipPath:clipAt(offset),'--myt-island-visibility':offset>=gone&&gone<1?'hidden':'visible'}));
+                    if(gone>0&&gone<1){
+                        let at=clipFrames.findIndex(frame=>frame.offset>gone);if(at<0)at=clipFrames.length;
+                        clipFrames.splice(at,0,{offset:gone,clipPath:clipAt(gone),'--myt-island-visibility':'visible'},{offset:gone,clipPath:clipAt(gone),'--myt-island-visibility':'hidden'});
+                    }
                     state.scrollAnimations=[
                         node.animate(offsets.map(offset=>({offset,translate:`0px ${-extent*offset}px`})),timing),
-                        node.animate(offsets.map(offset=>({offset,clipPath:`inset(${Math.max(0,header-base.y+extent*offset)}px 0px 0px)`})),timing),
+                        node.animate(clipFrames,timing),
                     ];
                     state.scrollKey=key;node.setAttribute('data-myt-scroll-bound','');return;
                 }catch{this.clearScrollBinding(node,state);}
@@ -1328,6 +1337,8 @@ main.has-sidecar .details { min-height:0; }
             const translation=`0px ${-scroll}px`,clip=`inset(${Math.max(0,header-box.y)}px 0px 0px)`;
             if(node.style.getPropertyValue('translate')!==translation)node.style.setProperty('translate',translation,'important');
             if(node.style.getPropertyValue('clip-path')!==clip)node.style.setProperty('clip-path',clip,'important');
+            const hidden=header-box.y>=box.height?'hidden':'';
+            if(node.style.getPropertyValue('--myt-island-visibility')!==hidden){if(hidden)node.style.setProperty('--myt-island-visibility','hidden');else node.style.removeProperty('--myt-island-visibility');}
         }
         position(scrollOnly=false) {
             if(!this.host.isConnected||document.fullscreenElement||this.fullscreenPending)return;

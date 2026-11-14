@@ -71,12 +71,36 @@ def check_miniplayer(browser):
     print('PASS no miniplayer: leaving a watch page stops the video and closes it', flush=True)
 
 
+def check_picture_in_picture(browser):
+    """The browser's own picture-in-picture window (macOS opens one when a
+    playing video leaves the screen) closes off a watch page, and on a watch
+    page, where the player is already shown."""
+    body = '<ytd-app>' + MASTHEAD + '<ytd-page-manager><ytd-browse><p>Channel</p></ytd-browse></ytd-page-manager><div id="movie_player"><video id="pip-video"></video></div></ytd-app>'
+    page = setup(browser, '/@creator/videos', body)
+    page.add_script_tag(path=str(ROOT / 'src/content/navigation-main.js'))
+    page.evaluate("""() => { let current = null; window.__exited = 0; window.__stopped = 0;
+      Object.defineProperty(document, 'pictureInPictureElement', {configurable: true, get: () => current});
+      document.exitPictureInPicture = () => { current = null; window.__exited++; return Promise.resolve(); };
+      document.querySelector('#movie_player').stopVideo = () => { window.__stopped++; };
+      window.__enterPip = () => { current = document.querySelector('#pip-video'); current.dispatchEvent(new Event('enterpictureinpicture', {bubbles: true})); }; }""")
+    # Off a watch page: the window closes and the video stops as soon as it opens.
+    page.evaluate('__enterPip()')
+    page.wait_for_function('window.__exited === 1 && window.__stopped === 1', timeout=3000)
+    # Back on a watch page: a window left open by the browser closes too.
+    page.evaluate("() => { history.pushState({}, '', '/watch?v=details'); __enterPip(); document.dispatchEvent(new Event('yt-navigate-finish')); }")
+    page.wait_for_function('window.__exited === 2', timeout=3000)
+    assert page.evaluate('window.__stopped') == 1, 'a watch page never stops its own video'
+    page.close()
+    print('PASS no second video window: picture-in-picture closes off and on watch pages', flush=True)
+
+
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
         check_watch_playlist(browser)
         check_search(browser)
         check_miniplayer(browser)
+        check_picture_in_picture(browser)
         browser.close()
 
 

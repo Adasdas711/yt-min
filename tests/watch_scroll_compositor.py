@@ -33,7 +33,17 @@ def main():
         assert started, events
         # Only the clip may fall back to the main thread; the movement is composited.
         assert len(failed) < len(started), (started, failed)
-        assert all(event.get('unsupportedProperties') == ['clip-path'] for event in failed), failed
+        assert all(set(event.get('unsupportedProperties') or []) <= {'clip-path', 'visibility', '--myt-island-visibility'} and 'clip-path' in event.get('unsupportedProperties') for event in failed), failed
+        # Scrolled wholly under the header, the player is hidden, not only
+        # clipped; scrolled back, it shows again.
+        viewport = page.evaluate_handle("()=>[...document.querySelectorAll('#myt-watch *')].map(n=>n.shadowRoot?.querySelector('.viewport')).find(Boolean)||null")
+        assert viewport.evaluate('v=>!!v'), 'viewport not reachable'
+        viewport.evaluate("v=>{const pad=document.createElement('div');pad.style.height='3000px';v.querySelector('main').append(pad)}")
+        page.wait_for_timeout(300)
+        viewport.evaluate('v=>v.scrollTo(0,v.scrollHeight)')
+        page.wait_for_function("()=>getComputedStyle(document.querySelector('[data-myt-scroll-bound]')).visibility==='hidden'", timeout=3000)
+        viewport.evaluate('v=>v.scrollTo(0,0)')
+        page.wait_for_function("()=>getComputedStyle(document.querySelector('[data-myt-scroll-bound]')).visibility==='visible'", timeout=3000)
         page.close()
         browser.close()
         print(f'PASS the player moves on the compositor: {len(started)} scroll effects, {len(failed)} on the main thread (clip only)', flush=True)

@@ -77,6 +77,19 @@
         for(const video of mini?.querySelectorAll('video')||[])video.pause();
         mini?.querySelector('.ytp-miniplayer-close-button,#close-button button,button#close-button')?.click();
     }
+    // The browser's own picture-in-picture window (macOS opens one when a
+    // playing video leaves the screen) is closed the same way: off a watch
+    // page nothing keeps playing, and on a watch page the player is already
+    // on the page, so a second window would only duplicate it.
+    function closePictureInPicture(){
+        if(!document.documentElement.classList.contains('minimal-youtube'))return;
+        const video=document.pictureInPictureElement;if(!(video instanceof HTMLVideoElement))return;
+        if(location.pathname!=='/watch'){try{document.querySelector('#movie_player')?.stopVideo?.();}catch{}video.pause();}
+        document.exitPictureInPicture?.().catch(()=>{});
+    }
+    document.addEventListener('enterpictureinpicture',()=>{if(location.pathname!=='/watch')closePictureInPicture();},true);
+    document.addEventListener('yt-navigate-finish',closePictureInPicture);
+    window.addEventListener('popstate',()=>setTimeout(closePictureInPicture,0));
     new MutationObserver(records=>{if(records.some(record=>record.target.localName==='ytd-app'||record.target.localName==='ytd-miniplayer'))closeMiniplayer();})
         .observe(document.documentElement,{subtree:true,attributes:true,attributeFilter:['miniplayer-is-active','active']});
     document.addEventListener('yt-navigate-finish',closeMiniplayer);
