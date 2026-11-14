@@ -179,13 +179,13 @@
         setSource(source){if(source===this.source)return;this.stopMenu();this.restoreAnchors();this.source.removeEventListener('load',this.load,true);this.source=source;source.addEventListener('load',this.load,true);}
         readSummary(){
             const source=this.source,authorLink=channel(source),author=clean(authorLink);
-            const title=clean(source.querySelector('h1,#title,.dynamic-text-view-model-wiz__h1'))||document.title.replace(/^\(\d+\)\s*| - YouTube$/g,'')||'Playlist';
+            const title=clean(source.querySelector('h1,#title,.dynamic-text-view-model-wiz__h1,yt-dynamic-sizing-formatted-string'))||document.title.replace(/^\(\d+\)\s*| - YouTube$/g,'')||'Playlist';
             const thumbnail=source.querySelector('ytd-thumbnail img,ytd-playlist-video-thumbnail-renderer img,ytd-hero-playlist-thumbnail-renderer img,yt-thumbnail-view-model img,#hero-image img,.thumbnail-wrapper img')||source.querySelector('img');
             const stats=clean(source.querySelector('#stats,.metadata-stats,.ytContentMetadataViewModelMetadataRow,.yt-content-metadata-view-model__metadata-row,yt-content-metadata-view-model'));
             const descriptionNode=source.querySelector('#description,yt-description-preview-view-model');
             const controls=[...source.querySelectorAll('button,a[role="button"],yt-icon-button')].map(node=>node.querySelector('button')||node).filter(node=>!descriptionNode?.contains(node));
             const find=pattern=>controls.find(node=>pattern.test(label(node)));
-            const play=find(/play all|watch all|воспроизвести|смотреть все/iu)||source.querySelector('a[href*="/watch?"]')||this.list.querySelector('a[href*="/watch?"]');
+            const play=find(/play all|watch all|воспроизвести|смотреть все|^(?:continue|start course|продолжить|начать курс)$/iu)||source.querySelector('a[href*="/watch?"]')||this.list.querySelector('a[href*="/watch?"]');
             let playHref=[...source.querySelectorAll('a[href*="/watch?"]'),...this.list.querySelectorAll('a[href*="/watch?"]')].map(anchor=>url(anchor.href)).find(href=>href&&new URL(href).searchParams.get('v'))||'';
             if(playHref){const target=new URL(playHref),list=new URL(location.href).searchParams.get('list');if(list)target.searchParams.set('list',list);playHref=target.searchParams.get('v')?target.href:'';}
             return {playHref,title,author,avatar:image([...source.querySelectorAll('a[href] img')].find(img=>img.closest('a').href===authorLink?.href)),image:image(thumbnail)||image(this.list.querySelector('img')),stats,description:clean(descriptionNode),actions:{play,channel:authorLink,shuffle:find(/shuffle|перемешать/iu),share:find(/share|поделиться/iu),menu:find(/actions|menu|действия|ещё|еще|^more$|^[⋯⋮…]$/iu)}};

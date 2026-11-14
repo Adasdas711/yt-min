@@ -301,6 +301,50 @@ def playlist_page(browser):
     print('PASS playlist rows, continuation and edits come from page data in the owned design', flush=True)
 
 
+LESSON = """const lesson=(id,title,index)=>({lockupViewModel:{contentId:id,contentType:'LOCKUP_CONTENT_TYPE_VIDEO',
+    contentImage:{thumbnailViewModel:{image:{sources:[{url:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg',width:246}]},overlays:[{thumbnailBottomOverlayViewModel:{badges:[{thumbnailBadgeViewModel:{text:'16:23'}}]}}]}},
+    metadata:{lockupMetadataViewModel:{title:{content:title},
+      image:{decoratedAvatarViewModel:{a11yLabel:'Перейти на канал "Немецкий с нуля!"',rendererContext:{commandContext:{onTap:{innertubeCommand:{browseEndpoint:{browseId:'UCdeu',canonicalBaseUrl:'/@deu'}}}}}}},
+      metadata:{contentMetadataViewModel:{metadataRows:[{metadataParts:[{text:{content:'10 млн'}},{text:{content:'6 л. назад'}}]}]}}}},
+    rendererContext:{commandContext:{onTap:{innertubeCommand:{commandMetadata:{webCommandMetadata:{url:'/watch?v='+id+'&list=PLcourse&index='+index}},watchEndpoint:{videoId:id,playlistId:'PLcourse',index:index-1}}}}}}});"""
+
+
+def course_page(browser):
+    """A course lists its lessons as video lockups in an item section; the
+    page shows them as owned playlist rows, with further lessons from the
+    continuation."""
+    from playlist import cover, MASTHEAD
+    header = f'<div id="header"><ytd-playlist-header-renderer style="display:block"><img src="{cover()}"><yt-dynamic-sizing-formatted-string>Немецкий с нуля. ВИДЕОУРОКИ</yt-dynamic-sizing-formatted-string><a href="/@deu">Немецкий с нуля!</a><button>Продолжить</button></ytd-playlist-header-renderer></div>'
+    native = ''.join(f'<yt-lockup-view-model style="display:block"><a href="/watch?v=lessonVid0{n}&list=PLcourse">Native {n}</a></yt-lockup-view-model>' for n in range(1, 4))
+    html = ('<ytd-app>' + MASTHEAD + '<ytd-page-manager><ytd-browse page-subtype="playlist" style="display:block">' + header
+            + '<div id="contents" style="display:block"><ytd-two-column-browse-results-renderer style="display:block"><div id="primary"><yt-section-list-renderer style="display:block"><yt-item-section-renderer style="display:block"><div id="contents">'
+            + native + '</div></yt-item-section-renderer></yt-section-list-renderer></div></ytd-two-column-browse-results-renderer></div></ytd-browse></ytd-page-manager></ytd-app>')
+    page = setup(browser, '/playlist?list=PLcourse', html)
+    more = []
+
+    def browse(route):
+        more.append(route.request.post_data_json)
+        route.fulfill(content_type='application/json', body=page.evaluate('()=>(()=>{' + LESSON + "return JSON.stringify({onResponseReceivedActions:[{appendContinuationItemsAction:{continuationItems:[lesson('lessonVid04','Урок 4',4)]}}]})})()"))
+    page.route('https://www.youtube.com/youtubei/v1/browse?**', browse)
+    page.evaluate(CONFIG + LESSON + """
+      document.querySelector('ytd-browse').data={contents:{twoColumnBrowseResultsRenderer:{tabs:[{tabRenderer:{selected:true,content:{sectionListRenderer:{targetId:'VLPLcourse',contents:[
+        {itemSectionRenderer:{targetId:'PLcourse',contents:[lesson('lessonVid01','Урок 1',1),lesson('lessonVid02','Урок 2',2),lesson('lessonVid03','Урок 3',3)]}},
+        {continuationItemViewModel:{continuationCommand:{innertubeCommand:{continuationCommand:{token:'course-more'}}}}}]}}}}]}}};
+      document.dispatchEvent(new Event('yt-page-data-updated'));""")
+    expect(page.locator('[data-myt-playlist-summary]')).to_have_count(1)
+    rows = page.locator('#myt-playlist-rows [data-myt-owned-playlist-card=video]')
+    expect(rows.first.locator('.title')).to_have_text('Урок 1')
+    page.locator('#myt-playlist-rows .myt-playlist-more').scroll_into_view_if_needed()
+    expect(rows.locator('.title')).to_have_text(['Урок 1', 'Урок 2', 'Урок 3', 'Урок 4'])
+    assert more and more[0]['continuation'] == 'course-more', more
+    expect(rows.locator('.index')).to_have_text(['1', '2', '3', '4'])
+    expect(rows.first.locator('.duration')).to_have_text('16:23')
+    expect(rows.first.locator('a.title')).to_have_attribute('href', 'https://www.youtube.com/watch?v=lessonVid01&list=PLcourse&index=1')
+    expect(page.locator('yt-lockup-view-model').first).to_be_hidden()
+    page.close()
+    print('PASS course lessons come from page data as owned playlist rows', flush=True)
+
+
 if __name__ == '__main__':
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
@@ -309,4 +353,5 @@ if __name__ == '__main__':
         channel_header_and_chips(browser)
         channel_posts(browser)
         playlist_page(browser)
+        course_page(browser)
         browser.close()
