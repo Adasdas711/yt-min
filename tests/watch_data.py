@@ -122,6 +122,13 @@ def theater_scroll(browser, theater=True):
         expect(expand).to_have_attribute('aria-expanded', 'true')
         page.wait_for_timeout(300)
         assert abs(sidecar.bounding_box()['height'] - before) < 1, (before, sidecar.bounding_box())
+        # Resizing the window: the player keeps its 16:9 shape and the panel its height.
+        for size in (2000, 1300, 1100, 1700):
+            page.set_viewport_size({'width': size, 'height': 1000})
+            page.wait_for_timeout(300)
+            box, panel = media.bounding_box(), sidecar.bounding_box()
+            assert abs(box['width'] / box['height'] - 16 / 9) < 0.02, (size, box)
+            assert abs(panel['height'] - box['height']) < 2, (size, panel, box)
         page.close()
         print('PASS normal mode: the playlist panel keeps the player height when the description opens', flush=True)
         return

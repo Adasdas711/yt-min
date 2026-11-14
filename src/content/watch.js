@@ -42,7 +42,7 @@ main.has-sidecar .details { min-height:0; }
     :host(:not([theater])) .has-sidecar .primary { display:contents; }
     :host(:not([theater])) .has-sidecar .media { grid-column:1;grid-row:1;width:calc(100% - 48px);margin:20px auto 0; }
     :host(:not([theater])) .has-sidecar .details { grid-column:1 / -1;grid-row:2;justify-self:center;width:calc(100% - 48px); }
-    :host(:not([theater])) .has-sidecar .sidecar { grid-column:2;grid-row:1;align-self:start;height:var(--playlist-player-height,320px);min-height:0;margin-top:20px; }
+    :host(:not([theater])) .has-sidecar .sidecar { grid-column:2;grid-row:1;align-self:stretch;contain:size;min-height:0;margin-top:20px; }
 }
 #watch-title { --title-ink:var(--ink);font-family:"MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;font-size:32px;font-weight:900;font-style:italic;text-transform:uppercase;line-height:.82;letter-spacing:-.025em;color:var(--title-ink);-webkit-text-fill-color:var(--title-ink);-webkit-text-stroke:0 transparent;overflow:visible;overflow-wrap:anywhere;padding-inline-end:.18em; }
 :host([dark]) #watch-title { --title-ink:#fff; }
