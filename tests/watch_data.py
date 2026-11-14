@@ -93,6 +93,28 @@ def check(browser, width):
     print(f'PASS watch page text, links, chapters, stats and playlist panel from page data: {width}px', flush=True)
 
 
+
+def theater_scroll(browser):
+    """In theater mode the playlist sits beside the details; a long playlist
+    keeps a bounded panel and scrolls inside it."""
+    page = setup(browser, '/watch?v=details&list=PLwatch', watch_details_fixture(), width=1440)
+    expect(page.locator('#myt-watch')).to_be_visible()
+    long_list = "contents:[" + ",".join(f"panel('vid{n:08d}','Item {n}',{n},false)" for n in range(1, 60)) + ",panel('details','Data title from the page',60,true)]"
+    response = RESPONSE.replace("contents:[panel('aaaaaaaaaaa','First in list',1,false),panel('details','Data title from the page',2,true),panel('ccccccccccc','Third in list',3,false)]", long_list)
+    assert response != RESPONSE
+    page.evaluate("document.querySelector('ytd-watch-flexy').setAttribute('theater','')")
+    page.evaluate(response)
+    root = page.locator('#myt-watch')
+    expect(root.locator('.own-playlist-name')).to_have_count(60)
+    page.wait_for_function("[...document.querySelectorAll('[theater]')].some(node=>node.localName!=='ytd-watch-flexy')")
+    page.wait_for_timeout(300)
+    box = root.locator('.sidecar').bounding_box()
+    assert box['height'] <= 960, box
+    scrollable = root.locator('.own-playlist-items').evaluate('e=>e.scrollHeight>e.clientHeight+100')
+    assert scrollable, 'playlist items do not scroll inside the panel'
+    page.close()
+    print('PASS theater mode: a long playlist panel stays bounded and scrolls', flush=True)
+
 def wheel_listeners(page):
     cdp = page.context.new_cdp_session(page)
     window = cdp.send('Runtime.evaluate', {'expression': 'window'})['result']['objectId']
@@ -134,4 +156,5 @@ if __name__ == '__main__':
             check(browser, width)
         other_video(browser)
         scroll_path(browser)
+        theater_scroll(browser)
         browser.close()
