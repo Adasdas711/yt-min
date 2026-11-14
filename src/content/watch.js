@@ -92,7 +92,7 @@ main.has-sidecar .details { min-height:0; }
 .own-playlist-items { flex:1;min-height:0;margin:0;padding:6px;list-style:none;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin; }
 .own-playlist-link { display:grid;grid-template-columns:22px 112px minmax(0,1fr);align-items:center;gap:10px;padding:6px;border-radius:12px;color:var(--ink);text-decoration:none; }
 .own-playlist-link:hover { background:var(--soft); }
-.own-playlist-link[aria-current="true"] { background:var(--soft); }
+.own-playlist-link[data-watched] { background:color-mix(in srgb,#e5202b 12%,transparent); }.own-playlist-link[data-watched]:hover { background:color-mix(in srgb,#e5202b 20%,transparent); }.own-playlist-link[aria-current="true"] { background:var(--soft); }
 .own-playlist-index { color:var(--muted);font-size:12px;text-align:center;font-variant-numeric:tabular-nums; }
 .own-playlist-link[aria-current="true"] .own-playlist-index { color:var(--ink); }
 .own-playlist-cover { position:relative;display:block;aspect-ratio:16/9;overflow:hidden;border-radius:8px;background:var(--soft); }
@@ -831,7 +831,7 @@ main.has-sidecar .details { min-height:0; }
                     const cover=this.node('span','own-playlist-cover'),image=safeURL(item.image,true);
                     if(image){const img=this.node('img');img.alt='';img.loading='lazy';img.decoding='async';img.src=image;cover.append(img);}
                     if(item.duration)cover.append(this.node('span','own-playlist-duration',item.duration));
-                    const progress=Math.min(100,Math.max(0,Number(item.progress)||0));if(progress){const bar=this.node('span','own-playlist-watched');bar.setAttribute('role','img');bar.setAttribute('aria-label','Watched '+progress+'%');const fill=this.node('i');fill.style.width=progress+'%';bar.append(fill);cover.append(bar);}
+                    const progress=Math.min(100,Math.max(0,Number(item.progress)||0));if(progress){link.dataset.watched='';const bar=this.node('span','own-playlist-watched');bar.setAttribute('role','img');bar.setAttribute('aria-label','Watched '+progress+'%');const fill=this.node('i');fill.style.width=progress+'%';bar.append(fill);cover.append(bar);}
                     const meta=this.node('span','own-playlist-text');meta.append(this.node('span','own-playlist-name',item.title));if(item.channel)meta.append(this.node('span','own-playlist-channel',item.channel));
                     link.append(position,cover,meta);row.append(link);return row;
                 }));
