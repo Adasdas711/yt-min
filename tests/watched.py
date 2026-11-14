@@ -33,6 +33,10 @@ def search(browser):
       document.dispatchEvent(new Event('yt-page-data-updated'));""")
     expect(page.locator('#myt-search .media-title')).to_have_text(['Half watched', 'Not watched', 'Watched lockup'])
     assert bars(page, '#myt-search .media') == ['Watched 40%', '', 'Watched 100%'], bars(page, '#myt-search .media')
+    tinted = page.locator('#myt-search .media').evaluate_all("cards=>cards.map(card=>card.hasAttribute('data-watched'))")
+    assert tinted == [True, False, True], tinted
+    colors = page.locator('#myt-search .media').evaluate_all("cards=>cards.map(card=>getComputedStyle(card).backgroundColor)")
+    assert colors[0] != colors[1] and colors[0] == colors[2], colors
     width = page.locator('#myt-search .media .watched > i').first.evaluate('e=>e.style.width')
     assert width == '40%', width
     page.close()
@@ -69,6 +73,10 @@ def playlist(browser):
     rows = page.locator('#myt-playlist-rows [data-myt-owned-playlist-card=video]')
     expect(rows.locator('.title')).to_have_text(['Data one', 'Data two'])
     assert row_bars(page) == ['Watched 60%', ''], row_bars(page)
+    tinted = rows.evaluate_all("rows=>rows.map(row=>row.hasAttribute('data-watched'))")
+    assert tinted == [True, False], tinted
+    colors = rows.evaluate_all("rows=>rows.map(row=>getComputedStyle(row).backgroundColor)")
+    assert colors[0] != colors[1], colors
     page.close()
     print('PASS playlist page: watched videos show the resume bar', flush=True)
 
@@ -105,6 +113,8 @@ def watch_panel(browser):
     expect(root.locator('.own-playlist-name')).to_have_count(3)
     labels = root.locator('.own-playlist-link').evaluate_all("links=>links.map(link=>link.querySelector('.own-playlist-watched')?.getAttribute('aria-label')||'')")
     assert labels == ['Watched 90%', '', ''], labels
+    tinted = root.locator('.own-playlist-link').evaluate_all("links=>links.map(link=>link.hasAttribute('data-watched'))")
+    assert tinted == [True, False, False], tinted
     expect(root.locator('.own-playlist-watched').first).to_be_visible()
     page.close()
     print('PASS watch page playlist: watched videos show the resume bar', flush=True)
