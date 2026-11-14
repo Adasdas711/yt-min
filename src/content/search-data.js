@@ -27,7 +27,7 @@
     function playlistCount(value){
         const parse=input=>{
             const text=(typeof input==='number'?String(input):label(input)).replace(/[\u00a0\u202f]/g,' ').trim();
-            return text.match(/([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*)/iu)?.[1]?.trim()||(/^[\d][\d\s,.]*\+?$/.test(text)?text:'');
+            return text.match(/([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*|lessons?|урок\S*|lektion\S*|episodes?|эпизод\S*|выпуск\S*)/iu)?.[1]?.trim()||(/^[\d][\d\s,.]*\+?$/.test(text)?text:'');
         };
         for(const input of [value.videoCount,value.videoCountText,value.videoCountShortText]){const count=parse(input);if(count)return count;}
         const stack=[value.contentImage,value.thumbnailRenderer,value.metadata?.lockupMetadataViewModel?.metadata||value.metadata?.metadata||value.metadata],seen=new Set();let scanned=0;
@@ -37,6 +37,20 @@
             for(const [key,child]of Object.entries(item))if(key!=='title'&&child&&typeof child==='object')stack.push(child);
         }
         return '';
+    }
+    // A course: its lockup type, or a lesson count on its cover badge.
+    const lessonPattern=/\d\s*(?:lessons?|урок\S*|lektion\S*)/iu;
+    function isCourse(value){
+        if(/COURSE/.test(String(value.contentType||'')))return true;
+        const stack=[value.contentImage,value.thumbnailRenderer,value.videoCountText,value.metadata],seen=new Set();let scanned=0;
+        while(stack.length&&scanned++<1200){
+            const item=stack.pop();if(!item||typeof item!=='object'||seen.has(item))continue;seen.add(item);
+            for(const [key,child]of Object.entries(item)){
+                if(typeof child==='string'){if(key!=='url'&&(lessonPattern.test(child)||/^(?:iconName|iconType|imageName)$/.test(key)&&/SCHOOL|COURSE|GRADUATION/i.test(child)))return true;}
+                else if(key!=='title'&&child&&typeof child==='object')stack.push(child);
+            }
+        }
+        return false;
     }
     // A video that is streaming now: YouTube marks it with a LIVE thumbnail
     // overlay or badge style; its view line counts current viewers.
@@ -61,7 +75,8 @@
         if(!input||typeof input!=='object')return null;
         let kind=hint,value=input;
         for(const [key,type] of [['videoRenderer','video'],['gridVideoRenderer','video'],['compactVideoRenderer','video'],['playlistRenderer','playlist'],['gridPlaylistRenderer','playlist'],['radioRenderer','playlist'],['channelRenderer','channel'],['gridChannelRenderer','channel'],['lockupViewModel','']])if(input[key]){value=input[key];kind=type;break;}
-        if(value.contentType)kind=/PLAYLIST/.test(value.contentType)?'playlist':/CHANNEL/.test(value.contentType)?'channel':/VIDEO/.test(value.contentType)?'video':kind;
+        // Courses, podcasts and albums are playlists with their own lockup type.
+        if(value.contentType)kind=/PLAYLIST|COURSE|PODCAST|ALBUM|SERIES/.test(value.contentType)?'playlist':/CHANNEL/.test(value.contentType)?'channel':/VIDEO/.test(value.contentType)?'video':kind;
         kind ||= value.channelId?'channel':value.playlistId?'playlist':value.videoId?'video':'';
         const metadata=value.metadata?.lockupMetadataViewModel||value.metadata||{};
         const title=label(value.title||metadata.title).trim().slice(0,1000);
@@ -91,7 +106,7 @@
                 for(const text of label(part.text).split(/\s*[•·]\s*/))if(!published&&publishedPattern.test(text.trim()))published=text.trim();
             }
         }
-        return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,kind==='channel'?8:4),count:kind==='playlist'?playlistCount(value):'',published:published.slice(0,100),...(kind==='video'?liveState(value):{})};
+        return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,kind==='channel'?8:4),count:kind==='playlist'?playlistCount(value):'',...(kind==='playlist'&&isCourse(value)?{course:true}:{}),published:published.slice(0,100),...(kind==='video'?liveState(value):{})};
     }
     function collect(root){
         const records=[],filters=[],seen=new Set(),stack=[root];let scans=0;
@@ -103,7 +118,7 @@
         }
         return {records,filters};
     }
-    globalThis.MinimalYouTubeSearchData={label,url,youtube,channelURL,endpoint,image,playlistCount,record,collect,publishedPattern,watchingPattern};
+    globalThis.MinimalYouTubeSearchData={label,url,youtube,channelURL,endpoint,image,playlistCount,isCourse,lessonPattern,record,collect,publishedPattern,watchingPattern};
     // Static MAIN injection also serves the first page after installation,
     // before the background has registered its optional response-pruning hook.
     if(typeof document!=='undefined'&&!globalThis.chrome?.runtime?.id)document.addEventListener('minimal-youtube:search-snapshot',()=>{

@@ -63,7 +63,7 @@
     }
     function playlistSummary(node) {
         const legacy=node.playlistRenderer||node.gridPlaylistRenderer,modern=node.lockupViewModel;
-        if(!legacy&&!(modern&&(modern.contentImage?.collectionThumbnailViewModel||/PLAYLIST/.test(modern.contentType||''))))return null;
+        if(!legacy&&!(modern&&(modern.contentImage?.collectionThumbnailViewModel||/PLAYLIST|COURSE|PODCAST|ALBUM|SERIES/.test(modern.contentType||''))))return null;
         const value=legacy||modern,id=value.playlistId||value.contentId;
         if(typeof id!=='string'||!/^[-\w]{2,200}$/.test(id))return null;
         const strings=[];let image='',width=-1;
@@ -85,8 +85,9 @@
         const imageStack=[modern?.contentImage];let scans=0;
         while(imageStack.length&&scans++<800){const item=imageStack.pop();if(!item||typeof item!=='object')continue;for(const[key,child]of Object.entries(item)){if(/badge|overlay/i.test(key))visit(child);if(child&&typeof child==='object')imageStack.push(child);}}
         let count=legacy?.videoCount!=null?String(legacy.videoCount):'';
-        if(!/^[\d][\d\s,.]*\+?$/.test(count))count=strings.map(text=>text.match(/([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*)/iu)?.[1]?.trim()).find(Boolean)||strings.find(text=>/^[\d][\d\s,.]*\+?$/.test(text))||'';
-        return image||count?{id,image,count}:null;
+        if(!/^[\d][\d\s,.]*\+?$/.test(count))count=strings.map(text=>text.match(/([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*|lessons?|урок\S*|lektion\S*|episodes?|эпизод\S*|выпуск\S*)/iu)?.[1]?.trim()).find(Boolean)||strings.find(text=>/^[\d][\d\s,.]*\+?$/.test(text))||'';
+        const course=/COURSE/.test(modern?.contentType||'')||strings.some(text=>/\d\s*(?:lessons?|урок\S*|lektion\S*)/iu.test(text));
+        return image||count?{id,image,count,...(course?{course:true}:{})}:null;
     }
     function hookInitial(name) {
         let descriptor = Object.getOwnPropertyDescriptor(window, name);
@@ -225,8 +226,8 @@
                     const summary=playlistSummary(node);
                     if(summary){
                         const previous=searchPlaylists.get(summary.id)||{};
-                        const next={id:summary.id,image:summary.image||previous.image||'',count:summary.count||previous.count||''};
-                        if(next.image!==previous.image||next.count!==previous.count){searchPlaylists.delete(next.id);searchPlaylists.set(next.id,next);playlistDataChanged=true;while(searchPlaylists.size>200)searchPlaylists.delete(searchPlaylists.keys().next().value);}
+                        const next={id:summary.id,image:summary.image||previous.image||'',count:summary.count||previous.count||'',...(summary.course||previous.course?{course:true}:{})};
+                        if(next.image!==previous.image||next.count!==previous.count||Boolean(next.course)!==Boolean(previous.course)){searchPlaylists.delete(next.id);searchPlaylists.set(next.id,next);playlistDataChanged=true;while(searchPlaylists.size>200)searchPlaylists.delete(searchPlaylists.keys().next().value);}
                     }
                 }
                 // Discard both live and archived chat before an iframe/polling

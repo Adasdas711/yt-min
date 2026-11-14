@@ -52,7 +52,7 @@
     const countSelector='#video-count-text,#video-count,#playlist-video-count,.formatted-video-count-label,yt-collection-thumbnail-overlay-view-model,ytd-thumbnail-overlay-side-panel-renderer,yt-thumbnail-overlay-badge-view-model,yt-thumbnail-bottom-overlay-view-model,yt-badge-shape,.ytBadgeShapeText,.yt-badge-shape__text,.badge-shape-wiz__text,[data-video-count]';
     const countNumber=value=>{
         const input=String(value??'').replace(/[\u00a0\u202f]/g,' ').trim();
-        return input.match(/([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*)/iu)?.[1]?.trim()||(/^[\d][\d\s,.]*\+?$/.test(input)?input:'');
+        return input.match(/([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*|lessons?|урок\S*|lektion\S*|episodes?|эпизод\S*|выпуск\S*)/iu)?.[1]?.trim()||(/^[\d][\d\s,.]*\+?$/.test(input)?input:'');
     };
     function coverImage(source){
         const covers=[...source.querySelectorAll('ytd-thumbnail,yt-collection-thumbnail-view-model,yt-thumbnail-view-model,.ytCollectionThumbnailViewModelHost,.ytLockupViewModelContentImage,.yt-lockup-view-model__content-image,.yt-lockup-view-model-wiz__content-image')];
@@ -229,7 +229,7 @@
       .media-channel{display:block;overflow-wrap:anywhere;color:var(--myt-muted);font-size:18px;font-weight:500;line-height:1.4}.media-channel:is(:hover,:focus-visible){color:var(--myt-ink)}
       .media.playlist{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:center;gap:20px;padding-bottom:12px}.media.playlist .cover{width:100%}.live-badge{position:absolute;left:8px;bottom:8px;padding:0 7px;border-radius:999px;background:#e5202b;color:#fff;font-size:11px;font-weight:700;line-height:18px;letter-spacing:.04em}.live-badge::before{content:"LIVE"}.live-badge[hidden]{display:none}.playlist-badge{position:absolute;right:8px;bottom:8px;display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:6px;background:#000b;color:#fff;font-size:13px}
       .group{min-width:0;padding:20px;border-radius:22px;background:var(--myt-soft)}.group h2{margin:0 0 18px;padding-inline-end:.2em;overflow:visible;overflow-wrap:anywhere;font:italic 900 40px/1.05 "MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:-.025em}
-      :host([data-channel]) .media.playlist{display:flex;flex-direction:column;gap:14px;padding-bottom:18px}:host([data-channel]) .media.playlist .media-title{font-size:16px}.playlist-badge[hidden]{display:none}.playlist-badge svg{width:15px;height:15px;flex:none}.media.playlist :is(.media-info,.playlist-badge){font-family:"SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace}.media.playlist .media-title{font-weight:600}
+      :host([data-channel]) .media.playlist{display:flex;flex-direction:column;gap:14px;padding-bottom:18px}:host([data-channel]) .media.playlist .media-title{font-size:16px}:host([data-channel-playlists]) .media.playlist{gap:10px;padding:8px 8px 12px;border-radius:14px}:host([data-channel-playlists]) .media.playlist .cover{border-radius:10px}:host([data-channel-playlists]) .media.playlist .media-title{font-size:14px;line-height:1.35}:host([data-channel-playlists]) .media.playlist .media-info{padding:0 2px}:host([data-channel-playlists]) .playlist-badge{right:6px;bottom:6px;padding:3px 6px;font-size:12px}:host([data-channel-playlists]) .playlist-badge svg{width:13px;height:13px}.playlist-badge[hidden]{display:none}.playlist-badge svg{width:15px;height:15px;flex:none}.playlist-icon{display:inline-flex}.media.playlist :is(.media-info,.playlist-badge){font-family:"SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace}.media.playlist .media-title{font-weight:600}
       /* Keep 20px gaps fixed while reducing channel column widths by 15%. */
       :host([data-channel]) :is(.row,.results-heading){width:calc(85% + (var(--myt-columns,1) - 1)*3px);margin-inline:auto}
       .filters{display:flex;flex-direction:column;align-items:center;margin:0 0 20px}.filters-panel{align-self:stretch}.filters[hidden],.filters-panel[hidden]{display:none}
@@ -258,6 +258,7 @@
       .post-meta{display:flex;flex-wrap:wrap;gap:16px;color:var(--myt-muted);font-size:13px}.post-meta:empty{display:none}
       @media(max-width:600px){.post{padding:16px}.post-media{grid-template-columns:1fr}}@media(max-width:700px){.channels{grid-template-columns:1fr}.media-title{font-size:16px}.media.video .media-title{font-size:15px}.media-channel{font-size:17px}.media.playlist{grid-template-columns:1fr;gap:14px;padding-bottom:18px}.group{padding:16px}.group h2{font-size:32px}.row{gap:16px}:host([data-channel]) .row{width:calc(85% + (var(--myt-columns,1) - 1)*2.4px)}}
     `;
+    const courseIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5Z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/></svg>';
     const videoIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3Z"/></svg>';
     // Upload dates older than four months read as month and year. YouTube
     // gives only a relative age, so the month is counted back from today.
@@ -296,7 +297,7 @@
             this.info=node('div','media-info');this.title=node('a','media-title');this.owner=node('a','media-channel');this.date=node('span','media-date');this.date.hidden=true;this.info.append(this.title,this.owner,this.date);
             this.host.append(this.cover,this.info);
             // A playlist shows its video count with a video icon, or nothing.
-            if(kind==='playlist'){this.badge=node('span','playlist-badge');this.badgeCount=node('span');this.badge.append(this.badgeCount);this.badge.insertAdjacentHTML('beforeend',videoIcon);this.badge.hidden=true;this.cover.append(this.badge);}
+            if(kind==='playlist'){this.badge=node('span','playlist-badge');this.badgeCount=node('span');this.badge.append(this.badgeCount);this.badgeIcon=node('span','playlist-icon');this.badgeIcon.innerHTML=videoIcon;this.badge.append(this.badgeIcon);this.badge.hidden=true;this.cover.append(this.badge);}
             for(const control of [this.cover,this.title,this.owner])control.addEventListener('click',event=>{
                 if(event.button||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey)return;
                 const main=control===this.title?this.source.querySelector(titleSelector):null;
@@ -317,7 +318,7 @@
             if(data.live&&!this.live){this.live=node('span','live-badge');this.live.setAttribute('role','img');this.live.setAttribute('aria-label','Live');this.cover.append(this.live);}
             if(this.live)this.live.hidden=!data.live;
             const date=data.live?data.viewers||'':publishedLabel(data.published);if(this.date.textContent!==date)this.date.textContent=date;this.date.hidden=!date;
-            if(this.badge){const count=data.count||'';if(this.badgeCount.textContent!==count)this.badgeCount.textContent=count;this.badge.hidden=!count;this.badge.setAttribute('aria-label',count?count+(count==='1'?' video':' videos'):'');}
+            if(this.badge){const count=data.count||'';if(this.badgeCount.textContent!==count)this.badgeCount.textContent=count;this.badge.hidden=!count;const course=Boolean(data.course);if(this.badge.dataset.course!==String(course)){this.badge.dataset.course=String(course);this.badgeIcon.innerHTML=course?courseIcon:videoIcon;}this.badge.setAttribute('aria-label',count?count+(course?(count==='1'?' lesson':' lessons'):(count==='1'?' video':' videos')):'');}
         }
         destroy(){this.host.remove();}
     }
@@ -455,7 +456,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             this.selectionNodes=new Set();this.selectionObserver=new MutationObserver(()=>this.queue());
             this.changed=()=>this.queue();document.addEventListener('yt-page-data-updated',this.changed);document.addEventListener('yt-rendererstamper-finished',this.changed);
         }
-        static isPlaylist(card){return card.matches('ytd-playlist-renderer,ytd-grid-playlist-renderer,ytd-radio-renderer,[is-playlist],[content-type="playlist"],[data-content-type="playlist"]')||!!card.querySelector('yt-collection-thumbnail-view-model,yt-collections-stack,ytd-thumbnail-overlay-side-panel-renderer,yt-lockup-view-model[content-type="playlist"]')||safeURL(card.querySelector(titleSelector)?.href)?.pathname==='/playlist';}
+        static isPlaylist(card){return card.matches('ytd-playlist-renderer,ytd-grid-playlist-renderer,ytd-radio-renderer,[is-playlist],:is([content-type],[data-content-type]):is([content-type="playlist" i],[content-type="course" i],[content-type="podcast" i],[data-content-type="playlist" i],[data-content-type="course" i],[data-content-type="podcast" i])')||!!card.querySelector('yt-collection-thumbnail-view-model,yt-collections-stack,ytd-thumbnail-overlay-side-panel-renderer,yt-lockup-view-model:is([content-type="playlist" i],[content-type="course" i],[content-type="podcast" i])')||safeURL(card.querySelector(titleSelector)?.href)?.pathname==='/playlist';}
         prepareChannelRoute(href){
             if(!this.channel)return;
             const url=new URL(href),key=JSON.stringify([url.pathname.replace(/\/$/,''),/\/search\/?$/.test(url.pathname)?url.searchParams.get('query')?.trim()||'':'']);
@@ -526,13 +527,14 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             let image=coverImage(source)||record?.image||cached?.image;
             if(!image&&parsed.searchParams.get('v')?.match(/^[-\w]{11}$/))image='https://i.ytimg.com/vi/'+parsed.searchParams.get('v')+'/hqdefault.jpg';
             const count=kind==='playlist'?([...source.querySelectorAll(countSelector)].map(node=>countNumber(node.getAttribute('data-video-count')||node.getAttribute('aria-label')||text(node))).find(Boolean)||countNumber(record?.count)||countNumber(cached?.count)):'';
+            const course=kind==='playlist'&&Boolean(record?.course||cached?.course||[...source.querySelectorAll(countSelector)].some(node=>/\d\s*(?:lessons?|урок\S*|lektion\S*)/iu.test(node.getAttribute('aria-label')||text(node))));
             // A channel's own cards need no owner line; it is the page's channel.
             const hideChannel=this.channel;
             const published=kind==='video'?record?.published||[...source.querySelectorAll('#metadata-line span,.inline-metadata-item,.ytContentMetadataViewModelMetadataText,[class*="MetadataText"]')].map(text).find(value=>value&&value.length<100&&datedText(value))||'':'';
             const watching=globalThis.MinimalYouTubeSearchData?.watchingPattern||/\bwatching\b/iu;
             const viewers=kind==='video'?record?.viewers||[...source.querySelectorAll('#metadata-line span,.inline-metadata-item,.ytContentMetadataViewModelMetadataText,[class*="MetadataText"]')].map(text).find(value=>value&&value.length<60&&watching.test(value))||'':'';
             const live=kind==='video'&&Boolean(record?.live||viewers||source.querySelector(liveSelector));
-            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,count,published,live,viewers,channel:hideChannel?{name:'',href:''}:ownerLine(text(owner)||record?.channel?.name||'',channelURL(owner?.href||record?.channel?.href))};
+            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,count,course,published,live,viewers,channel:hideChannel?{name:'',href:''}:ownerLine(text(owner)||record?.channel?.name||'',channelURL(owner?.href||record?.channel?.href))};
         }
         sync(searches){
             if(!this.nativeStyle.isConnected)document.documentElement.append(this.nativeStyle);
@@ -779,7 +781,8 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
 
         layout(){
             if(!this.host.isConnected||!this.stream)return;
-            const style=getComputedStyle(this.search),width=this.search.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),columns=width<560?1:width<900?2:3;
+            const style=getComputedStyle(this.search),width=this.search.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),playlists=this.channel&&/\/playlists\/?$/.test(location.pathname),columns=playlists?(width<520?1:width<760?2:width<1000?3:4):width<560?1:width<900?2:3;
+            this.host.toggleAttribute('data-channel-playlists',Boolean(playlists));
             if(this.channel&&this.host.style.getPropertyValue('--myt-columns')!==String(columns))this.host.style.setProperty('--myt-columns',String(columns));
             if(this.host.style.getPropertyValue('--myt-skeleton-columns')!==String(columns))this.host.style.setProperty('--myt-skeleton-columns',String(columns));
             this.place(this.q('.stream'),this.stream,columns);
