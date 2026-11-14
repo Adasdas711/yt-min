@@ -216,6 +216,21 @@ def redirects(browser):
     print('PASS single English /videos redirect for all channel URL forms; disabled mode stays native',flush=True)
 
 
+def playlist_language(browser):
+    page,requests=startup(browser,'/playlist?list=PLcourse#top')
+    page.wait_for_url('**hl=en**')
+    assert urlparse(page.url).path=='/playlist',page.url
+    assert parse_qs(urlparse(page.url).query)=={'list':['PLcourse'],'hl':['en'],'persist_hl':['1']},page.url
+    page.wait_for_timeout(200)
+    assert len(requests)==2,requests
+    page.close()
+    page,requests=startup(browser,'/playlist?list=PLcourse',False)
+    page.wait_for_timeout(200)
+    assert len(requests)==1,requests
+    page.close()
+    print('PASS a playlist or course in another language loads once in English; disabled mode stays native',flush=True)
+
+
 def navigation(browser):
     page,requests=startup(browser,'/@JoeSpeen/videos?hl=en&persist_hl=1')
     for name,path in [('Live','streams'),('Playlists','playlists'),('Posts','posts'),('Videos','videos')]:
@@ -409,6 +424,7 @@ if __name__=='__main__':
             for width,dark in ((1440,True),(390,False)):
                 header(browser,legacy,width,dark)
         redirects(browser)
+        playlist_language(browser)
         navigation(browser)
         links_and_more(browser)
         preview_descenders(browser)

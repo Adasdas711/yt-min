@@ -137,6 +137,8 @@
     let holdTimer = 0;
     let navigationSource = "";
     let redirectingURL = "";
+    // A document YouTube served for an English request never redirects again.
+    const englishDocument = new URL(location.href).searchParams.get('hl') === 'en';
     let transitionActive = false;
     let home = null;
     let query = "";
@@ -1383,6 +1385,14 @@
         }
         holdStarted = 0; clearTimeout(holdTimer); holdTimer = 0;
         const channelDestination=nextPage==='channel'&&settingsReady&&!pendingNavigation?globalThis.MinimalYouTubeChannel?.destination(url,root.lang):null;
+        // Playlists and courses load in English, as channels do: YouTube then
+        // writes view counts, dates and labels in English for every language.
+        if(nextPage==='playlist'&&settingsReady&&!pendingNavigation&&!englishDocument&&root.lang&&!/^en(?:-|$)/i.test(root.lang)&&url.searchParams.get('hl')!=='en'){
+            const target=new URL(url);target.searchParams.set('hl','en');target.searchParams.set('persist_hl','1');
+            root.dataset.mytPage='playlist';
+            if(redirectingURL!==url.href){redirectingURL=url.href;console.info('[Minimal YouTube] document load:','playlist language redirect',url.href,'->',target.href);location.replace(target.href);}
+            return;
+        }
         if(channelDestination){
             root.dataset.mytPage='channel';
             if(redirectingURL!==url.href){redirectingURL=url.href;console.info('[Minimal YouTube] document load:','channel landing/language redirect',url.href,'->',channelDestination);location.replace(channelDestination);}
