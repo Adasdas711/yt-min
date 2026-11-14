@@ -84,7 +84,7 @@
         return {kind:'video',id,href:data.endpoint(value.navigationEndpoint)||fallback,title:(data.label(value.title).trim()||'Unavailable video').slice(0,1000),
             image:data.image(value.thumbnail),channel:{name:data.label(owner).slice(0,500),href:data.endpoint(owner?.runs?.find(run=>run.navigationEndpoint)?.navigationEndpoint)},
             index:data.label(value.index).trim().slice(0,12),duration:duration.slice(0,20),stats:info.slice(0,200),published:published.slice(0,100),
-            setVideoId:String(value.setVideoId||'').slice(0,100),playable:value.isPlayable!==false,actions:options,group:''};
+            setVideoId:String(value.setVideoId||'').slice(0,100),playable:value.isPlayable!==false,actions:options,group:'',progress:data.progress(value)};
     }
     function playlistList(root){
         const stack=[root],seen=new Set();let scans=0;
@@ -132,7 +132,7 @@
         const index=Number.isInteger(command?.watchEndpoint?.index)?String(command.watchEndpoint.index+1):'';
         return {kind:'video',id,href,title:(data.label(metadata.title).trim()||'Unavailable video').slice(0,1000),image:data.image(value.contentImage),
             channel:{name:name.slice(0,500),href:data.channelURL(data.endpoint(owner))},index,duration:duration.slice(0,20),stats:parts.join(' • ').slice(0,200),
-            published:published.slice(0,100),setVideoId:'',playable:true,actions:[],group:''};
+            published:published.slice(0,100),setVideoId:'',playable:true,actions:[],group:'',progress:data.progress(value)};
     }
     function chips(content){
         const data=globalThis.MinimalYouTubeSearchData;
@@ -426,7 +426,7 @@
                 const item=entry.playlistPanelVideoRenderer;if(!item||!/^[-\w]{3,64}$/.test(String(item.videoId||'')))continue;
                 items.push({id:item.videoId,title:data.label(item.title).trim().slice(0,500)||'Unavailable video',channel:data.label(item.shortBylineText||item.longBylineText).trim().slice(0,300),
                     duration:data.label(item.lengthText).trim().slice(0,20),index:data.label(item.indexText).trim().slice(0,12),image:data.image(item.thumbnail),
-                    href:data.endpoint(item.navigationEndpoint)||data.url('/watch?v='+item.videoId+'&list='+encodeURIComponent(playlist.playlistId||'')),selected:Boolean(item.selected)||item.videoId===video});
+                    href:data.endpoint(item.navigationEndpoint)||data.url('/watch?v='+item.videoId+'&list='+encodeURIComponent(playlist.playlistId||'')),selected:Boolean(item.selected)||item.videoId===video,progress:data.progress(item)});
             }
             panel={id:String(playlist.playlistId||''),title:data.label(playlist.title).trim().slice(0,500),owner:data.label(playlist.ownerName||playlist.longBylineText||playlist.shortBylineText).trim().slice(0,300),
                 total:Number(playlist.totalVideos)||items.length,current:Number.isInteger(playlist.localCurrentIndex)?playlist.localCurrentIndex:Number.isInteger(playlist.currentIndex)?playlist.currentIndex:items.findIndex(item=>item.selected),

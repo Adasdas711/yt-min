@@ -27,4 +27,8 @@ assert.equal(course.kind,'playlist');assert.equal(course.count,'33');assert.equa
 const lessons=plain(model.record({lockupViewModel:{contentId:'PLcourse02',contentType:'LOCKUP_CONTENT_TYPE_PLAYLIST',contentImage:{collectionThumbnailViewModel:{primaryThumbnail:{thumbnailViewModel:{overlays:[{thumbnailBadgeViewModel:{text:'94 урока'}}]}}}}}}));
 assert.equal(lessons.count,'94');assert.equal(lessons.course,true);
 assert.equal(plain(model.record({lockupViewModel:{contentId:'PLplain',contentType:'LOCKUP_CONTENT_TYPE_PLAYLIST',videoCountText:{simpleText:'19 videos'}}})).course,undefined);
+// Watched progress from legacy resume overlays and lockup progress bars.
+assert.equal(model.record({videoRenderer:{videoId:'abcdefghijk',navigationEndpoint:{watchEndpoint:{videoId:'abcdefghijk'}},thumbnailOverlays:[{thumbnailOverlayResumePlaybackRenderer:{percentDurationWatched:37}}]}}).progress,37);
+assert.equal(model.record({lockupViewModel:{contentId:'abcdefghijk',contentType:'LOCKUP_CONTENT_TYPE_VIDEO',contentImage:{thumbnailViewModel:{overlays:[{thumbnailBottomOverlayViewModel:{progressBar:{thumbnailOverlayProgressBarViewModel:{startPercent:100}}}}]}}}}).progress,100);
+assert.equal(model.record({videoRenderer:{videoId:'abcdefghijk',navigationEndpoint:{watchEndpoint:{videoId:'abcdefghijk'}}}}).progress,0);
 console.log('PASS legacy and modern public search records, nested avatars, channel endpoints, native filters and unchanged user text');

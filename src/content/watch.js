@@ -97,6 +97,7 @@ main.has-sidecar .details { min-height:0; }
 .own-playlist-link[aria-current="true"] .own-playlist-index { color:var(--ink); }
 .own-playlist-cover { position:relative;display:block;aspect-ratio:16/9;overflow:hidden;border-radius:8px;background:var(--soft); }
 .own-playlist-cover img { display:block;width:100%;height:100%;object-fit:cover; }
+.own-playlist-watched { position:absolute;left:0;right:0;bottom:0;height:3px;background:#ffffff59; }.own-playlist-watched > i { display:block;height:100%;background:#e5202b; }
 .own-playlist-duration { position:absolute;right:4px;bottom:4px;padding:0 4px;border-radius:4px;background:#000b;color:#fff;font-size:11px;font-variant-numeric:tabular-nums; }
 .own-playlist-text { display:flex;flex-direction:column;gap:3px;min-width:0; }
 .own-playlist-name { font-size:14px;font-weight:600;line-height:1.35;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden; }
@@ -819,7 +820,7 @@ main.has-sidecar .details { min-height:0; }
             if(page){if(!titleLink){titleLink=this.node('a','own-playlist-page');title.replaceChildren(titleLink);}if(titleLink.href!==page)titleLink.href=page;titleLink.textContent=playlist.title||'Playlist';}
             else title.textContent=playlist.title||'Playlist';
             panel.querySelector('.own-playlist-meta').textContent=[playlist.owner,playlist.infinite?'':(current>=0?(current+1)+' / ':'')+(playlist.total||playlist.items.length)].filter(Boolean).join(' · ');
-            const signature=JSON.stringify(playlist.items.map(item=>[item.href,item.title,item.channel,item.duration,item.index,item.image,item.selected]));
+            const signature=JSON.stringify(playlist.items.map(item=>[item.href,item.title,item.channel,item.duration,item.index,item.image,item.selected,item.progress]));
             const items=panel.querySelector('.own-playlist-items');
             if(items.dataset.signature!==signature){
                 items.dataset.signature=signature;
@@ -830,6 +831,7 @@ main.has-sidecar .details { min-height:0; }
                     const cover=this.node('span','own-playlist-cover'),image=safeURL(item.image,true);
                     if(image){const img=this.node('img');img.alt='';img.loading='lazy';img.decoding='async';img.src=image;cover.append(img);}
                     if(item.duration)cover.append(this.node('span','own-playlist-duration',item.duration));
+                    const progress=Math.min(100,Math.max(0,Number(item.progress)||0));if(progress){const bar=this.node('span','own-playlist-watched');bar.setAttribute('role','img');bar.setAttribute('aria-label','Watched '+progress+'%');const fill=this.node('i');fill.style.width=progress+'%';bar.append(fill);cover.append(bar);}
                     const meta=this.node('span','own-playlist-text');meta.append(this.node('span','own-playlist-name',item.title));if(item.channel)meta.append(this.node('span','own-playlist-channel',item.channel));
                     link.append(position,cover,meta);row.append(link);return row;
                 }));
