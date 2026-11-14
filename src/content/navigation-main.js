@@ -87,6 +87,32 @@
         if(location.pathname!=='/watch'){try{document.querySelector('#movie_player')?.stopVideo?.();}catch{}video.pause();}
         document.exitPictureInPicture?.().catch(()=>{});
     }
+    // Arc opens its own picture-in-picture window (not the page's, so it
+    // cannot be closed from here) when a page changes its address while a
+    // video plays. Leaving a watch page therefore pauses the video before
+    // the address changes and forbids picture-in-picture until a watch page
+    // shows again.
+    let pipBlocked=null;
+    function leaveWatch(){
+        if(!document.documentElement.classList.contains('minimal-youtube'))return;
+        const player=document.querySelector('#movie_player'),video=player?.querySelector('video')||document.querySelector('video.html5-main-video');
+        try{player?.pauseVideo?.();}catch{}
+        if(video instanceof HTMLVideoElement){video.pause();if(!video.disablePictureInPicture){video.disablePictureInPicture=true;pipBlocked=video;}}
+    }
+    function arriveWatch(){
+        if(location.pathname!=='/watch'||!pipBlocked)return;
+        pipBlocked.disablePictureInPicture=false;pipBlocked=null;
+    }
+    globalThis.navigation?.addEventListener?.('navigate',event=>{
+        let target;try{target=new URL(event.destination.url);}catch{return;}
+        if(location.pathname==='/watch'&&target.origin===location.origin&&target.pathname!=='/watch')leaveWatch();
+    });
+    document.addEventListener('yt-navigate-start',event=>{
+        let target;try{target=new URL(event.detail?.url||'',location.href);}catch{return;}
+        if(location.pathname==='/watch'&&event.detail?.url&&target.pathname!=='/watch')leaveWatch();
+    });
+    document.addEventListener('yt-navigate-finish',arriveWatch);
+    window.addEventListener('popstate',()=>setTimeout(arriveWatch,0));
     document.addEventListener('enterpictureinpicture',()=>{if(location.pathname!=='/watch')closePictureInPicture();},true);
     document.addEventListener('yt-navigate-finish',closePictureInPicture);
     window.addEventListener('popstate',()=>setTimeout(closePictureInPicture,0));
