@@ -266,6 +266,32 @@
         'секунд':1/86400,'сек':1/86400,'минут':1/1440,'мин':1/1440,'час':1/24,'ч':1/24,'дн':1,'день':1,'д':1,'недел':7,'нед':7,'месяц':30.44,'мес':30.44,'год':365.25,'лет':365.25,'г':365.25,'л':365.25};
     // English words for the native prefixes before an age.
     const datePrefixes=[[/^трансляция (?:закончилась|завершена|прошла)\s*/iu,'Streamed '],[/^премьера (?:состоялась)?\s*/iu,'Premiered '],[/^запланировано\s*/iu,'Scheduled ']];
+    // Native statistics in English: view and video counts, update dates and
+    // recent ages ("10 млн просмотров" -> "10M views", "94 видео" -> "94 videos",
+    // "Обновлен 1 нояб. 2026 г." -> "Updated Nov 1, 2026").
+    const months=[['янв','Jan'],['фев','Feb'],['мар','Mar'],['апр','Apr'],['ма[йя]','May'],['июн','Jun'],['июл','Jul'],['авг','Aug'],['сен','Sep'],['окт','Oct'],['ноя','Nov'],['дек','Dec']];
+    const ageWords=[[/^(?:секунд|сек)/,'second'],[/^(?:минут|мин)/,'minute'],[/^(?:час|ч)/,'hour'],[/^(?:дн|день|д)/,'day'],[/^(?:недел|нед)/,'week'],[/^(?:месяц|мес)/,'month'],[/^(?:год|лет|г|л)/,'year']];
+    function amount(number,unit){
+        let value=number.replace(/[\s  ]/g,'');unit=(unit||'').toLowerCase().replace(/\.$/,'');
+        if(!unit&&/^\d{1,3}(?:[.,]\d{3})+$/.test(value))value=value.replace(/[.,]/g,'');else value=value.replace(',','.');
+        const count=Number(value)*10**(/^(?:k|тыс)$/.test(unit)?3:/^(?:m|млн)$/.test(unit)?6:/^(?:b|млрд)$/.test(unit)?9:0);
+        return Number.isFinite(count)?count:null;
+    }
+    function englishStat(value){
+        let text=String(value||'').replace(/\p{Cf}/gu,'').replace(/[\s  ]+/g,' ').trim();if(!text)return '';
+        text=text.replace(/(\d[\d\s.,]*?)\s*(тыс\.?|млн\.?|млрд\.?|[KMB])?\s*(?:просмотр[а-яё]*|views?)(?=$|[\s·•,])/giu,(all,number,unit)=>{
+            const count=amount(number,unit);if(count===null)return all;
+            return compactSubscribers.format(count)+(count===1?' view':' views');
+        });
+        text=text.replace(/(\d[\d\s.,]*?)\s*(?:видео|ролик[а-яё]*)(?=$|[\s·•,])/giu,(all,number)=>{const count=amount(number,'');return count===null?all:count.toLocaleString('en')+(count===1?' video':' videos');});
+        text=text.replace(/(\d+)\s*урок[а-яё]*/giu,(all,number)=>number+(number==='1'?' lesson':' lessons'));
+        text=text.replace(/(?:^|\s)Обновлен[оаы]?(?=\s|$)/giu,match=>(match.startsWith(' ')?' ':'')+'Updated');
+        text=text.replace(/(\d{1,2})\s+([а-яё]+)\.?\s+(\d{4})(?:\s*г\.?)?/giu,(all,day,month,year)=>{const name=months.find(([pattern])=>new RegExp('^'+pattern,'iu').test(month))?.[1];return name?name+' '+day+', '+year:all;});
+        text=text.replace(/(\d+)\s*([а-яё]+)\.?\s+назад/giu,(all,number,unit)=>{const word=ageWords.find(([pattern])=>pattern.test(unit.toLowerCase()))?.[1];return word?number+' '+word+(number==='1'?'':'s')+' ago':all;});
+        text=text.replace(/(?:^|\s)сегодня(?=\s|$)/giu,match=>(match.startsWith(' ')?' ':'')+'today').replace(/(?:^|\s)вчера(?=\s|$)/giu,match=>(match.startsWith(' ')?' ':'')+'yesterday');
+        // Separate a count from the update date that follows it.
+        return text.replace(/(videos?|lessons?|views?)\s+(Updated)/g,'$1 · $2');
+    }
     function publishedLabel(value){
         // YouTube may wrap words and numbers in invisible format characters
         // (direction marks, isolates, zero-width spaces) and add words
@@ -838,7 +864,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             this.host.remove();this.cards.clear();this.channels.clear();this.sources.clear();
         }
     }
-    Search.publishedLabel=publishedLabel;
+    Search.publishedLabel=publishedLabel;Search.englishStat=englishStat;
     Search.playlistSelector=playlistSelector;Search.filterScopeSelector=filterScopeSelector;
     globalThis.MinimalYouTubeSearch=Search;
 })();
