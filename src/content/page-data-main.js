@@ -95,6 +95,40 @@
         }
         return null;
     }
+    function lessonList(root){
+        const stack=[root],seen=new Set();let scans=0;
+        while(stack.length&&scans++<2000){
+            const item=stack.pop();if(!item||typeof item!=='object'||seen.has(item))continue;seen.add(item);
+            const section=item.sectionListRenderer;
+            if(Array.isArray(section?.contents)&&section.contents.some(entry=>(entry?.itemSectionRenderer?.contents||[]).some(child=>/VIDEO/.test(child?.lockupViewModel?.contentType||''))))return section;
+            for(const child of Object.values(item))if(child&&typeof child==='object')stack.push(child);
+        }
+        return null;
+    }
+    // A lesson: a video lockup in a course, in the fields of a playlist row.
+    function lessonItem(value){
+        const data=globalThis.MinimalYouTubeSearchData;
+        const id=String(value.contentId||'');if(!/^[-\w]{11}$/.test(id)||!/VIDEO/.test(value.contentType||''))return null;
+        const list=new URL(location.href).searchParams.get('list')||'';
+        const command=value.rendererContext?.commandContext?.onTap?.innertubeCommand;
+        const href=data.endpoint(command)||data.url('/watch?v='+encodeURIComponent(id)+(list?'&list='+encodeURIComponent(list):''));
+        const metadata=value.metadata?.lockupMetadataViewModel||{};
+        let duration='';const stack=[value.contentImage];let scans=0;
+        while(stack.length&&scans++<400&&!duration){
+            const item=stack.pop();if(!item||typeof item!=='object')continue;
+            const text=typeof item.text==='string'?item.text.trim():'';if(/^\d{1,3}:\d{2}(?::\d{2})?$/.test(text)){duration=text;break;}
+            for(const child of Object.values(item))if(child&&typeof child==='object')stack.push(child);
+        }
+        const parts=[];
+        for(const row of metadata.metadata?.contentMetadataViewModel?.metadataRows||[])for(const part of row.metadataParts||[]){const text=data.label(part.text).trim();if(text)parts.push(text);}
+        const published=parts.find(text=>data.publishedPattern.test(text))||'';
+        const avatar=metadata.image?.decoratedAvatarViewModel,owner=avatar?.rendererContext?.commandContext?.onTap?.innertubeCommand;
+        const name=String(avatar?.a11yLabel||'').match(/["«“](.+)["»”]\s*$/u)?.[1]||'';
+        const index=Number.isInteger(command?.watchEndpoint?.index)?String(command.watchEndpoint.index+1):'';
+        return {kind:'video',id,href,title:(data.label(metadata.title).trim()||'Unavailable video').slice(0,1000),image:data.image(value.contentImage),
+            channel:{name:name.slice(0,500),href:data.channelURL(data.endpoint(owner))},index,duration:duration.slice(0,20),stats:parts.join(' • ').slice(0,200),
+            published:published.slice(0,100),setVideoId:'',playable:true,actions:[],group:''};
+    }
     function chips(content){
         const data=globalThis.MinimalYouTubeSearchData;
         const bar=content?.richGridRenderer?.header?.feedFilterChipBarRenderer||content?.sectionListRenderer?.header?.feedFilterChipBarRenderer;
@@ -113,6 +147,8 @@
         for(const entry of Array.isArray(list)?list:[]){
             if(!entry||typeof entry!=='object'||out.items.length>=600)continue;
             if(entry.continuationItemRenderer){const value=token(entry.continuationItemRenderer);if(value)out.continuation=value;continue;}
+            if(entry.continuationItemViewModel){const value=token(entry.continuationItemViewModel);if(value)out.continuation=value;continue;}
+            if(out.playlist&&entry.lockupViewModel){const value=lessonItem(entry.lockupViewModel);if(value)out.items.push(value);continue;}
             if(entry.playlistVideoRenderer){const value=playlistItem(entry.playlistVideoRenderer);if(value)out.items.push(value);continue;}
             if(entry.itemSectionRenderer){parse(entry.itemSectionRenderer.contents,out,group,channel);continue;}
             if(entry.richItemRenderer){parse([entry.richItemRenderer.content],out,group,channel);continue;}
@@ -152,8 +188,16 @@
             const tabs=(browse?.data?.contents||browse?.data?.response?.contents)?.twoColumnBrowseResultsRenderer?.tabs;
             const renderer=Array.isArray(tabs)?playlistList(tabs):null;
             // Data for another playlist is a page still in transition.
-            if(!renderer||!Array.isArray(renderer.contents)||renderer.playlistId&&renderer.playlistId!==list)return null;
-            return {type:'playlist',list:renderer.contents,content:renderer};
+            if(renderer){
+                if(!Array.isArray(renderer.contents)||renderer.playlistId&&renderer.playlistId!==list)return null;
+                return {type:'playlist',list:renderer.contents,content:renderer};
+            }
+            // Courses list their lessons as video lockups in item sections.
+            const section=Array.isArray(tabs)?lessonList(tabs):null;
+            if(!section)return null;
+            const id=String(section.targetId||'').replace(/^VL/,'')||section.contents.map(entry=>entry.itemSectionRenderer?.targetId).find(Boolean)||'';
+            if(id&&id!==list)return null;
+            return {type:'playlist',list:section.contents,content:section};
         }
         if(!channelPath.test(path)||/\/featured$/.test(path)||/^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)$/.test(path))return null;
         const browse=[...document.querySelectorAll('ytd-browse')].find(visible)||document.querySelector('ytd-browse');
@@ -194,7 +238,7 @@
         if(!found)return null;
         let value=models.get(found.list);
         if(!value){
-            value={key:routeKey(),type:found.type,items:[],continuation:'',loading:false,failed:false,chips:[]};
+            value={key:routeKey(),type:found.type,items:[],continuation:'',loading:false,failed:false,chips:[],playlist:found.type==='playlist'};
             try{parse(found.list,value,'',found.type!=='search');value.chips=found.type==='channel'?chips(found.content):[];}catch{return null;}
             models.set(found.list,value);
         }
@@ -221,7 +265,7 @@
                 body:JSON.stringify({continuation,context:{...context,client:{...client,clientName:client.clientName||'WEB',clientVersion:version}}})});
             if(!response.ok)throw new Error('Continuation failed');
             const data=await response.json();
-            const next={items:[],continuation:''};
+            const next={items:[],continuation:'',playlist:state.type==='playlist'};
             for(const command of [...(data.onResponseReceivedCommands||[]),...(data.onResponseReceivedActions||[]),...(data.onResponseReceivedEndpoints||[])]){
                 const action=command.appendContinuationItemsAction||command.reloadContinuationItemsCommand;
                 // A reload names its slot; only the feed's items replace it.

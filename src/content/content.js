@@ -1293,10 +1293,12 @@
             for (const browse of document.querySelectorAll('ytd-browse:not([hidden])')) {
                 if (!visible(browse)) continue;
                 const lists = [...browse.querySelectorAll('ytd-playlist-video-list-renderer')];
+                // Courses list lessons as lockups in an item section.
+                if (!lists.length) lists.push(...[...browse.querySelectorAll('yt-item-section-renderer,ytd-item-section-renderer')].filter(node => node.querySelector(':scope yt-lockup-view-model') && !node.parentElement.closest('yt-item-section-renderer,ytd-item-section-renderer')));
                 let list = lists.find(visible) || (playlistView?.list?.isConnected && browse.contains(playlistView.list) && visible(playlistView.list) ? playlistView.list : null);
                 const types = ['yt-page-header-renderer','ytd-page-header-renderer','ytd-playlist-header-renderer','yt-playlist-header-view-model','yt-page-header-view-model','ytd-playlist-sidebar-renderer'];
                 let source = null;
-                for (const type of types) { source = [...browse.querySelectorAll(type)].find(node => visible(node) && !node.contains(list) && node.querySelector('h1,#title'));if (source) break; }
+                for (const type of types) { source = [...browse.querySelectorAll(type)].find(node => visible(node) && !node.contains(list) && node.querySelector('h1,#title,yt-dynamic-sizing-formatted-string'));if (source) break; }
                 if (!source) {
                     const heading = [...browse.querySelectorAll('h1')].find(visible);
                     source = heading?.closest('#header,#page-header') || heading?.parentElement;
@@ -1342,7 +1344,7 @@
     function destinationMounted(path) {
         if(channelRoute.test(path))return Boolean(channelBrowse()?.getClientRects().length);
         const selector = path === "/watch" ? "ytd-watch-flexy" : path === "/results" ? "ytd-search" :
-            path === "/playlist" ? "ytd-browse[page-subtype='playlist'],ytd-browse:has(ytd-playlist-header-renderer,ytd-playlist-sidebar-renderer,yt-playlist-header-view-model)" :
+            path === "/playlist" ? "ytd-browse[page-subtype='playlist'],ytd-browse:has(ytd-playlist-header-renderer,ytd-playlist-sidebar-renderer,yt-playlist-header-view-model,yt-page-header-view-model)" :
             "ytd-page-manager > :not(ytd-browse[page-subtype='home'])";
         return [...document.querySelectorAll(selector)].some(element =>
             !element.closest("[hidden], [aria-hidden='true']") && getComputedStyle(element).display !== "none" && element.getClientRects().length);
