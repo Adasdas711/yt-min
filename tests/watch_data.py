@@ -94,7 +94,7 @@ def check(browser, width):
 
 
 
-def theater_scroll(browser):
+def theater_scroll(browser, theater=True):
     """In theater mode the playlist sits beside the details; a long playlist
     keeps a bounded panel and scrolls inside it."""
     page = setup(browser, '/watch?v=details&list=PLwatch', watch_details_fixture(), width=1440)
@@ -104,12 +104,27 @@ def theater_scroll(browser):
     assert response != RESPONSE
     long_text = ''.join(f'\\nParagraph {n}: a longer line of the description that wraps across the column.' for n in range(1, 40))
     response = response.replace("const description='Intro at 1:05 and more at example.com plus #music';", "const description='Intro at 1:05 and more at example.com plus #music"+long_text+"';")
-    page.evaluate("document.querySelector('ytd-watch-flexy').setAttribute('theater','')")
+    if theater:
+        page.evaluate("document.querySelector('ytd-watch-flexy').setAttribute('theater','')")
     page.evaluate(response)
     root = page.locator('#myt-watch')
     expect(root.locator('.own-playlist-name')).to_have_count(60)
-    page.wait_for_function("[...document.querySelectorAll('[theater]')].some(node=>node.localName!=='ytd-watch-flexy')")
+    if theater:
+        page.wait_for_function("[...document.querySelectorAll('[theater]')].some(node=>node.localName!=='ytd-watch-flexy')")
     page.wait_for_timeout(300)
+    if not theater:
+        # Beside the player the panel keeps the player's height, whatever the description does.
+        sidecar, media, expand = root.locator('.sidecar'), root.locator('.media'), root.locator('.expand')
+        before = sidecar.bounding_box()['height']
+        assert abs(before - media.bounding_box()['height']) < 2, (before, media.bounding_box())
+        assert root.locator('.own-playlist-items').evaluate('e=>e.scrollHeight>e.clientHeight+100')
+        expand.click()
+        expect(expand).to_have_attribute('aria-expanded', 'true')
+        page.wait_for_timeout(300)
+        assert abs(sidecar.bounding_box()['height'] - before) < 1, (before, sidecar.bounding_box())
+        page.close()
+        print('PASS normal mode: the playlist panel keeps the player height when the description opens', flush=True)
+        return
     sidecar, details = root.locator('.sidecar'), root.locator('.details')
     collapsed = sidecar.bounding_box()
     assert collapsed['height'] < 2000, collapsed
@@ -174,4 +189,5 @@ if __name__ == '__main__':
         other_video(browser)
         scroll_path(browser)
         theater_scroll(browser)
+        theater_scroll(browser, theater=False)
         browser.close()
