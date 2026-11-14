@@ -154,6 +154,36 @@ def theater_scroll(browser, theater=True):
     page.close()
     print('PASS theater mode: the playlist panel follows the description height and scrolls', flush=True)
 
+
+def playlist_next(browser):
+    """Moving to the next video of the playlist keeps the panel and the
+    player in place while the next video's data loads: no jump, no resize."""
+    page = setup(browser, '/watch?v=details&list=PLwatch', watch_details_fixture(), width=1440)
+    expect(page.locator('#myt-watch')).to_be_visible()
+    page.evaluate(RESPONSE)
+    root = page.locator('#myt-watch')
+    expect(root.locator('.own-playlist-name')).to_have_count(3)
+    page.wait_for_timeout(300)
+    before = root.locator('.media').bounding_box()
+    frames = page.evaluate("""async () => {
+      const root = [...document.querySelectorAll('#myt-watch *')].map(n => n.shadowRoot).find(Boolean);
+      const probe = () => { const media = root.querySelector('.media').getBoundingClientRect(), side = root.querySelector('.sidecar');
+        return [Math.round(media.width), Math.round(media.height), side.hidden, root.querySelector('[aria-current="true"] .own-playlist-name')?.textContent || ''] };
+      const frames = []; let running = true;
+      const sample = () => { frames.push(probe()); if (running) requestAnimationFrame(sample); };
+      requestAnimationFrame(sample);
+      document.dispatchEvent(new CustomEvent('yt-navigate-start', {detail: {url: '/watch?v=ccccccccccc&list=PLwatch&index=3'}}));
+      history.pushState({}, '', '/watch?v=ccccccccccc&list=PLwatch&index=3');
+      document.dispatchEvent(new Event('yt-navigate-finish'));
+      await new Promise(resolve => setTimeout(resolve, 600));
+      running = false; return frames; }""")
+    widths = {(width, height) for width, height, hidden, current in frames}
+    assert len(widths) == 1 and (round(before['width']), round(before['height'])) in widths, (before, widths)
+    assert not any(hidden for width, height, hidden, current in frames), frames
+    assert frames[-1][3] == 'Third in list', frames[-1]
+    page.close()
+    print('PASS next video in the playlist: the panel and player stay put while data loads', flush=True)
+
 def wheel_listeners(page):
     cdp = page.context.new_cdp_session(page)
     window = cdp.send('Runtime.evaluate', {'expression': 'window'})['result']['objectId']
@@ -197,4 +227,5 @@ if __name__ == '__main__':
         scroll_path(browser)
         theater_scroll(browser)
         theater_scroll(browser, theater=False)
+        playlist_next(browser)
         browser.close()

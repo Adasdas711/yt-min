@@ -1133,7 +1133,16 @@ main.has-sidecar .details { min-height:0; }
             const comments=options.commentsOpen&&(this.native.querySelector('ytd-comments')||this.native.querySelector('ytd-engagement-panel-section-list-renderer[target-id*="comments"],ytd-engagement-panel-section-list-renderer[data-target-id*="comments"]'));
             for(const[node,state]of this.islands)if(state.kind==='comments'&&node!==comments)this.restore(node);
             if(comments)this.island(comments,'comments',()=>this.q('.comments').getBoundingClientRect());
+            // Between two videos of the same playlist the next video's data is
+            // not on the page yet: the panel stays, with the new video marked,
+            // so the player keeps its size instead of jumping to full width.
+            const pageList=new URL(location.href).searchParams.get('list');
             if(model?.playlist?.items?.length)this.syncDataPlaylist(model.playlist);
+            else if(this.dataPlaylist&&pageList&&pageList===this.dataPlaylistList){
+                const video=new URL(location.href).searchParams.get('v');
+                const items=this.dataPlaylist.items.map(item=>{let id='';try{id=new URL(item.href,location.href).searchParams.get('v')||'';}catch{}return {...item,selected:Boolean(video)&&id===video};});
+                this.syncDataPlaylist({...this.dataPlaylist,items,current:items.findIndex(item=>item.selected)});
+            }
             else {this.leaveDataPlaylist();
             const candidate=this.native.querySelector('ytd-playlist-panel-renderer#playlist,#playlist ytd-playlist-panel-renderer');
             const candidateCollapsed=Boolean(candidate&&this.isPlaylistCollapsed(candidate));
