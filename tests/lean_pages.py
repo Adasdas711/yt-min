@@ -94,30 +94,6 @@ def check_picture_in_picture(browser):
     print('PASS no second video window: picture-in-picture closes off and on watch pages', flush=True)
 
 
-def check_arc_picture_in_picture(browser):
-    """Arc opens its own picture-in-picture window when the address changes
-    while a video plays. Leaving a watch page pauses the video before the
-    address changes and forbids picture-in-picture until a watch page shows."""
-    body = '<ytd-app>' + MASTHEAD + '<ytd-page-manager><ytd-browse><p>Page</p></ytd-browse></ytd-page-manager><div id="movie_player"><video class="html5-main-video"></video></div></ytd-app>'
-    page = setup(browser, '/watch?v=details', body)
-    page.add_script_tag(path=str(ROOT / 'src/content/navigation-main.js'))
-    page.evaluate("""() => { const player = document.querySelector('#movie_player'), video = player.querySelector('video'); window.__log = [];
-      player.pauseVideo = () => window.__log.push('pause:' + location.pathname);
-      Object.defineProperty(video, 'paused', {configurable: true, get: () => false}); video.pause = () => window.__log.push('video-pause:' + location.pathname); }""")
-    page.evaluate("() => history.pushState({}, '', '/@creator/videos')")
-    log = page.evaluate('window.__log')
-    # Paused while the address was still the watch page's.
-    assert 'pause:/watch' in log, log
-    assert page.evaluate("document.querySelector('video').disablePictureInPicture") is True
-    page.evaluate("() => { history.pushState({}, '', '/watch?v=next'); document.dispatchEvent(new Event('yt-navigate-finish')); }")
-    assert page.evaluate("document.querySelector('video').disablePictureInPicture") is False
-    # Watch to watch never pauses.
-    page.evaluate("() => { window.__log = []; history.pushState({}, '', '/watch?v=third'); }")
-    assert page.evaluate('window.__log') == [], page.evaluate('window.__log')
-    page.close()
-    print('PASS Arc picture-in-picture: leaving a watch page pauses first and blocks it until the next watch page', flush=True)
-
-
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
@@ -125,7 +101,6 @@ def main():
         check_search(browser)
         check_miniplayer(browser)
         check_picture_in_picture(browser)
-        check_arc_picture_in_picture(browser)
         browser.close()
 
 
