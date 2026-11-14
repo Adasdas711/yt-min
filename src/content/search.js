@@ -52,7 +52,7 @@
     const countSelector='#video-count-text,#video-count,#playlist-video-count,.formatted-video-count-label,yt-collection-thumbnail-overlay-view-model,ytd-thumbnail-overlay-side-panel-renderer,yt-thumbnail-overlay-badge-view-model,yt-thumbnail-bottom-overlay-view-model,yt-badge-shape,.ytBadgeShapeText,.yt-badge-shape__text,.badge-shape-wiz__text,[data-video-count]';
     const countNumber=value=>{
         const input=String(value??'').replace(/[\u00a0\u202f]/g,' ').trim();
-        return input.match(/([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*|lessons?|урок\S*|lektion\S*|episodes?|эпизод\S*|выпуск\S*)/iu)?.[1]?.trim()||(/^[\d][\d\s,.]*\+?$/.test(input)?input:'');
+        return input.match(/^([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*|lessons?|урок\S*|lektion\S*|episodes?|эпизод\S*|выпуск\S*)$/iu)?.[1]?.trim()||(/^(?:\d[\d\s,.]*\d|\d)\+?$/.test(input)?input:'');
     };
     function coverImage(source){
         const covers=[...source.querySelectorAll('ytd-thumbnail,yt-collection-thumbnail-view-model,yt-thumbnail-view-model,.ytCollectionThumbnailViewModelHost,.ytLockupViewModelContentImage,.yt-lockup-view-model__content-image,.yt-lockup-view-model-wiz__content-image')];

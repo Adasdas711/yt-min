@@ -31,4 +31,14 @@ assert.equal(plain(model.record({lockupViewModel:{contentId:'PLplain',contentTyp
 assert.equal(model.record({videoRenderer:{videoId:'abcdefghijk',navigationEndpoint:{watchEndpoint:{videoId:'abcdefghijk'}},thumbnailOverlays:[{thumbnailOverlayResumePlaybackRenderer:{percentDurationWatched:37}}]}}).progress,37);
 assert.equal(model.record({lockupViewModel:{contentId:'abcdefghijk',contentType:'LOCKUP_CONTENT_TYPE_VIDEO',contentImage:{thumbnailViewModel:{overlays:[{thumbnailBottomOverlayViewModel:{progressBar:{thumbnailOverlayProgressBarViewModel:{startPercent:100}}}}]}}}}).progress,100);
 assert.equal(model.record({videoRenderer:{videoId:'abcdefghijk',navigationEndpoint:{watchEndpoint:{videoId:'abcdefghijk'}}}}).progress,0);
+// A course in search lists its first lessons in metadata; their titles
+// ("1 урок. ...") are not the course's size, the cover badge is.
+const searchCourse=plain(model.record({lockupViewModel:{contentId:'PLcourse03',contentType:'LOCKUP_CONTENT_TYPE_PLAYLIST',
+  contentImage:{collectionThumbnailViewModel:{primaryThumbnail:{thumbnailViewModel:{overlays:[{thumbnailOverlayBadgeViewModel:{thumbnailBadges:[{thumbnailBadgeViewModel:{text:'94 lessons'}}]}}]}}}},
+  metadata:{lockupMetadataViewModel:{title:{content:'Немецкий с нуля: 1 урок'},metadata:{contentMetadataViewModel:{metadataRows:[
+    {metadataParts:[{text:{content:'Немецкий язык для начинающих. 1 урок. Приветствие'}}]},{metadataParts:[{text:{content:'0. Вступление'}}]}]}}}}}}));
+assert.equal(searchCourse.count,'94');
+const metadataOnly=plain(model.record({lockupViewModel:{contentId:'PLcourse04',contentType:'LOCKUP_CONTENT_TYPE_PLAYLIST',
+  metadata:{lockupMetadataViewModel:{metadata:{contentMetadataViewModel:{metadataRows:[{metadataParts:[{text:{content:'1 урок. Приветствие'}}]},{metadataParts:[{text:{content:'77 уроков'}}]}]}}}}}}));
+assert.equal(metadataOnly.count,'77');
 console.log('PASS legacy and modern public search records, nested avatars, channel endpoints, native filters and unchanged user text');

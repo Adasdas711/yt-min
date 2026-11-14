@@ -25,16 +25,22 @@
         return best;
     }
     function playlistCount(value){
-        const parse=input=>{
-            const text=(typeof input==='number'?String(input):label(input)).replace(/[\u00a0\u202f]/g,' ').trim();
-            return text.match(/([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*|lessons?|урок\S*|lektion\S*|episodes?|эпизод\S*|выпуск\S*)/iu)?.[1]?.trim()||(/^[\d][\d\s,.]*\+?$/.test(text)?text:'');
+        // A count is a whole text: "94 lessons", "1 234 видео", or a bare
+        // number on the cover badge. Counts inside other text (a lesson
+        // title such as "1 урок. Приветствие") are not the playlist's size.
+        const counted=/^([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*|lessons?|урок\S*|lektion\S*|episodes?|эпизод\S*|выпуск\S*)$/iu,bare=/^(?:\d[\d\s,.]*\d|\d)\+?$/;
+        const parse=(input,badge)=>{
+            const text=(typeof input==='number'?String(input):label(input)).replace(/[  ]/g,' ').trim();
+            return text.match(counted)?.[1]?.trim()||(badge&&bare.test(text)?text:'');
         };
-        for(const input of [value.videoCount,value.videoCountText,value.videoCountShortText]){const count=parse(input);if(count)return count;}
-        const stack=[value.contentImage,value.thumbnailRenderer,value.metadata?.lockupMetadataViewModel?.metadata||value.metadata?.metadata||value.metadata],seen=new Set();let scanned=0;
-        while(stack.length&&scanned++<1200){
-            const item=stack.pop();if(!item||typeof item!=='object'||seen.has(item))continue;seen.add(item);
-            const count=parse(item.text)||parse(item);if(count)return count;
-            for(const [key,child]of Object.entries(item))if(key!=='title'&&child&&typeof child==='object')stack.push(child);
+        for(const input of [value.videoCount,value.videoCountText,value.videoCountShortText]){const count=parse(input,true);if(count)return count;}
+        for(const [roots,badge] of [[[value.contentImage,value.thumbnailRenderer],true],[[value.metadata?.lockupMetadataViewModel?.metadata||value.metadata?.metadata||value.metadata],false]]){
+            const stack=[...roots],seen=new Set();let scanned=0;
+            while(stack.length&&scanned++<1200){
+                const item=stack.pop();if(!item||typeof item!=='object'||seen.has(item))continue;seen.add(item);
+                const count=parse(item.text,badge)||parse(item,badge);if(count)return count;
+                for(const [key,child]of Object.entries(item))if(key!=='title'&&child&&typeof child==='object')stack.push(child);
+            }
         }
         return '';
     }

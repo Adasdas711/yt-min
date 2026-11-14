@@ -85,7 +85,7 @@
         const imageStack=[modern?.contentImage];let scans=0;
         while(imageStack.length&&scans++<800){const item=imageStack.pop();if(!item||typeof item!=='object')continue;for(const[key,child]of Object.entries(item)){if(/badge|overlay/i.test(key))visit(child);if(child&&typeof child==='object')imageStack.push(child);}}
         let count=legacy?.videoCount!=null?String(legacy.videoCount):'';
-        if(!/^[\d][\d\s,.]*\+?$/.test(count))count=strings.map(text=>text.match(/([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*|lessons?|урок\S*|lektion\S*|episodes?|эпизод\S*|выпуск\S*)/iu)?.[1]?.trim()).find(Boolean)||strings.find(text=>/^[\d][\d\s,.]*\+?$/.test(text))||'';
+        if(!/^[\d][\d\s,.]*\+?$/.test(count))count=strings.map(text=>text.replace(/[\u00a0\u202f]/g,' ').trim().match(/^([\d][\d\s,.]*\+?)\s*(?:videos?|видео|ролик\S*|lessons?|урок\S*|lektion\S*|episodes?|эпизод\S*|выпуск\S*)$/iu)?.[1]?.trim()).find(Boolean)||strings.map(text=>text.trim()).find(text=>/^(?:\d[\d\s,.]*\d|\d)\+?$/.test(text))||'';
         const course=/COURSE/.test(modern?.contentType||'')||strings.some(text=>/\d\s*(?:lessons?|урок\S*|lektion\S*)/iu.test(text));
         return image||count?{id,image,count,...(course?{course:true}:{})}:null;
     }
