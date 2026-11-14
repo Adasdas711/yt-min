@@ -305,7 +305,7 @@ LESSON = """const lesson=(id,title,index)=>({lockupViewModel:{contentId:id,conte
     contentImage:{thumbnailViewModel:{image:{sources:[{url:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg',width:246}]},overlays:[{thumbnailBottomOverlayViewModel:{badges:[{thumbnailBadgeViewModel:{text:'16:23'}}]}}]}},
     metadata:{lockupMetadataViewModel:{title:{content:title},
       image:{decoratedAvatarViewModel:{a11yLabel:'Перейти на канал "Немецкий с нуля!"',rendererContext:{commandContext:{onTap:{innertubeCommand:{browseEndpoint:{browseId:'UCdeu',canonicalBaseUrl:'/@deu'}}}}}}},
-      metadata:{contentMetadataViewModel:{metadataRows:[{metadataParts:[{text:{content:'10 млн'}},{text:{content:'6 л. назад'}}]}]}}}},
+      metadata:{contentMetadataViewModel:{metadataRows:[{metadataParts:[{text:{content:'10 млн'},accessibilityLabel:'10 миллионов просмотров'},{text:{content:'6 л. назад'}}]}]}}}},
     rendererContext:{commandContext:{onTap:{innertubeCommand:{commandMetadata:{webCommandMetadata:{url:'/watch?v='+id+'&list=PLcourse&index='+index}},watchEndpoint:{videoId:id,playlistId:'PLcourse',index:index-1}}}}}}});"""
 
 
@@ -314,7 +314,7 @@ def course_page(browser):
     page shows them as owned playlist rows, with further lessons from the
     continuation."""
     from playlist import cover, MASTHEAD
-    header = f'<div id="header"><ytd-playlist-header-renderer style="display:block"><img src="{cover()}"><yt-dynamic-sizing-formatted-string>Немецкий с нуля. ВИДЕОУРОКИ</yt-dynamic-sizing-formatted-string><a href="/@deu">Немецкий с нуля!</a><button>Продолжить</button></ytd-playlist-header-renderer></div>'
+    header = f'<div id="header"><ytd-playlist-header-renderer style="display:block"><img src="{cover()}"><yt-dynamic-sizing-formatted-string>Немецкий с нуля. ВИДЕОУРОКИ</yt-dynamic-sizing-formatted-string><a href="/@deu">Немецкий с нуля!</a><div id="stats">94 видео Обновлен 1 нояб. 2026 г.</div><button>Продолжить</button></ytd-playlist-header-renderer></div>'
     native = ''.join(f'<yt-lockup-view-model style="display:block"><a href="/watch?v=lessonVid0{n}&list=PLcourse">Native {n}</a></yt-lockup-view-model>' for n in range(1, 4))
     html = ('<ytd-app>' + MASTHEAD + '<ytd-page-manager><ytd-browse page-subtype="playlist" style="display:block">' + header
             + '<div id="contents" style="display:block"><ytd-two-column-browse-results-renderer style="display:block"><div id="primary"><yt-section-list-renderer style="display:block"><yt-item-section-renderer style="display:block"><div id="contents">'
@@ -340,6 +340,12 @@ def course_page(browser):
     expect(rows.locator('.index')).to_have_text(['1', '2', '3', '4'])
     expect(rows.first.locator('.duration')).to_have_text('16:23')
     expect(rows.first.locator('a.title')).to_have_attribute('href', 'https://www.youtube.com/watch?v=lessonVid01&list=PLcourse&index=1')
+    # Statistics read in English.
+    import datetime
+    today = datetime.date.today()
+    six_years = today.replace(year=today.year - 6).strftime('%B %Y')
+    expect(rows.first.locator('.metadata')).to_have_text('10M views · ' + six_years)
+    expect(page.locator('[data-myt-playlist-summary]').locator('.stats')).to_have_text('94 videos · Updated Nov 1, 2026')
     expect(page.locator('yt-lockup-view-model').first).to_be_hidden()
     page.close()
     print('PASS course lessons come from page data as owned playlist rows', flush=True)

@@ -15,6 +15,8 @@
     // Native nodes or plain records ({href}) can back a card's controls.
     const attribute=(node,name)=>typeof node?.getAttribute==='function'?node.getAttribute(name):node?.[name]??null;
     const disabledSource=node=>typeof node?.matches==='function'&&node.matches(':disabled,[aria-disabled="true"]');
+    // Native statistics read in English, ages older than four months as a month.
+    const english=part=>{const search=globalThis.MinimalYouTubeSearch,dated=search?.publishedLabel?search.publishedLabel(part):part;return search?.englishStat?search.englishStat(dated):dated;};
     const route=()=>{const url=new URL(location.href);return url.pathname==='/playlist'?JSON.stringify(['playlist',url.searchParams.get('list')||'']):'';};
     const menuCSS=`:host{all:initial;position:fixed;inset:auto;margin:0;padding:6px;min-width:220px;max-width:min(320px,calc(100vw - 16px));border:1px solid var(--myt-border,#2c2c33);border-radius:16px;background:var(--myt-surface,#19191d);color:var(--myt-ink,#f4f4f5);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 12px 32px #0006}:host(:not(:popover-open)){display:none}button{display:block;width:100%;padding:10px 12px;border:0;border-radius:10px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}button:hover,button:focus-visible{background:var(--myt-soft,#24242a);outline:none}`;
     class Card {
@@ -112,8 +114,7 @@
             if(this.moreVisible&&this.model?.more&&!this.model.loading&&this.rowsHost.isConnected)document.dispatchEvent(new Event('minimal-youtube:page-model-more'));
         }
         readItem(item,index){
-            const label=globalThis.MinimalYouTubeSearch?.publishedLabel;
-            const stats=(item.stats||'').split(/\s*[•·]\s*/).filter(Boolean).map(part=>label?label(part):part).join(' · ');
+            const stats=(item.stats||'').split(/\s*[•·]\s*/).filter(Boolean).map(english).join(' · ');
             return {title:item.title||'Unavailable video',author:item.channel?.name||'',stats,image:url(item.image,true)||'',duration:item.duration||'',
                 index:/^\d+$/.test(item.index||'')?item.index:String(index+1),current:false,
                 actions:{play:url(item.href)?{href:url(item.href)}:null,channel:url(item.channel?.href)?{href:url(item.channel.href)}:null,menu:{href:''}}};
@@ -188,7 +189,7 @@
             const play=find(/play all|watch all|воспроизвести|смотреть все|^(?:continue|start course|продолжить|начать курс)$/iu)||source.querySelector('a[href*="/watch?"]')||this.list.querySelector('a[href*="/watch?"]');
             let playHref=[...source.querySelectorAll('a[href*="/watch?"]'),...this.list.querySelectorAll('a[href*="/watch?"]')].map(anchor=>url(anchor.href)).find(href=>href&&new URL(href).searchParams.get('v'))||'';
             if(playHref){const target=new URL(playHref),list=new URL(location.href).searchParams.get('list');if(list)target.searchParams.set('list',list);playHref=target.searchParams.get('v')?target.href:'';}
-            return {playHref,title,author,avatar:image([...source.querySelectorAll('a[href] img')].find(img=>img.closest('a').href===authorLink?.href)),image:image(thumbnail)||image(this.list.querySelector('img')),stats,description:clean(descriptionNode),actions:{play,channel:authorLink,shuffle:find(/shuffle|перемешать/iu),share:find(/share|поделиться/iu),menu:find(/actions|menu|действия|ещё|еще|^more$|^[⋯⋮…]$/iu)}};
+            return {playHref,title,author,stats:english(stats),avatar:image([...source.querySelectorAll('a[href] img')].find(img=>img.closest('a').href===authorLink?.href)),image:image(thumbnail)||image(this.list.querySelector('img')),description:clean(descriptionNode),actions:{play,channel:authorLink,shuffle:find(/shuffle|перемешать/iu),share:find(/share|поделиться/iu),menu:find(/actions|menu|действия|ещё|еще|^more$|^[⋯⋮…]$/iu)}};
         }
         readRow(row,index){
             const play=row.querySelector('a#video-title,a#video-title-link,h3 a[href],a[href*="/watch?"]'),authorLink=channel(row);
@@ -199,7 +200,7 @@
             const author=clean(authorLink),metadata=[...new Set(metadataNodes.filter(node=>!metadataNodes.some(parent=>parent!==node&&parent.contains(node))).map(node=>{
                 const copy=node.cloneNode(true);let link;while((link=channel(copy)))link.remove();
                 copy.querySelectorAll('#byline-container,ytd-channel-name').forEach(node=>node.remove());
-                return clean(copy).split(/[·•]/).map(text=>text.trim()).filter(text=>text&&text!==author).join(' · ');
+                return clean(copy).split(/[·•]/).map(text=>text.trim()).filter(text=>text&&text!==author).map(english).join(' · ');
             }).filter(Boolean))].join(' · ');
             const duration=[...row.querySelectorAll('ytd-thumbnail-overlay-time-status-renderer,.badge-shape-wiz__text,.yt-badge-shape__text,.ytThumbnailOverlayBadgeViewModelBadgeText')].map(clean).find(value=>/^\d{1,3}:\d{2}(?::\d{2})?$/.test(value))||'';
             return {title:clean(row.querySelector('#video-title,#video-title-link,h3'))||clean(play)||'Unavailable video',author:clean(authorLink),stats:metadata,image:image(row.querySelector('ytd-thumbnail img,yt-thumbnail-view-model img,img'))||fallback,duration,index:clean(row.querySelector('#index-container,#index')).match(/\d+/)?.[0]||String(index+1),current:row.hasAttribute('selected')&&row.getAttribute('selected')!=='false'||row.getAttribute('aria-current')==='true',actions:{play,channel:authorLink,menu:row.querySelector('#menu button,ytd-menu-renderer button,button[aria-label*="actions" i]')}};

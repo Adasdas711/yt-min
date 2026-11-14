@@ -120,7 +120,12 @@
             for(const child of Object.values(item))if(child&&typeof child==='object')stack.push(child);
         }
         const parts=[];
-        for(const row of metadata.metadata?.contentMetadataViewModel?.metadataRows||[])for(const part of row.metadataParts||[]){const text=data.label(part.text).trim();if(text)parts.push(text);}
+        for(const row of metadata.metadata?.contentMetadataViewModel?.metadataRows||[])for(const part of row.metadataParts||[]){
+            let text=data.label(part.text).trim();if(!text)continue;
+            // A count shown with the views icon alone names its unit only in its label.
+            if(/просмотр|views?\b|Aufrufe/iu.test(String(part.accessibilityLabel||''))&&!/просмотр|views?\b|Aufrufe/iu.test(text))text+=' views';
+            parts.push(text);
+        }
         const published=parts.find(text=>data.publishedPattern.test(text))||'';
         const avatar=metadata.image?.decoratedAvatarViewModel,owner=avatar?.rendererContext?.commandContext?.onTap?.innertubeCommand;
         const name=String(avatar?.a11yLabel||'').match(/["«“](.+)["»”]\s*$/u)?.[1]||'';
