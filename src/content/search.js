@@ -227,7 +227,7 @@
       .media:is(:hover,:focus-within){background:var(--myt-soft)}.cover{position:relative;display:block;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:var(--myt-soft)}.cover img{display:block;width:100%;height:100%;object-fit:cover}.media-info{display:flex;flex-direction:column;justify-content:center;gap:12px;min-width:0;padding:0 3px}
       .media-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;font-size:17px;line-height:1.35;font-weight:700}.media.video .media-title{font-size:16px}.media-date{display:block;color:var(--myt-muted);font-size:14px;line-height:1.4}.media-date[hidden]{display:none}
       .media-channel{display:block;overflow-wrap:anywhere;color:var(--myt-muted);font-size:18px;font-weight:500;line-height:1.4}.media-channel:is(:hover,:focus-visible){color:var(--myt-ink)}
-      .media.playlist{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:center;gap:20px;padding-bottom:12px}.media.playlist .cover{width:100%}.live-badge{position:absolute;left:8px;bottom:8px;padding:0 7px;border-radius:999px;background:#e5202b;color:#fff;font-size:11px;font-weight:700;line-height:18px;letter-spacing:.04em}.live-badge::before{content:"LIVE"}.live-badge[hidden]{display:none}.playlist-badge{position:absolute;right:8px;bottom:8px;display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:6px;background:#000b;color:#fff;font-size:13px}
+      .media.playlist{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:center;gap:20px;padding-bottom:12px}.media.playlist .cover{width:100%}.watched{position:absolute;left:0;right:0;bottom:0;height:4px;background:#ffffff59;pointer-events:none}.watched[hidden]{display:none}.watched>i{display:block;height:100%;background:#e5202b}.live-badge{position:absolute;left:8px;bottom:8px;padding:0 7px;border-radius:999px;background:#e5202b;color:#fff;font-size:11px;font-weight:700;line-height:18px;letter-spacing:.04em}.live-badge::before{content:"LIVE"}.live-badge[hidden]{display:none}.playlist-badge{position:absolute;right:8px;bottom:8px;display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:6px;background:#000b;color:#fff;font-size:13px}
       .group{min-width:0;padding:20px;border-radius:22px;background:var(--myt-soft)}.group h2{margin:0 0 18px;padding-inline-end:.2em;overflow:visible;overflow-wrap:anywhere;font:italic 900 40px/1.05 "MYT Barlow Condensed","MYT Cyrillic Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:-.025em}
       :host([data-channel]) .media.playlist{display:flex;flex-direction:column;gap:14px;padding-bottom:18px}:host([data-channel]) .media.playlist .media-title{font-size:16px}:host([data-channel-playlists]) .media.playlist{gap:10px;padding:8px 8px 12px;border-radius:14px}:host([data-channel-playlists]) .media.playlist .cover{border-radius:10px}:host([data-channel-playlists]) .media.playlist .media-title{font-size:14px;line-height:1.35}:host([data-channel-playlists]) .media.playlist .media-info{padding:0 2px}:host([data-channel-playlists]) .playlist-badge{right:6px;bottom:6px;padding:3px 6px;font-size:12px}:host([data-channel-playlists]) .playlist-badge svg{width:13px;height:13px}.playlist-badge[hidden]{display:none}.playlist-badge svg{width:15px;height:15px;flex:none}.playlist-icon{display:inline-flex}.media.playlist :is(.media-info,.playlist-badge){font-family:"SFMono-Regular",Menlo,Monaco,Consolas,"Liberation Mono",ui-monospace,monospace}.media.playlist .media-title{font-weight:600}
       /* Keep 20px gaps fixed while reducing channel column widths by 15%. */
@@ -315,6 +315,8 @@
     const liveSelector='ytd-thumbnail-overlay-time-status-renderer[overlay-style="LIVE"],.badge-style-type-live-now,.badge-style-type-live-now-alternate,[class*="thumbnail-live"],[class*="BadgeShapeThumbnailLive"]';
     const datedText=value=>(globalThis.MinimalYouTubeSearchData?.publishedPattern||/\bago\b|назад/iu).test(value);
     // A content type label is not an owner.
+    // The resume bar YouTube draws on a watched video's cover.
+    const watchedProgress=root=>{const bar=root?.querySelector?.('.ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment,.ytThumbnailOverlayProgressBarHostWatchedProgressBar>div,ytd-thumbnail-overlay-resume-playback-renderer #progress,[class*="WatchedProgressBarSegment"]');const value=parseFloat(bar?.style.width||'');return Number.isFinite(value)&&value>0?Math.min(100,Math.round(value)):0;};
     const ownerLine=(name,href)=>/^(?:playlist|плейлист|mix|микс|podcast|подкаст)$/iu.test(name.trim())?{name:'',href:''}:{name,href};
     class MediaCard{
         constructor(source,kind){
@@ -344,6 +346,10 @@
             if(data.live&&!this.live){this.live=node('span','live-badge');this.live.setAttribute('role','img');this.live.setAttribute('aria-label','Live');this.cover.append(this.live);}
             if(this.live)this.live.hidden=!data.live;
             const date=data.live?data.viewers||'':publishedLabel(data.published);if(this.date.textContent!==date)this.date.textContent=date;this.date.hidden=!date;
+            // A watched video: a red bar along the cover's bottom edge.
+            const progress=data.progress||0;
+            if(progress&&!this.watched){this.watched=node('span','watched');this.watched.setAttribute('role','img');this.watched.append(node('i'));this.cover.append(this.watched);}
+            if(this.watched){this.watched.hidden=!progress;this.watched.firstChild.style.width=progress+'%';this.watched.setAttribute('aria-label',progress?'Watched '+progress+'%':'');}
             if(this.badge){const count=data.count||'';if(this.badgeCount.textContent!==count)this.badgeCount.textContent=count;this.badge.hidden=!count;const course=Boolean(data.course);if(this.badge.dataset.course!==String(course)){this.badge.dataset.course=String(course);this.badgeIcon.innerHTML=course?courseIcon:videoIcon;}this.badge.setAttribute('aria-label',count?count+(course?(count==='1'?' lesson':' lessons'):(count==='1'?' video':' videos')):'');}
         }
         destroy(){this.host.remove();}
@@ -560,7 +566,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             const watching=globalThis.MinimalYouTubeSearchData?.watchingPattern||/\bwatching\b/iu;
             const viewers=kind==='video'?record?.viewers||[...source.querySelectorAll('#metadata-line span,.inline-metadata-item,.ytContentMetadataViewModelMetadataText,[class*="MetadataText"]')].map(text).find(value=>value&&value.length<60&&watching.test(value))||'':'';
             const live=kind==='video'&&Boolean(record?.live||viewers||source.querySelector(liveSelector));
-            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,count,course,published,live,viewers,channel:hideChannel?{name:'',href:''}:ownerLine(text(owner)||record?.channel?.name||'',channelURL(owner?.href||record?.channel?.href))};
+            return {kind,href,title:text(title)||text(main)||record?.title||'Video',image,count,course,progress:kind==='video'?record?.progress||watchedProgress(source):0,published,live,viewers,channel:hideChannel?{name:'',href:''}:ownerLine(text(owner)||record?.channel?.name||'',channelURL(owner?.href||record?.channel?.href))};
         }
         sync(searches){
             if(!this.nativeStyle.isConnected)document.documentElement.append(this.nativeStyle);

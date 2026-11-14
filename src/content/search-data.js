@@ -52,6 +52,18 @@
         }
         return false;
     }
+    // How much of a video the viewer has watched (0-100): the resume bar on
+    // its cover, in legacy (percentDurationWatched) or lockup (startPercent) data.
+    function progress(value){
+        if(!value||typeof value!=='object')return 0;
+        const stack=[value.thumbnailOverlays,value.contentImage,value.thumbnail?.thumbnailOverlays,value.thumbnailRenderer],seen=new Set();let scans=0;
+        while(stack.length&&scans++<600){
+            const item=stack.pop();if(!item||typeof item!=='object'||seen.has(item))continue;seen.add(item);
+            for(const key of ['percentDurationWatched','startPercent'])if(typeof item[key]==='number'&&item[key]>0)return Math.min(100,Math.round(item[key]));
+            for(const child of Object.values(item))if(child&&typeof child==='object')stack.push(child);
+        }
+        return 0;
+    }
     // A video that is streaming now: YouTube marks it with a LIVE thumbnail
     // overlay or badge style; its view line counts current viewers.
     const watchingPattern=/\bwatching\b|смотрят|зрител/iu;
@@ -106,7 +118,7 @@
                 for(const text of label(part.text).split(/\s*[•·]\s*/))if(!published&&publishedPattern.test(text.trim()))published=text.trim();
             }
         }
-        return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,kind==='channel'?8:4),count:kind==='playlist'?playlistCount(value):'',...(kind==='playlist'&&isCourse(value)?{course:true}:{}),published:published.slice(0,100),...(kind==='video'?liveState(value):{})};
+        return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,kind==='channel'?8:4),count:kind==='playlist'?playlistCount(value):'',...(kind==='playlist'&&isCourse(value)?{course:true}:{}),published:published.slice(0,100),...(kind==='video'?{...liveState(value),progress:progress(value)}:{})};
     }
     function collect(root){
         const records=[],filters=[],seen=new Set(),stack=[root];let scans=0;
@@ -118,7 +130,7 @@
         }
         return {records,filters};
     }
-    globalThis.MinimalYouTubeSearchData={label,url,youtube,channelURL,endpoint,image,playlistCount,isCourse,lessonPattern,record,collect,publishedPattern,watchingPattern};
+    globalThis.MinimalYouTubeSearchData={progress,label,url,youtube,channelURL,endpoint,image,playlistCount,isCourse,lessonPattern,record,collect,publishedPattern,watchingPattern};
     // Static MAIN injection also serves the first page after installation,
     // before the background has registered its optional response-pruning hook.
     if(typeof document!=='undefined'&&!globalThis.chrome?.runtime?.id)document.addEventListener('minimal-youtube:search-snapshot',()=>{
