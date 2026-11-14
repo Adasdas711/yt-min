@@ -37,6 +37,12 @@ def search(browser):
     assert tinted == [True, False, True], tinted
     colors = page.locator('#myt-search .media').evaluate_all("cards=>cards.map(card=>getComputedStyle(card).backgroundColor)")
     assert colors[0] != colors[1] and colors[0] == colors[2], colors
+    # Hovering a card makes its text bold, never underlined.
+    page.locator('#myt-search .media').nth(1).hover()
+    weight = page.locator('#myt-search .media-title').nth(1).evaluate('e=>getComputedStyle(e).fontWeight')
+    assert int(weight) >= 800, weight
+    assert page.locator('#myt-search .media-channel').nth(1).evaluate('e=>getComputedStyle(e).fontWeight') == '700'
+    assert page.locator('#myt-search .media-title').nth(0).evaluate('e=>getComputedStyle(e).fontWeight') == '700'
     width = page.locator('#myt-search .media .watched > i').first.evaluate('e=>e.style.width')
     assert width == '40%', width
     page.close()
@@ -77,6 +83,10 @@ def playlist(browser):
     assert tinted == [True, False], tinted
     colors = rows.evaluate_all("rows=>rows.map(row=>getComputedStyle(row).backgroundColor)")
     assert colors[0] != colors[1], colors
+    rows.nth(1).hover()
+    weight = rows.nth(1).evaluate("row=>getComputedStyle(row.shadowRoot.querySelector('h3')).fontWeight")
+    assert int(weight) >= 800, weight
+    assert rows.nth(0).evaluate("row=>getComputedStyle(row.shadowRoot.querySelector('h3')).fontWeight") != weight
     page.close()
     print('PASS playlist page: watched videos show the resume bar', flush=True)
 
@@ -115,6 +125,10 @@ def watch_panel(browser):
     assert labels == ['Watched 90%', '', ''], labels
     tinted = root.locator('.own-playlist-link').evaluate_all("links=>links.map(link=>link.hasAttribute('data-watched'))")
     assert tinted == [True, False, False], tinted
+    link = root.locator('.own-playlist-link').nth(2)
+    link.hover()
+    style = link.evaluate("l=>({name:getComputedStyle(l.querySelector('.own-playlist-name')).fontWeight,line:getComputedStyle(l.querySelector('.own-playlist-name')).textDecorationLine,channel:getComputedStyle(l.querySelector('.own-playlist-channel')).fontWeight})")
+    assert style == {'name': '800', 'line': 'none', 'channel': '700'}, style
     expect(root.locator('.own-playlist-watched').first).to_be_visible()
     page.close()
     print('PASS watch page playlist: watched videos show the resume bar', flush=True)
