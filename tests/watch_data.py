@@ -102,18 +102,35 @@ def theater_scroll(browser):
     long_list = "contents:[" + ",".join(f"panel('vid{n:08d}','Item {n}',{n},false)" for n in range(1, 60)) + ",panel('details','Data title from the page',60,true)]"
     response = RESPONSE.replace("contents:[panel('aaaaaaaaaaa','First in list',1,false),panel('details','Data title from the page',2,true),panel('ccccccccccc','Third in list',3,false)]", long_list)
     assert response != RESPONSE
+    long_text = ''.join(f'\\nParagraph {n}: a longer line of the description that wraps across the column.' for n in range(1, 40))
+    response = response.replace("const description='Intro at 1:05 and more at example.com plus #music';", "const description='Intro at 1:05 and more at example.com plus #music"+long_text+"';")
     page.evaluate("document.querySelector('ytd-watch-flexy').setAttribute('theater','')")
     page.evaluate(response)
     root = page.locator('#myt-watch')
     expect(root.locator('.own-playlist-name')).to_have_count(60)
     page.wait_for_function("[...document.querySelectorAll('[theater]')].some(node=>node.localName!=='ytd-watch-flexy')")
     page.wait_for_timeout(300)
-    box = root.locator('.sidecar').bounding_box()
-    assert box['height'] <= 960, box
+    sidecar, details = root.locator('.sidecar'), root.locator('.details')
+    collapsed = sidecar.bounding_box()
+    assert collapsed['height'] < 2000, collapsed
+    # The panel follows the details: as tall as they are, never taller.
+    assert abs(collapsed['height'] - details.bounding_box()['height']) < 4 or collapsed['height'] <= 400, (collapsed, details.bounding_box())
     scrollable = root.locator('.own-playlist-items').evaluate('e=>e.scrollHeight>e.clientHeight+100')
     assert scrollable, 'playlist items do not scroll inside the panel'
+    # Opening the description makes the panel taller; closing it shortens it again.
+    expand = root.locator('.expand')
+    expand.click()
+    expect(expand).to_have_attribute('aria-expanded', 'true')
+    page.wait_for_timeout(300)
+    opened = sidecar.bounding_box()
+    assert opened['height'] > collapsed['height'] + 20, (collapsed, opened)
+    assert abs(opened['height'] - details.bounding_box()['height']) < 4, (opened, details.bounding_box())
+    expand.click()
+    expect(expand).to_have_attribute('aria-expanded', 'false')
+    page.wait_for_timeout(300)
+    assert abs(sidecar.bounding_box()['height'] - collapsed['height']) < 4, (collapsed, sidecar.bounding_box())
     page.close()
-    print('PASS theater mode: a long playlist panel stays bounded and scrolls', flush=True)
+    print('PASS theater mode: the playlist panel follows the description height and scrolls', flush=True)
 
 def wheel_listeners(page):
     cdp = page.context.new_cdp_session(page)
