@@ -12,7 +12,7 @@ document.querySelector('ytd-watch-flexy').data={
   currentVideoEndpoint:{watchEndpoint:{videoId:'details'}},
   contents:{twoColumnWatchNextResults:{
     results:{results:{contents:[
-      {videoPrimaryInfoRenderer:{title:{runs:[{text:'Data title from the page'}]},viewCount:{videoViewCountRenderer:{viewCount:{simpleText:'1,234,567 views'}}},dateText:{simpleText:'Mar 5, 2024'}}},
+      {videoPrimaryInfoRenderer:{title:{runs:[{text:'Data title from the page'}]},viewCount:{videoViewCountRenderer:{originalViewCount:'0',viewCount:{simpleText:'1,234,567 views'}}},dateText:{simpleText:'Mar 5, 2024'}}},
       {videoSecondaryInfoRenderer:{owner:{videoOwnerRenderer:{title:{runs:[run('Data Owner','/@dataowner')]},thumbnail:{thumbnails:[{url:'https://yt3.ggpht.com/owner=s88',width:88}]}}},
         attributedDescription:{content:description,commandRuns:[
           {startIndex:9,length:4,onTap:{innertubeCommand:{commandMetadata:{webCommandMetadata:{url:'/watch?v=details&t=65s'}},watchEndpoint:{videoId:'details',startTimeSeconds:65}}}},
@@ -36,6 +36,8 @@ def check(browser, width):
     # Text comes from the page data, not the native DOM.
     expect(root.locator('#watch-title')).to_have_text('Data title from the page')
     expect(root.locator('.stats')).to_contain_text('5 March 2024')
+    # A navigation response's originalViewCount "0" does not hide the real count.
+    expect(root.locator('.stats')).to_contain_text('1.23')
     # Without a native owner, the page data names the channel.
     expect(root.locator('.owner .owner-name')).to_have_text('Data Owner')
     expect(root.locator('.owner .owner-name')).to_have_attribute('href', 'https://www.youtube.com/@dataowner')

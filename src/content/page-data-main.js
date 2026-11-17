@@ -414,7 +414,11 @@
             }
         }
         chapters.sort((a,b)=>a.seconds-b.seconds);
-        const viewText=data.label(primary.viewCount?.videoViewCountRenderer?.originalViewCount)||data.label(primary.viewCount?.videoViewCountRenderer?.viewCount)||data.label(header.views);
+        // A response fetched on in-app navigation (e.g. from search) can carry
+        // originalViewCount "0" next to the real label: a zero never outranks
+        // a real count from another field.
+        const viewCandidates=[primary.viewCount?.videoViewCountRenderer?.originalViewCount,primary.viewCount?.videoViewCountRenderer?.viewCount,header.views].map(value=>data.label(value).trim()).filter(Boolean);
+        const viewText=viewCandidates.find(text=>/[1-9]/.test(text))||viewCandidates[0]||'';
         const live=Boolean(primary.viewCount?.videoViewCountRenderer?.isLive);
         const views=!live&&/^\D*([\d][\d\s,.\u00a0\u202f]*)\D*$/.test(viewText)?viewText.replace(/\D/g,''):'';
         const ownerRenderer=secondary.owner?.videoOwnerRenderer||{},ownerRun=ownerRenderer.title?.runs?.find(run=>run.navigationEndpoint);
