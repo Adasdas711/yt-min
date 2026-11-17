@@ -191,6 +191,11 @@ main.has-sidecar .details { min-height:0; }
                 if(event.ctrlKey||!event.deltaY||Math.abs(event.deltaX)>Math.abs(event.deltaY))return;
                 const media=target?.closest('[data-myt-watch-island="media"]'),comments=target?.closest('[data-myt-watch-island="comments"]'),ownPage=path.includes(this.viewport);
                 if(target?.closest('[data-myt-watch-island="sidecar"]')){event.stopImmediatePropagation();return;}
+                if(comments&&this.wheelMode==='passive'){
+                    // Between its ends the comment list scrolls on the
+                    // browser's own path; the gesture only stays off YouTube.
+                    event.stopImmediatePropagation();return;
+                }
                 if(comments){
                     // Keep native replies/menus and their own scrollports, but
                     // never pass the gesture on to YouTube's hidden watch page.
@@ -234,8 +239,18 @@ main.has-sidecar .details { min-height:0; }
             // layer (player, comments, playlist) or in fullscreen; the owned
             // page scrolls on the browser's own, unblocked path.
             this.wheelGuards=new Set();
-            this.pointerGuard=event=>this.wheelGuard('pointer',event.composedPath().some(node=>node instanceof Element&&['media','comments','sidecar'].includes(node.getAttribute('data-myt-watch-island'))));
+            // Over the comments the listener is passive while the list can
+            // scroll either way, so wheel scrolling there never waits for
+            // the main thread; it blocks only at an end, where the gesture
+            // moves on to the owned page.
+            this.pointerGuard=event=>{
+                const island=event.composedPath().find(node=>node instanceof Element&&['media','comments','sidecar'].includes(node.getAttribute('data-myt-watch-island')));
+                this.commentsHover=island?.getAttribute('data-myt-watch-island')==='comments'?island:null;
+                this.wheelGuard('pointer',Boolean(island&&!this.commentsHover));this.updateCommentsGuard();
+            };
             window.addEventListener('pointerover',this.pointerGuard,{capture:true,passive:true});
+            this.commentsScroll=event=>{if(event.target===this.commentsHover)this.updateCommentsGuard();};
+            document.addEventListener('scroll',this.commentsScroll,{capture:true,passive:true});
             this.fullscreenTouch=event=>{if((document.fullscreenElement||this.fullscreenPending)&&!event.target.closest?.('.ytp-settings-menu,.ytp-panel,[role="menu"],[role="listbox"]')){event.preventDefault();event.stopImmediatePropagation();}};
             window.addEventListener('touchmove',this.fullscreenTouch,{capture:true,passive:false});
             this.geometry=()=>{
@@ -330,11 +345,17 @@ main.has-sidecar .details { min-height:0; }
             const title=section.querySelector('h2');if(title){title.tabIndex=-1;title.focus({preventScroll:true});}
         }
         wheelGuard(reason,on) {
-            const before=this.wheelGuards.size>0;
             if(on)this.wheelGuards.add(reason);else this.wheelGuards.delete(reason);
-            const after=this.wheelGuards.size>0;
-            if(after&&!before)window.addEventListener('wheel',this.nativeWheel,{capture:true,passive:false});
-            else if(!after&&before)window.removeEventListener('wheel',this.nativeWheel,{capture:true});
+            const mode=this.wheelGuards.size?'block':this.commentsHover?.isConnected?'passive':'';
+            if(mode===(this.wheelMode||''))return;
+            if(this.wheelMode)window.removeEventListener('wheel',this.nativeWheel,{capture:true});
+            this.wheelMode=mode;
+            if(mode)window.addEventListener('wheel',this.nativeWheel,{capture:true,passive:mode==='passive'});
+        }
+        updateCommentsGuard() {
+            const node=this.commentsHover;let edge=false;
+            if(node?.isConnected){const top=node.scrollTop;edge=top<=0||top+node.clientHeight>=node.scrollHeight-1;}
+            this.wheelGuard('comments-edge',edge);
         }
         prepareFullscreen(target=this.native.querySelector('#movie_player')||this.nativePlayer()) {
             if(this.fullscreenPending)return;
@@ -1403,7 +1424,7 @@ main.has-sidecar .details { min-height:0; }
             this.q('.transcript-status').textContent=data.length?(filtered.length?'':this.copy.noResults):(this.transcriptLoading?this.copy.loading:this.copy.unavailable);this.q('.transcript-retry').hidden=!!data.length||this.transcriptLoading;this.q('.transcript-search').hidden=!data.length;
         }
         closeTranscript() {this.transcriptOpen=false;clearTimeout(this.transcriptTimeout);if(this.q){this.q('#watch-transcript').hidden=true;this.q('.transcript-menu-toggle')?.setAttribute('aria-expanded','false');this.q('.transcript-content').hidden=true;this.q('.transcript-toggle').setAttribute('aria-expanded','false');}if(this.nativePanelState){for(const[name,value]of this.nativePanelState.attrs){if(value===null)this.nativePanelState.node.removeAttribute(name);else this.nativePanelState.node.setAttribute(name,value);}this.nativePanelState=null;}}
-        destroy() {this.watchFullscreenControls(false);clearTimeout(this.detailsTimer);this.markDormant([]);this.playlistStateObserver?.disconnect();this.restorePlaylistChrome();clearTimeout(this.titleTimer);cancelAnimationFrame(this.geometryFrame);cancelAnimationFrame(this.sourceFrame);this.subscriptionPress?.cancel();this.subscriptionPress=null;this.clearSubscription(true);this.clearFullscreenPreview();this.restoreFullscreenLayout();for(const type of ['click','dblclick','keydown','keyup'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);window.removeEventListener('pointerover',this.pointerGuard,true);this.wheelGuards?.clear();window.removeEventListener('touchmove',this.fullscreenTouch,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);for(const type of ['timeupdate','seeked'])this.media?.removeEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.removeEventListener(type,this.videoMetadata);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;window.dispatchEvent(new Event('resize'));}
+        destroy() {this.watchFullscreenControls(false);clearTimeout(this.detailsTimer);this.markDormant([]);this.playlistStateObserver?.disconnect();this.restorePlaylistChrome();clearTimeout(this.titleTimer);cancelAnimationFrame(this.geometryFrame);cancelAnimationFrame(this.sourceFrame);this.subscriptionPress?.cancel();this.subscriptionPress=null;this.clearSubscription(true);this.clearFullscreenPreview();this.restoreFullscreenLayout();for(const type of ['click','dblclick','keydown','keyup'])window.removeEventListener(type,this.fullscreenIntent,true);document.removeEventListener('fullscreenerror',this.fullscreenError);this.closeMore();this.closeTranscript();cancelAnimationFrame(this.resizeFrame);this.observer.disconnect();document.removeEventListener('keydown',this.shortcut);window.removeEventListener('wheel',this.nativeWheel,true);document.removeEventListener('scroll',this.commentsScroll,true);this.commentsHover=null;window.removeEventListener('pointerover',this.pointerGuard,true);this.wheelGuards?.clear();this.wheelMode="";window.removeEventListener('touchmove',this.fullscreenTouch,true);window.removeEventListener('resize',this.geometry);document.removeEventListener('fullscreenchange',this.fullscreen);for(const type of ['timeupdate','seeked'])this.media?.removeEventListener(type,this.videoTime);for(const type of ['loadedmetadata','resize'])this.media?.removeEventListener(type,this.videoMetadata);this.native.removeEventListener('load',this.sourceLoad,true);delete this.native.dataset.mytWatchSource;for(const node of [...this.islands.keys()])this.restore(node);this.host.remove();delete document.documentElement.dataset.mytWatchUi;window.dispatchEvent(new Event('resize'));}
     }
     WatchView.loadTitleFonts=loadTitleFonts;
     WatchView.readSubscriptionState=WatchView.prototype.subscriptionState;

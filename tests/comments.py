@@ -32,13 +32,22 @@ def check(browser,width,dark,panel=False):
     box=target.bounding_box();page.mouse.move(box['x']+50,min(box['y']+150,850 if width>600 else 800));page.mouse.wheel(0,300)
     page.wait_for_function('document.querySelector("[data-myt-watch-island=comments]").scrollTop>0')
     assert viewport.evaluate('e=>e.scrollTop')==before
+    # Between the list's ends the wheel listener is passive: native scrolling
+    # over the comments never waits for YouTube's busy main thread.
+    cdp=page.context.new_cdp_session(page);win=cdp.send('Runtime.evaluate',{'expression':'window'})['result']['objectId']
+    wheels=lambda:[l for l in cdp.send('DOMDebugger.getEventListeners',{'objectId':win})['listeners'] if l['type']=='wheel']
+    page.wait_for_function('document.querySelector("[data-myt-watch-island=comments]").scrollTop>0')
+    page.wait_for_timeout(100)
+    assert [l['passive'] for l in wheels()]==[True],wheels()
     result=target.evaluate('''e=>{
       const target=e.querySelector('#content-text'),start=performance.now();
       for(let i=0;i<120;i++)target.dispatchEvent(new WheelEvent('wheel',{deltaY:1,bubbles:true,cancelable:true,composed:true}));
       return {ms:performance.now()-start,leaks:__nativeWheelLeaks,scans:__commentFullScans};
     }''')
     assert result['leaks']==0 and result['scans']==0,result
-    target.evaluate('e=>e.scrollTop=0');page.mouse.wheel(0,-160)
+    target.evaluate('e=>e.scrollTop=0');page.wait_for_timeout(100)
+    assert [l['passive'] for l in wheels()]==[False],wheels()
+    page.mouse.wheel(0,-160)
     page.wait_for_function('document.querySelector("#myt-watch").firstChild.shadowRoot.querySelector(".viewport").scrollTop<'+str(before))
     assert page.evaluate('document.scrollingElement.scrollTop')==0
     assert page.evaluate('__commentNode===document.querySelector("ytd-comment-thread-renderer")&&__commentParent===__commentNode.parentElement')
