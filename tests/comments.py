@@ -45,7 +45,16 @@ def check(browser,width,dark,panel=False):
       return {ms:performance.now()-start,leaks:__nativeWheelLeaks,scans:__commentFullScans};
     }''')
     assert result['leaks']==0 and result['scans']==0,result
-    target.evaluate('e=>e.scrollTop=0');page.wait_for_timeout(100)
+    # A quick flick up that reaches the top of the list stops there, momentum
+    # included: the page itself does not move.
+    target.evaluate('e=>e.scrollTop=600');page.wait_for_timeout(300)
+    for _ in range(30):page.mouse.wheel(0,-120);page.wait_for_timeout(16)
+    page.wait_for_function('document.querySelector("[data-myt-watch-island=comments]").scrollTop===0')
+    for _ in range(10):page.mouse.wheel(0,-120);page.wait_for_timeout(16)
+    page.wait_for_timeout(300)
+    assert viewport.evaluate('e=>e.scrollTop')==before,(viewport.evaluate('e=>e.scrollTop'),before)
+    # A new gesture after a pause moves on to the page.
+    target.evaluate('e=>e.scrollTop=0');page.wait_for_timeout(400)
     assert [l['passive'] for l in wheels()]==[False],wheels()
     page.mouse.wheel(0,-160)
     page.wait_for_function('document.querySelector("#myt-watch").firstChild.shadowRoot.querySelector(".viewport").scrollTop<'+str(before))
