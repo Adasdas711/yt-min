@@ -634,7 +634,7 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
             for(const [id,source]of this.virtualSources)if(!dataRecords.has(source))this.virtualSources.delete(id);
             this.model=model;document.documentElement.toggleAttribute('data-myt-page-data',Boolean(model));
             const wanted=new Set(sources);
-            const stream=[],groups=new Map();
+            const stream=[],groups=new Map(),shownResults=new Set();
             for(const source of sources){
                 const record=dataRecords.get(source)||records.get(this.sources.get(source)),kind=record?.kind||source.getAttribute('data-myt-search-source-kind');
                 if(kind==='channel'){
@@ -650,6 +650,11 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
                 const shelf=dataGroup?this.dataGroup(dataGroup):source.closest(shelfSelector),header=dataGroup?null:shelf?.querySelector('#title-container,#header,h2,[role="heading"]'),label=dataGroup||channelText(header?.querySelector('#title,h2,h3,.ytShelfHeaderLayoutTitle')||header);
                 if(!this.channel&&shelf&&label&&!knownGroup(label))continue;
                 const value=this.read(source,kind,record);if(!value)continue;
+                // One card per video or playlist: YouTube can repeat a result
+                // in the list, in a shelf or after a continuation.
+                const resultKey=(()=>{try{const url=new URL(value.href,location.href);return kind==='video'?'v:'+(url.searchParams.get('v')||url.pathname):'p:'+(url.searchParams.get('list')||url.pathname);}catch{return '';}})();
+                if(resultKey&&shownResults.has(resultKey)){this.cards.get(source)?.destroy();this.cards.delete(source);continue;}
+                if(resultKey)shownResults.add(resultKey);
                 let card=this.cards.get(source);if(card&&card.host.dataset.kind!==kind){card.destroy();card=null;}if(!card){card=new MediaCard(source,kind);this.cards.set(source,card);}card.record=record;card.update(value);
                 if(shelf&&label){
                     let group=groups.get(shelf);if(!group){
