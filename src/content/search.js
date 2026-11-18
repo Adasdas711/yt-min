@@ -612,10 +612,20 @@ html.minimal-youtube[data-myt-search-ui] ytd-search [data-myt-native-filters] { 
                 // A channel without a native card (YouTube's newer channel
                 // lockups) gets its card from the data: name, photo and link.
                 const channelPath=value=>{try{return new URL(value,location.href).pathname.replace(/\/$/,'').toLowerCase();}catch{return '';}};
-                const nativeChannels=new Set(sources.flatMap(source=>[...source.querySelectorAll('a[href]')].map(link=>channelPath(link.href))).filter(Boolean));
+                // One card per channel: YouTube can list the same channel
+                // several times (repeated lockups, continuations, a native
+                // card next to its data), under its handle or its id.
+                const channelKeys=(record,source)=>[...(source?[...source.querySelectorAll('a[href]')].map(link=>channelPath(link.href)):[]),channelPath(record?.href||''),
+                    /^UC[-\w]{10,}$/.test(record?.id||'')?'/channel/'+record.id.toLowerCase():'',/^@/.test(record?.handle||'')?'/'+record.handle.toLowerCase():''].filter(path=>/^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)$/.test(path));
+                const nativeChannels=new Set();
+                sources=sources.filter(source=>{const keys=channelKeys(records.get(this.sources.get(source)),source);if(keys.some(key=>nativeChannels.has(key)))return false;for(const key of keys)nativeChannels.add(key);return true;});
                 for(const record of model.items){
                     if(typeof record?.href!=='string'||!youtubeURL(record.href))continue;
-                    if(record.kind==='channel'&&(this.channel||nativeChannels.has(channelPath(record.href))))continue;
+                    if(record.kind==='channel'){
+                        const keys=channelKeys(record);
+                        if(this.channel||keys.some(key=>nativeChannels.has(key)))continue;
+                        for(const key of keys)nativeChannels.add(key);
+                    }
                     const id=record.href+'|'+(record.group||'');
                     let source=this.virtualSources.get(id);if(!source){source=document.createElement('div');this.virtualSources.set(id,source);}
                     dataRecords.set(source,record);sources.push(source);
