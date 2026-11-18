@@ -36,7 +36,8 @@ def search_page(browser):
     page.evaluate(CONFIG + ITEM + """
       document.querySelector('ytd-search').data={contents:{twoColumnSearchResultsRenderer:{primaryContents:{sectionListRenderer:{contents:[
         {itemSectionRenderer:{contents:[item('dataVideo01','Data one'),
-          {shelfRenderer:{title:{simpleText:'People also watched'},content:{verticalListRenderer:{items:[item('dataVideo02','Data two')]}}}},
+          {shelfRenderer:{title:{simpleText:'People also watched'},content:{verticalListRenderer:{items:[item('dataVideo02','Data two'),item('dataVideo01','Data one')]}}}},
+          item('dataVideo01','Data one'),
           {shelfRenderer:{title:{simpleText:'Shorts'},content:{verticalListRenderer:{items:[item('shortVideo1','Short in shelf')]}}}},
           {reelShelfRenderer:{items:[]}},
           {backstagePostThreadRenderer:{post:{backstagePostRenderer:{postId:'UgSearchPost',contentText:{runs:[{text:'A post in search'}]},authorText:{runs:[{text:'Poster'}]}}}}},
@@ -49,7 +50,7 @@ def search_page(browser):
             {channelRenderer:{channelId:'UCdatachannel00000000000',title:{simpleText:'Data Channel'},navigationEndpoint:{browseEndpoint:{browseId:'UCdatachannel00000000000',canonicalBaseUrl:'/@datachannel'}}}}]}}}},
           {channelRenderer:{channelId:'UCdatachannel00000000000',title:{simpleText:'Data Channel'},navigationEndpoint:{browseEndpoint:{browseId:'UCdatachannel00000000000'}}}},
           {channelRenderer:{channelId:'UCcreator100000000000000',title:{simpleText:'Creator 1'},subscriberCountText:{simpleText:'@creator1'},navigationEndpoint:{browseEndpoint:{browseId:'UCcreator100000000000000'}}}},
-          item('dataVideo03','Data three')]}},
+          item('dataVideo03','Data three'),item('dataVideo02','Data two')]}},
         more('page-two')],
         subMenu:{searchSubMenuRenderer:{groups:[
           {searchFilterGroupRenderer:{title:{simpleText:'Upload date'},filters:[
