@@ -194,7 +194,7 @@ main.has-sidecar .details { min-height:0; }
                 if(comments&&this.wheelMode==='passive'){
                     // Between its ends the comment list scrolls on the
                     // browser's own path; the gesture only stays off YouTube.
-                    event.stopImmediatePropagation();return;
+                    this.commentsLatch=performance.now();event.stopImmediatePropagation();return;
                 }
                 if(comments){
                     // Keep native replies/menus and their own scrollports, but
@@ -202,9 +202,13 @@ main.has-sidecar .details { min-height:0; }
                     for(const node of path){
                         const scrollable=node.scrollHeight>node.clientHeight+1&&/^(auto|scroll)$/.test(getComputedStyle(node).overflowY);
                         const available=event.deltaY>0?node.scrollTop+node.clientHeight<node.scrollHeight-1:node.scrollTop>0;
-                        if(scrollable&&available){event.stopImmediatePropagation();return;}
+                        if(scrollable&&available){this.commentsLatch=performance.now();event.stopImmediatePropagation();return;}
                         if(node===comments)break;
                     }
+                    // A gesture that brought the list to its end stops there,
+                    // momentum included; only a new gesture moves the page.
+                    const now=performance.now();
+                    if(now-(this.commentsLatch||0)<250){this.commentsLatch=now;event.preventDefault();event.stopImmediatePropagation();return;}
                 }
                 // The owned page is the viewport itself: the browser scrolls it
                 // natively and smoothly, and overscroll-behavior keeps the
@@ -249,7 +253,7 @@ main.has-sidecar .details { min-height:0; }
                 this.wheelGuard('pointer',Boolean(island&&!this.commentsHover));this.updateCommentsGuard();
             };
             window.addEventListener('pointerover',this.pointerGuard,{capture:true,passive:true});
-            this.commentsScroll=event=>{if(event.target===this.commentsHover)this.updateCommentsGuard();};
+            this.commentsScroll=event=>{if(event.target===this.commentsHover){this.commentsLatch=performance.now();this.updateCommentsGuard();}};
             document.addEventListener('scroll',this.commentsScroll,{capture:true,passive:true});
             this.fullscreenTouch=event=>{if((document.fullscreenElement||this.fullscreenPending)&&!event.target.closest?.('.ytp-settings-menu,.ytp-panel,[role="menu"],[role="listbox"]')){event.preventDefault();event.stopImmediatePropagation();}};
             window.addEventListener('touchmove',this.fullscreenTouch,{capture:true,passive:false});
