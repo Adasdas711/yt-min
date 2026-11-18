@@ -44,6 +44,11 @@ def search_page(browser):
           {videoRenderer:{videoId:'shortVideo2',title:{runs:[{text:'Reel'}]},navigationEndpoint:{reelWatchEndpoint:{videoId:'shortVideo2'}}}},
           {channelRenderer:{channelId:'UCdatachannel00000000000',title:{simpleText:'Data Channel'},navigationEndpoint:{commandMetadata:{webCommandMetadata:{url:'/@datachannel'}},browseEndpoint:{browseId:'UCdatachannel00000000000',canonicalBaseUrl:'/@datachannel'}},
             thumbnail:{thumbnails:[{url:'https://yt3.ggpht.com/datachannel=s176',width:176}]},subscriberCountText:{simpleText:'1.2M subscribers'}}},
+          // The same channels again, in a shelf and by channel id: one card each.
+          {shelfRenderer:{title:{simpleText:'People also watched'},content:{verticalListRenderer:{items:[
+            {channelRenderer:{channelId:'UCdatachannel00000000000',title:{simpleText:'Data Channel'},navigationEndpoint:{browseEndpoint:{browseId:'UCdatachannel00000000000',canonicalBaseUrl:'/@datachannel'}}}}]}}}},
+          {channelRenderer:{channelId:'UCdatachannel00000000000',title:{simpleText:'Data Channel'},navigationEndpoint:{browseEndpoint:{browseId:'UCdatachannel00000000000'}}}},
+          {channelRenderer:{channelId:'UCcreator100000000000000',title:{simpleText:'Creator 1'},subscriberCountText:{simpleText:'@creator1'},navigationEndpoint:{browseEndpoint:{browseId:'UCcreator100000000000000'}}}},
           item('dataVideo03','Data three')]}},
         more('page-two')],
         subMenu:{searchSubMenuRenderer:{groups:[
