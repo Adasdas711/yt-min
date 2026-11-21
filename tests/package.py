@@ -1,6 +1,6 @@
 """Two store builds from one source: Chrome Web Store and Firefox Add-ons (AMO).
 
-scripts/package.py writes articafts/minimal-youtube-<version>.zip (Chrome,
+scripts/package.py writes builds/minimal-youtube-<version>.zip (Chrome,
 the repository manifest unchanged) and ...-<version>-firefox.zip (the same
 files; only manifest.json differs: an event-page background instead of a
 service worker, a Gecko ID, Firefox 128+ and the data collection
@@ -30,7 +30,7 @@ def main():
     subprocess.run([sys.executable, str(ROOT / 'scripts/package.py')], check=True, capture_output=True)
     source = json.loads((ROOT / 'manifest.json').read_text())
     version = source['version']
-    chrome_zip, firefox_zip = ROOT / f'articafts/minimal-youtube-{version}.zip', ROOT / f'articafts/minimal-youtube-{version}-firefox.zip'
+    chrome_zip, firefox_zip = ROOT / f'builds/minimal-youtube-{version}.zip', ROOT / f'builds/minimal-youtube-{version}-firefox.zip'
     with ZipFile(chrome_zip) as chrome, ZipFile(firefox_zip) as firefox:
         assert chrome.testzip() is None and firefox.testzip() is None
         # The same files; only the manifest differs.
@@ -38,7 +38,7 @@ def main():
         for name in chrome.namelist():
             if name != 'manifest.json':
                 assert chrome.read(name) == firefox.read(name), name
-        assert not any(name.startswith(('tests/', 'scripts/', '_metadata/', 'articafts/', '.git')) for name in chrome.namelist())
+        assert not any(name.startswith(('tests/', 'scripts/', '_metadata/', 'builds/', '.git')) for name in chrome.namelist())
         chrome_manifest = json.loads(chrome.read('manifest.json'))
         firefox_manifest = json.loads(firefox.read('manifest.json'))
     # Chrome: the repository manifest as it is.

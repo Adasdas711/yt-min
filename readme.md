@@ -146,8 +146,8 @@
 ## Установка
 
 Готовые сборки:
-- Chrome / Chromium / Edge и Chrome Web Store: [articafts/minimal-youtube-1.0.0.zip](articafts/minimal-youtube-1.0.0.zip).
-- Firefox 128+ и Firefox Add-ons (AMO): [articafts/minimal-youtube-1.0.0-firefox.zip](articafts/minimal-youtube-1.0.0-firefox.zip). Те же файлы, отличается только `manifest.json`: фоновый скрипт вместо service worker, ID `minimal-youtube@yt-min.extension` и объявление `data_collection_permissions: none`. Для проверки без публикации: `about:debugging#/runtime/this-firefox` → «Загрузить временное дополнение…» → выбрать ZIP.
+- Chrome / Chromium / Edge и Chrome Web Store: [builds/minimal-youtube-1.0.0.zip](builds/minimal-youtube-1.0.0.zip).
+- Firefox 128+ и Firefox Add-ons (AMO): [builds/minimal-youtube-1.0.0-firefox.zip](builds/minimal-youtube-1.0.0-firefox.zip). Те же файлы, отличается только `manifest.json`: фоновый скрипт вместо service worker, ID `minimal-youtube@yt-min.extension` и объявление `data_collection_permissions: none`. Для проверки без публикации: `about:debugging#/runtime/this-firefox` → «Загрузить временное дополнение…» → выбрать ZIP.
 
 Публикация: Chrome-архив загружается в Chrome Web Store Developer Dashboard как есть; Firefox-архив — на addons.mozilla.org. Исходный код не минифицирован и не собирается сборщиком, поэтому отдельный архив исходников для AMO не нужен.
 
@@ -184,7 +184,7 @@
 
 ## Разработка и проверка
 
-Исходники находятся в `src/`, зависимости и сборка JavaScript не нужны. В `articafts/` хранится только актуальный архив расширения.
+Исходники находятся в `src/`, зависимости и сборка JavaScript не нужны. В `builds/` хранится только актуальный архив расширения.
 
 ```sh
 cd /workspace/yt-min
@@ -284,7 +284,7 @@ python scripts/package.py
 
 После установки проверьте главную, канал (главная/видео/плейлисты), поиск, обычное видео, прямую трансляцию и её запись без чата, плейлист, меню «Ещё» → «Поделиться», прямую ссылку на Shorts, переходы назад/вперёд и переключатель расширения. Убедитесь, что комментарии открываются и закрываются пунктом меню «Ещё», а на другом видео снова сворачиваются; выберите тему на главной и обновите страницу. Проверьте светлую и тёмную темы, обычный, театральный и полноэкранный режимы просмотра. YouTube меняет разметку и проводит A/B-тесты: отдельные варианты интерфейса могут потребовать обновления селекторов.
 
-Команда упаковки `python scripts/package.py` создаёт два воспроизводимых ZIP в `articafts/` (Chrome и Firefox) с `manifest.json` в корне, без метаданных Web Store, тестов и инструментов разработки. Готовые архивы сохранены в репозитории; `tests/package.py` проверяет, что они совпадают по файлам и различаются только манифестом.
+Команда упаковки `python scripts/package.py` создаёт два воспроизводимых ZIP в `builds/` (Chrome и Firefox) с `manifest.json` в корне, без метаданных Web Store, тестов и инструментов разработки. Готовые архивы сохранены в репозитории; `tests/package.py` проверяет, что они совпадают по файлам и различаются только манифестом.
 
 ## Измерение памяти
 
