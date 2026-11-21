@@ -2419,3 +2419,7 @@ html.minimal-youtube .myt-loading-more span:nth-child(3) { animation-delay: .4s;
 @keyframes myt-pulse { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { html.minimal-youtube :is(.myt-playlist-skeleton-row > *, .myt-loading-more span) { animation: none; } }
 @media (max-width: 600px) { html.minimal-youtube .myt-playlist-skeleton-row { grid-template-columns: 120px minmax(0,1fr); } html.minimal-youtube .myt-playlist-skeleton-row > span:first-child { display: none; } }
+
+/* An ad that still shows (server-stitched in streams) is muted by ads.js;
+   its picture stays hidden. YouTube's own ad controls remain visible. */
+html.minimal-youtube .html5-video-player:is(.ad-showing,.ad-interrupting) video.html5-main-video { opacity: 0 !important; }

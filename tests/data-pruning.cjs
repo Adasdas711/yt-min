@@ -185,6 +185,15 @@ async function main() {
         assert(!breakAnswer.adPlacements && !breakAnswer.adSlots);
         assert.equal(breakAnswer.responseContext.visitorData, 'keep');
     }
+    // Streams and their recordings: server-stitched ads need their ad data,
+    // or the player stalls on a black screen. It stays, for the player
+    // response and for the ad-break answers that follow it.
+    const livePlayer = parse({ ...adPlayer, videoDetails: { videoId: 'stream', isLiveContent: true }, adPlacements: [{ slot: 'stitched' }], adSlots: [{ slot: 'stitched' }] });
+    assert.equal(livePlayer.adPlacements.length, 1);assert.equal(livePlayer.adSlots.length, 1);
+    assert.equal(parse({ responseContext: {}, adPlacements: [{ slot: 'live-break' }] }).adPlacements.length, 1);
+    // An ordinary video after it is ad-free again, its ad-break answers too.
+    assert(!parse({ ...adPlayer, adPlacements: [1] }).adPlacements);
+    assert(!parse({ responseContext: {}, adPlacements: [{ slot: 'vod-break' }] }).adPlacements);
     const prefetched = parse({ playerResponse: { ...adPlayer, adSlots: [1] } });
     assert(!prefetched.playerResponse.adSlots);
     const adOnly = parse({ responseContext: { visitorData: 'keep' }, adSlots: [1], adPlacements: [2], tracking: 'keep' });
