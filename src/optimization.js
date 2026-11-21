@@ -50,24 +50,12 @@
                         excludedInitiatorDomains: ["music.youtube.com"],
                         excludedRequestDomains: ["music.youtube.com"],
                     },
-                }, {
-                    id: adRuleIds[0], priority: 1, action: { type: "block" },
-                    condition: {
-                        regexFilter: "^https://([a-z0-9-]+\\.)*(doubleclick\\.net|googleadservices\\.com|googlesyndication\\.com)/(pagead/|gampad/|pcs/|ddm/|simgad/)",
-                        initiatorDomains: ["youtube.com"], excludedInitiatorDomains: ["music.youtube.com"],
-                        resourceTypes: ["script", "xmlhttprequest", "sub_frame", "image", "media", "ping"],
-                    },
-                }, {
-                    // The ad-break request is not blocked: a live stream waits
-                    // for its answer at every ad cue and stays black without it.
-                    // The answer loads; its ads are removed in the page
-                    // (data-pruning.js), so nothing plays.
-                    id: adRuleIds[1], priority: 1, action: { type: "block" },
-                    condition: {
-                        regexFilter: "^https://([a-z0-9-]+\\.)?youtube\\.com/(pagead/|api/stats/ads([/?]|$))",
-                        initiatorDomains: ["youtube.com"], excludedInitiatorDomains: ["music.youtube.com"],
-                        resourceTypes: ["script", "xmlhttprequest", "sub_frame", "image", "media", "ping"],
-                    },
+                    // Ad requests are not blocked: the player waits for them
+                    // (ad breaks, server-stitched stream ads) and stays black
+                    // when they fail. Ads load but do not play: their data is
+                    // removed from ordinary videos (data-pruning.js) and an ad
+                    // that still shows is muted and hidden (ads.js). Old
+                    // releases' ad rules are removed above.
                 }, {
                     id: extrasRuleId, priority: 1, action: { type: "block" },
                     condition: {
