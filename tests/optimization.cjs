@@ -91,7 +91,9 @@ async function main() {
         assert(!ad.condition.resourceTypes.includes('main_frame'));
     }
     const blocksAdURL = url => adRules.some(rule => new RegExp(rule.condition.regexFilter).test(url));
-    for (const url of ['https://googleads.g.doubleclick.net/pagead/ads?slot=1', 'https://pubads.g.doubleclick.net/gampad/ads', 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', 'https://www.googleadservices.com/pagead/conversion', 'https://www.youtube.com/pagead/adview', 'https://www.youtube.com/api/stats/ads?ver=2', 'https://www.youtube.com/youtubei/v1/player/ad_break?prettyPrint=false']) assert(blocksAdURL(url), url);
+    for (const url of ['https://googleads.g.doubleclick.net/pagead/ads?slot=1', 'https://pubads.g.doubleclick.net/gampad/ads', 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', 'https://www.googleadservices.com/pagead/conversion', 'https://www.youtube.com/pagead/adview', 'https://www.youtube.com/api/stats/ads?ver=2']) assert(blocksAdURL(url), url);
+    // A live stream waits for the ad-break answer; it loads and is emptied in the page.
+    assert(!blocksAdURL('https://www.youtube.com/youtubei/v1/player/ad_break?prettyPrint=false'));
     for (const url of ['https://rr1---sn.example.googlevideo.com/videoplayback?sig=keep&ad=word', 'https://www.youtube.com/youtubei/v1/player?videoId=keep', 'https://www.youtube.com/youtubei/v1/next', 'https://www.youtube.com/api/stats/watchtime', 'https://www.youtube.com/watch?v=ad123', 'https://i.ytimg.com/vi/video/default.jpg', 'https://static.doubleclick.net/instream/ad_status.js', 'https://www.youtube.com/s/player/native/base.js', 'https://doubleclick.net.example/pagead/ads']) assert(!blocksAdURL(url), url);
     const home = { id: chrome.runtime.id, url: chrome.runtime.getURL("src/home/index.html") + "?hl=ru", frameId: 0 };
     const request = (action, sender = home, extra = {}) => new Promise(resolve => {

@@ -58,9 +58,13 @@
                         resourceTypes: ["script", "xmlhttprequest", "sub_frame", "image", "media", "ping"],
                     },
                 }, {
+                    // The ad-break request is not blocked: a live stream waits
+                    // for its answer at every ad cue and stays black without it.
+                    // The answer loads; its ads are removed in the page
+                    // (data-pruning.js), so nothing plays.
                     id: adRuleIds[1], priority: 1, action: { type: "block" },
                     condition: {
-                        regexFilter: "^https://([a-z0-9-]+\\.)?youtube\\.com/(pagead/|api/stats/ads([/?]|$)|youtubei/v1/player/ad_break([/?]|$))",
+                        regexFilter: "^https://([a-z0-9-]+\\.)?youtube\\.com/(pagead/|api/stats/ads([/?]|$))",
                         initiatorDomains: ["youtube.com"], excludedInitiatorDomains: ["music.youtube.com"],
                         resourceTypes: ["script", "xmlhttprequest", "sub_frame", "image", "media", "ping"],
                     },

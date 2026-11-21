@@ -179,6 +179,12 @@ async function main() {
         assert.deepEqual(JSON.parse(JSON.stringify(response.streamingData)), stream);
         assert.equal(response.playabilityStatus.status, 'OK');
     }
+    // A live stream's ad-break answer loads (it is not blocked) but carries no ads.
+    for (const breakAnswer of [parse({ responseContext: { visitorData: 'keep' }, adPlacements: [{ slot: 'live-mid-roll' }], adSlots: [{ slot: 'live' }] }),
+        await new Response({ responseContext: { visitorData: 'keep' }, adPlacements: [{ slot: 'live-mid-roll' }] }).json()]) {
+        assert(!breakAnswer.adPlacements && !breakAnswer.adSlots);
+        assert.equal(breakAnswer.responseContext.visitorData, 'keep');
+    }
     const prefetched = parse({ playerResponse: { ...adPlayer, adSlots: [1] } });
     assert(!prefetched.playerResponse.adSlots);
     const adOnly = parse({ responseContext: { visitorData: 'keep' }, adSlots: [1], adPlacements: [2], tracking: 'keep' });
