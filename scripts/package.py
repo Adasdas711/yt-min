@@ -63,5 +63,5 @@ def build(output, manifest_text):
 
 
 version = manifest['version']
-build(ROOT / 'articafts' / f'minimal-youtube-{version}.zip', (ROOT / 'manifest.json').read_text())
-build(ROOT / 'articafts' / f'minimal-youtube-{version}-firefox.zip', json.dumps(firefox_manifest(manifest), indent=4, ensure_ascii=False) + '\n')
+build(ROOT / 'builds' / f'minimal-youtube-{version}.zip', (ROOT / 'manifest.json').read_text())
+build(ROOT / 'builds' / f'minimal-youtube-{version}-firefox.zip', json.dumps(firefox_manifest(manifest), indent=4, ensure_ascii=False) + '\n')
