@@ -49,10 +49,7 @@
         "service_worker": "src/background.js"
     },
     "host_permissions": [
-        "https://*.youtube.com/*",
-        "https://*.doubleclick.net/*",
-        "https://*.googleadservices.com/*",
-        "https://*.googlesyndication.com/*"
+        "https://*.youtube.com/*"
     ],
     "permissions": [
         "storage",
