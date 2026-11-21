@@ -17,12 +17,16 @@ const lockup=(id,title)=>({lockupViewModel:{contentId:id,contentType:'LOCKUP_CON
   contentImage:{thumbnailViewModel:{image:{sources:[{url:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg',width:480}]},
     overlays:[{thumbnailOverlayBadgeViewModel:{thumbnailBadges:[{thumbnailBadgeViewModel:{text:'LIVE',badgeStyle:'THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE'}}]}}]}},
   metadata:{lockupMetadataViewModel:{title:{content:title},metadata:{contentMetadataViewModel:{metadataRows:[{metadataParts:[{text:{content:'88 watching'}}]}]}}}},
-  rendererContext:{commandContext:{onTap:{innertubeCommand:{commandMetadata:{webCommandMetadata:{url:'/watch?v='+id}},watchEndpoint:{videoId:id}}}}}}});"""
+  rendererContext:{commandContext:{onTap:{innertubeCommand:{commandMetadata:{webCommandMetadata:{url:'/watch?v='+id}},watchEndpoint:{videoId:id}}}}}}});
+const timed=(id,title,length,published)=>{const value=item(id,title,'',published);value.videoRenderer.lengthText={simpleText:length};return value;};
+const recordedLockup=(id,title)=>{const value=lockup(id,title),meta=value.lockupViewModel.metadata.lockupMetadataViewModel.metadata.contentMetadataViewModel;
+  value.lockupViewModel.contentImage.thumbnailViewModel.overlays=[{thumbnailOverlayBadgeViewModel:{thumbnailBadges:[{thumbnailBadgeViewModel:{text:'1:02:03',badgeStyle:'THUMBNAIL_OVERLAY_BADGE_STYLE_DEFAULT'}}]}}];
+  meta.metadataRows=[{metadataParts:[{text:{content:'5 days ago'}}]}];return value;};"""
 
 
 def badges(page):
     return page.locator('#myt-search .media').evaluate_all(
-        "cards=>cards.map(c=>[c.querySelector('.media-title').textContent,Boolean(c.querySelector('.live-badge')&&!c.querySelector('.live-badge').hidden&&c.querySelector('.live-badge').getClientRects().length),c.querySelector('.media-date').textContent])")
+        "cards=>cards.map(c=>[c.querySelector('.media-title').textContent,Boolean(c.querySelector('.live-badge')&&!c.querySelector('.live-badge').hidden&&c.querySelector('.live-badge').getClientRects().length),c.querySelector('.media-date').textContent,(d=>d&&!d.hidden&&d.getClientRects().length?d.textContent:'')(c.querySelector('.duration-badge'))])")
 
 
 def search(browser, width):
@@ -31,10 +35,11 @@ def search(browser, width):
     page = setup(browser, '/results?search_query=stream', body, width=width)
     page.evaluate(CONFIG + ITEM + LIVE + """
       document.querySelector('ytd-search').data={contents:{twoColumnSearchResultsRenderer:{primaryContents:{sectionListRenderer:{contents:[
-        {itemSectionRenderer:{contents:[live('liveVideo01','Live now'),item('dataVideo01','Recorded'),lockup('liveLockup1','Lockup live')]}}]}}}}};
+        {itemSectionRenderer:{contents:[live('liveVideo01','Live now'),timed('dataVideo01','Recorded','12:34'),lockup('liveLockup1','Lockup live'),recordedLockup('dataLockup1','Lockup recorded')]}}]}}}}};
       document.dispatchEvent(new Event('yt-page-data-updated'));""")
-    expect(page.locator('#myt-search .media-title')).to_have_text(['Live now', 'Recorded', 'Lockup live'])
-    assert badges(page) == [['Live now', True, '1,234 watching'], ['Recorded', False, '3 days ago'], ['Lockup live', True, '88 watching']], badges(page)
+    expect(page.locator('#myt-search .media-title')).to_have_text(['Live now', 'Recorded', 'Lockup live', 'Lockup recorded'])
+    # Recorded videos show their length; live streams show LIVE and no length.
+    assert badges(page) == [['Live now', True, '1,234 watching', ''], ['Recorded', False, '3 days ago', '12:34'], ['Lockup live', True, '88 watching', ''], ['Lockup recorded', False, '5 days ago', '1:02:03']], badges(page)
     page.close()
     print(f'PASS search: live cards show LIVE and viewers: {width}px', flush=True)
 
@@ -45,10 +50,10 @@ def channel(browser):
     page.evaluate(CONFIG + ITEM + LIVE + """
       const tab=(name,selected,content)=>({tabRenderer:{title:name,selected,endpoint:{commandMetadata:{webCommandMetadata:{url:'/@creator/'+name.toLowerCase()}}},content}});
       document.querySelector('ytd-browse').data={contents:{twoColumnBrowseResultsRenderer:{tabs:[
-        tab('Videos',true,{richGridRenderer:{contents:[{richItemRenderer:{content:live('chanLive001','Streaming now')}},{richItemRenderer:{content:item('chanVideo02','Past stream','','Streamed 2 days ago')}}]}})]}}};
+        tab('Videos',true,{richGridRenderer:{contents:[{richItemRenderer:{content:live('chanLive001','Streaming now')}},{richItemRenderer:{content:timed('chanVideo02','Past stream','3:45:10','Streamed 2 days ago')}}]}})]}}};
       document.dispatchEvent(new Event('yt-page-data-updated'));""")
     expect(page.locator('#myt-search .media-title')).to_have_text(['Streaming now', 'Past stream'])
-    assert badges(page) == [['Streaming now', True, '1,234 watching'], ['Past stream', False, 'Streamed 2 days ago']], badges(page)
+    assert badges(page) == [['Streaming now', True, '1,234 watching', ''], ['Past stream', False, 'Streamed 2 days ago', '3:45:10']], badges(page)
     page.close()
     print('PASS channel: the live stream card shows LIVE and viewers', flush=True)
 
@@ -58,9 +63,13 @@ def native_fallback(browser):
             + video(1) + '</div></ytd-item-section-renderer></div></ytd-section-list-renderer></ytd-search></ytd-page-manager></ytd-app>')
     page = setup(browser, '/results?search_query=stream', body)
     expect(page.locator('#myt-search .media')).to_have_count(1)
-    page.evaluate("""()=>{const v=document.querySelector('ytd-video-renderer');
+    # A recorded video's length comes from its native time overlay.
+    page.evaluate("""()=>document.querySelector('ytd-video-renderer').insertAdjacentHTML('beforeend','<ytd-thumbnail-overlay-time-status-renderer id="native-time">9:59</ytd-thumbnail-overlay-time-status-renderer>')""")
+    expect(page.locator('#myt-search .duration-badge')).to_have_text('9:59')
+    page.evaluate("""()=>{const v=document.querySelector('ytd-video-renderer');document.getElementById('native-time').remove();
       v.insertAdjacentHTML('beforeend','<ytd-thumbnail-overlay-time-status-renderer overlay-style="LIVE">LIVE</ytd-thumbnail-overlay-time-status-renderer>');}""")
     expect(page.locator('#myt-search .live-badge')).to_be_visible()
+    expect(page.locator('#myt-search .duration-badge')).to_be_hidden()
     page.close()
     print('PASS search without page data: a native LIVE overlay marks the card', flush=True)
 

@@ -88,6 +88,19 @@
         if(viewers)live=true;
         return {live,viewers:viewers.trim().slice(0,60)};
     }
+    // A video's length: its own field, the time overlay on its cover, or the
+    // time badge of a lockup ("12:34", "1:02:03").
+    const durationPattern=/^\d{1,3}:\d{2}(?::\d{2})?$/;
+    function duration(value){
+        const own=label(value.lengthText).trim();if(durationPattern.test(own))return own;
+        const stack=[value.thumbnailOverlays,value.contentImage,value.thumbnail?.thumbnailOverlays];let scans=0;
+        while(stack.length&&scans++<600){
+            const item=stack.pop();if(!item||typeof item!=='object')continue;
+            for(const key of ['text','simpleText','content']){const text=typeof item[key]==='string'?item[key].trim():'';if(durationPattern.test(text))return text;}
+            for(const child of Object.values(item))if(child&&typeof child==='object')stack.push(child);
+        }
+        return '';
+    }
     const publishedPattern=/\bago\b|назад|^(?:streamed|premiered|scheduled)\b|^(?:трансляция|премьера)/iu;
     function record(input,hint=''){
         if(!input||typeof input!=='object')return null;
@@ -124,7 +137,7 @@
                 for(const text of label(part.text).split(/\s*[•·]\s*/))if(!published&&publishedPattern.test(text.trim()))published=text.trim();
             }
         }
-        return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,kind==='channel'?8:4),count:kind==='playlist'?playlistCount(value):'',...(kind==='playlist'&&isCourse(value)?{course:true}:{}),published:published.slice(0,100),...(kind==='video'?{...liveState(value),progress:progress(value)}:{})};
+        return {kind,id,href,title,image:avatar,channel,handle,metadata:metadataText.slice(0,kind==='channel'?8:4),count:kind==='playlist'?playlistCount(value):'',...(kind==='playlist'&&isCourse(value)?{course:true}:{}),published:published.slice(0,100),...(kind==='video'?{...liveState(value),progress:progress(value),duration:duration(value)}:{})};
     }
     function collect(root){
         const records=[],filters=[],seen=new Set(),stack=[root];let scans=0;
@@ -136,7 +149,7 @@
         }
         return {records,filters};
     }
-    globalThis.MinimalYouTubeSearchData={progress,label,url,youtube,channelURL,endpoint,image,playlistCount,isCourse,lessonPattern,record,collect,publishedPattern,watchingPattern};
+    globalThis.MinimalYouTubeSearchData={progress,duration,durationPattern,label,url,youtube,channelURL,endpoint,image,playlistCount,isCourse,lessonPattern,record,collect,publishedPattern,watchingPattern};
     // Static MAIN injection also serves the first page after installation,
     // before the background has registered its optional response-pruning hook.
     if(typeof document!=='undefined'&&!globalThis.chrome?.runtime?.id)document.addEventListener('minimal-youtube:search-snapshot',()=>{
