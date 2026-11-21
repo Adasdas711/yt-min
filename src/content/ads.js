@@ -1,5 +1,7 @@
 /* Native ad controls only: no seeking, playback-rate changes, polling or media
-   replacement. Player-response and request filtering run before this fallback. */
+   replacement. Player-response and request filtering run before this fallback.
+   An ad that still shows (server-stitched ads of streams) is muted and its
+   picture hidden until it ends; the viewer's own sound setting returns. */
 (() => {
     "use strict";
     const skipSelector = ".ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, .ytp-ad-skip-button-container button";
@@ -9,7 +11,7 @@
         constructor() {
             this.enabled = false;this.player = null;this.frame = 0;this.clicked = new WeakSet();this.active = false;this.controlsObserved = null;
             this.observer = new MutationObserver(records => {
-                if (!this.showing()) { if (this.active) { this.active = false;this.clicked = new WeakSet(); }this.observeControls(false);return; }
+                if (!this.showing()) { if (this.active) { this.active = false;this.clicked = new WeakSet(); }this.restoreSound();this.observeControls(false);return; }
                 if (!this.controlsObserved) { this.observeControls(true);this.queue();return; }
                 const relevant = records.some(record => record.type === "attributes" ?
                     record.target === this.player || record.target.matches(controls + "," + adParents) || Boolean(record.target.closest(".ytp-ad-skip-button-container")) :
@@ -21,6 +23,16 @@
         showing() { return Boolean(this.enabled && this.player?.isConnected &&
             (this.player.classList.contains("ad-showing") || this.player.classList.contains("ad-interrupting"))); }
         setEnabled(enabled) { this.enabled = enabled;if (!enabled) this.bind(null); }
+        silence() {
+            if (this.silenced || typeof this.player?.mute !== "function") return;
+            this.silenced = this.player;this.wasMuted = Boolean(this.player.isMuted?.());
+            if (!this.wasMuted) this.player.mute();
+        }
+        restoreSound() {
+            const player = this.silenced;if (!player) return;
+            this.silenced = null;
+            if (!this.wasMuted && typeof player.unMute === "function") player.unMute();
+        }
         observeControls(active) {
             if (!this.player || this.controlsObserved === active) return;
             this.observer.disconnect();this.controlsObserved = active;
@@ -33,7 +45,7 @@
         bind(player) {
             if (!this.enabled) player = null;
             if (player === this.player) return;
-            this.observer.disconnect();cancelAnimationFrame(this.frame);this.frame = 0;
+            this.observer.disconnect();cancelAnimationFrame(this.frame);this.frame = 0;this.restoreSound();
             this.player?.removeEventListener("loadedmetadata", this.mediaChanged, true);
             this.player = player;this.clicked = new WeakSet();this.active = false;this.controlsObserved = null;
             if (!player) return;
@@ -48,7 +60,7 @@
         run() {
             this.frame = 0;
             if (!this.showing()) return;
-            this.active = true;
+            this.active = true;this.silence();
             for (const button of this.player.querySelectorAll(skipSelector)) {
                 let visible = !button.disabled && button.getAttribute("aria-disabled") !== "true" &&
                     button.getAttribute("aria-hidden") !== "true" && button.getClientRects().length &&

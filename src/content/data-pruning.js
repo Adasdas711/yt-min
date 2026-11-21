@@ -112,10 +112,17 @@
         const current = get();if (current) set(current);
     }
     const playerAdKeys = ["playerAds", "adPlacements", "adSlots"];
+    // Streams and their recordings carry server-stitched ads (SABR/SSDAI):
+    // the ads are inside the media itself, and a player that does not know
+    // their places stalls on a black, loading screen. Their ad data stays;
+    // ads.js mutes and hides an ad while it shows.
+    let liveContent = false;
     function stripPlayerAds(player) {
         if (!player || typeof player !== "object") return;
         const adResponse = player.responseContext && playerAdKeys.some(key => Array.isArray(player[key]));
         if (!(player.playabilityStatus || player.streamingData || player.videoDetails || adResponse)) return;
+        if (player.videoDetails) liveContent = player.videoDetails.isLiveContent === true || player.videoDetails.isLive === true;
+        if (liveContent) return;
         for (const key of playerAdKeys) if (Object.hasOwn(player, key)) delete player[key];
     }
     function shortItem(item) {
